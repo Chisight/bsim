@@ -49,7 +49,7 @@ const WasmEngine = {
             const ioNodes = lib.nodes.filter(x => x.type.startsWith(isInput ? 'IN-' : 'OUT-') || (isInput && x.type.startsWith('PROBE-')));
             ioNodes.sort((a, b) => a.y - b.y);
             const exactNode = ioNodes.find(x => x.id === portStr);
-            if (exactNode) return { id: `${gid}:${exactNode.id}`, port: isInput ? 'in0' : 'out0' };
+            if (exactNode) return { nodeId: `${gid}:${exactNode.id}`, portId: isInput ? 'in0' : 'out0' };
             const targetIdx = parseInt(portStr.replace(/\D/g, '')) || 0;
             let currentIdx = 0;
             for (const io of ioNodes) {
@@ -57,7 +57,7 @@ const WasmEngine = {
                 if (targetIdx < currentIdx + bits) {
                     const bitOffset = targetIdx - currentIdx;
                     const bIdx = bits > 1 ? (bits - 1 - bitOffset) : 0;
-                    return { id: `${gid}:${io.id}`, port: isInput ? `in${bIdx}` : `out${bIdx}` };
+                    return { nodeId: `${gid}:${io.id}`, portId: isInput ? `in${bIdx}` : `out${bIdx}` };
                 }
                 currentIdx += bits;
             }
