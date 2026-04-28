@@ -14,6 +14,7 @@ const WireRenderer = {
     },
 
     /**
+     * [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for SVG wire layer redraw.
      * @ARCH: UI_RENDERING
      * @IO: SVG_LAYER_MUTATION
      * @INTENT: Main entry point for redrawing the entire SVG wire layer based on current netlist connectivity and signal states.
@@ -84,6 +85,7 @@ const WireRenderer = {
         }
 
         this._renderCrossingMasks(svg);
+        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: SVG wire layer update complete. Rendered ${Sim.wires.length} wires.
     },
 
     /**

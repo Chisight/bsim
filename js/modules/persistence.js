@@ -4,6 +4,7 @@
 const ProjectManager = {
     MigrationEngine: {
         /**
+         * [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for semantic version parsing.
          * @ARCH: VERSION_PARSER
          * @CONSTRAINT: SEMANTIC_VERSIONING
          * @INTENT: Convert semantic version strings into a comparable integer format for migration logic.
@@ -12,6 +13,7 @@ const ProjectManager = {
             if (!vStr) return 0;
             const m = vStr.match(/v?(\d+)\.(\d+)\.(\d+)/);
             if (!m) return 0;
+            // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Version parsed successfully.
             return parseInt(m[1]) * 1000000 + parseInt(m[2]) * 1000 + parseInt(m[3]);
         },
         /**
@@ -91,7 +93,8 @@ const ProjectManager = {
             if (data.library) Object.values(data.library).forEach(chip => fixNetlist(chip.wires, chip.nodes));
 
             if (!data.meta) data.meta = {};
-            data.meta.version = (window.EXPECTED_BSIM_VERSION || "1.23.59") + "-Modular";
+            data.meta.version = (window.EXPECTED_BSIM_VERSION || "1.23.64") + "-Modular";
+            // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Migration complete. Target version: ${data.meta.version}.
             return data;
         },
         /**
@@ -231,6 +234,7 @@ const ProjectManager = {
         document.body.removeChild(a);
         URL.revokeObjectURL(a.href);
         Sim.toast('Project exported successfully.', 'success');
+        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Project serialization and export complete.
     },
 
     /**
@@ -268,6 +272,7 @@ const ProjectManager = {
             reader.readAsText(e.target.files[0]);
         };
         input.click();
+        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Import process initiated via UI file picker.
     },
 
     /**

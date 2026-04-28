@@ -15,6 +15,7 @@
   ;; ATOMIC PRIMITIVE: $nand
   ;; Strict 1-bit: only (1 AND 1) -> 0, everything else -> 1
   ;; -----------------------------------------------------------------------
+  ;; [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for NAND primitive.
   ;; @ARCH: ATOMIC_PRIMITIVE
   ;; @CONSTRAINT: TRUTH_TABLE
   ;; @INTENT: Define the fundamental logical NAND operation as the system's singular primitive.
@@ -50,6 +51,7 @@
   ;; All other gates (NOT, AND, OR, NOR, XOR, XNOR) are decomposed into
   ;; sequences of NAND instructions by the JS bridge before reaching here.
   ;; -----------------------------------------------------------------------
+  ;; [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for Wasm simulation tick.
   ;; @ARCH: CORE_KERNEL
   ;; @CONSTRAINT: LINEAR_EXECUTION
   ;; @INTENT: Main execution loop for redrawing the logical state across all synthesized primitive gates in linear memory.
