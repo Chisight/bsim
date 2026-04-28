@@ -283,6 +283,44 @@ const WasmEngine = {
             if (dIdx.length > 0) this.wireIdxMap.set(i, dIdx[0]);
         });
 
+        // Implement Kahn's Algorithm for Topological Sorting to prevent 
+        // stale evaluation and recursion issues in nested custom chips.
+        let inDegree = new Map();
+        let adjList = new Map();
+        this.flatNodes.forEach(n => { inDegree.set(n.id, 0); adjList.set(n.id, []); });
+
+        this.flatWires.forEach(w => {
+            const u = w.from.nodeId;
+            const v = w.to.nodeId;
+            const toNode = this.flatNodes.find(n => n.id === v);
+            // Sequential elements (DFF/TFF/CLOCK) act as boundaries and break combinatorial cycles
+            const isSequential = toNode && ['DFF', 'TFF', 'CLOCK'].includes(toNode.type);
+            
+            if (adjList.has(u) && adjList.has(v) && !isSequential) {
+                adjList.get(u).push(v);
+                inDegree.set(v, inDegree.get(v) + 1);
+            }
+        });
+
+        let sortedNodes = [];
+        let queue = [];
+        inDegree.forEach((deg, id) => { if (deg === 0) queue.push(id); });
+
+        while (queue.length > 0) {
+            const u = queue.shift();
+            const node = this.flatNodes.find(n => n.id === u);
+            if (node) sortedNodes.push(node);
+            adjList.get(u).forEach(v => {
+                inDegree.set(v, inDegree.get(v) - 1);
+                if (inDegree.get(v) === 0) queue.push(v);
+            });
+        }
+        
+        // Append sequential gates and isolated cyclic nodes safely at the end
+        this.flatNodes.forEach(n => {
+            if (!sortedNodes.some(sn => sn.id === n.id)) sortedNodes.push(n);
+        });
+
         // Helper to emit instructions into Region B
         const emitNAND = (target, a, b) => {
             const baseIdx = this.REGION_B_OFFSET + (this.instructionCount * 4);
@@ -299,7 +337,7 @@ const WasmEngine = {
 
         // After _flattenNetlist, every node is either NAND, a sequential gate,
         // or an IO proxy. No compound gate types should appear here.
-        this.flatNodes.forEach(n => {
+        sortedNodes.forEach(n => {
             const mapped = this.idMap.get(n.id);
             if (Array.isArray(mapped)) return; // multi-bit IO slot, skip
             const t = n.type;

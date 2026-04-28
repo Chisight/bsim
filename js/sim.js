@@ -921,7 +921,7 @@ const Sim = {
                     nVal = { q: inner.state, nq: inner.state === 1 ? 0 : 1 };
                 } else if (inner.type === 'JUNCTION') {
                     nVal = getDrive(inner.id, 'j');
-                } else if (inner.type.startsWith('OUT-')) {
+                } else if (inner.type.startsWith('OUT-') || inner.type.startsWith('PROBE-')) {
                     const bits = parseInt(inner.type.split('-')[1]) || 1;
                     if (bits === 1) {
                         nVal = getDrive(inner.id, 'in0');
@@ -937,7 +937,7 @@ const Sim = {
             if (!changed) break;
         }
         const res = {};
-        meta.nodes.filter(n => n.type.startsWith('OUT-')).forEach(out => res[out.id] = out.val === undefined ? 0 : out.val);
+        meta.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-')).forEach(out => res[out.id] = out.val === undefined ? 0 : out.val);
         if (this.debugToasts) console.debug(`[SimTrace] Sub-Circuit Result: ${typeof chipTypeOrMeta === 'string' ? chipTypeOrMeta : 'Custom'} | Outputs:`, res);
         return res;
     },
