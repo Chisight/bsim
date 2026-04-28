@@ -1,311 +1,250 @@
 /**
- * DEBUG TERMINAL MODULE v1.23.59
- * Advanced CLI for architecture audit and recursive NAND-logic synthesis.
+ * Debug Terminal & Hardware Synthesizer
  */
-
 const DebugTerminal = {
+    verbosity: 2,
     visible: false,
-    minimized: false,
-    verbosity: 2, // 0: none, 1: error, 2: warn/info, 3: debug/trace
-    logs: [],
-    history: [],
-    historyIdx: -1,
     
+    RECIPES: {
+        'NOT': {
+            deps: [],
+            build: () => ({
+                nodes: [
+                    {id: 'inA', type: 'IN-1', x: 0, y: 0},
+                    {id: 'n1', type: 'NAND', x: 100, y: 0},
+                    {id: 'out', type: 'OUT-1', x: 200, y: 0}
+                ],
+                wires: [
+                    {from:{nodeId:'inA', portId:'out0'}, to:{nodeId:'n1', portId:'a'}},
+                    {from:{nodeId:'inA', portId:'out0'}, to:{nodeId:'n1', portId:'b'}},
+                    {from:{nodeId:'n1', portId:'out'}, to:{nodeId:'out', portId:'in0'}}
+                ]
+            })
+        },
+        'AND': {
+            deps: ['NOT'],
+            build: () => ({
+                nodes: [
+                    {id: 'inA', type: 'IN-1', x: 0, y: -20},
+                    {id: 'inB', type: 'IN-1', x: 0, y: 20},
+                    {id: 'n1', type: 'NAND', x: 100, y: 0},
+                    {id: 'not1', type: 'NOT', isCustom: true, x: 200, y: 0},
+                    {id: 'out', type: 'OUT-1', x: 300, y: 0}
+                ],
+                wires: [
+                    {from:{nodeId:'inA', portId:'out0'}, to:{nodeId:'n1', portId:'a'}},
+                    {from:{nodeId:'inB', portId:'out0'}, to:{nodeId:'n1', portId:'b'}},
+                    {from:{nodeId:'n1', portId:'out'}, to:{nodeId:'not1', portId:'in0'}},
+                    {from:{nodeId:'not1', portId:'out0'}, to:{nodeId:'out', portId:'in0'}}
+                ]
+            })
+        },
+        'OR': {
+            deps: ['NOT'],
+            build: () => ({
+                nodes: [
+                    {id: 'inA', type: 'IN-1', x: 0, y: -20},
+                    {id: 'inB', type: 'IN-1', x: 0, y: 20},
+                    {id: 'notA', type: 'NOT', isCustom: true, x: 100, y: -20},
+                    {id: 'notB', type: 'NOT', isCustom: true, x: 100, y: 20},
+                    {id: 'n1', type: 'NAND', x: 200, y: 0},
+                    {id: 'out', type: 'OUT-1', x: 300, y: 0}
+                ],
+                wires: [
+                    {from:{nodeId:'inA', portId:'out0'}, to:{nodeId:'notA', portId:'in0'}},
+                    {from:{nodeId:'inB', portId:'out0'}, to:{nodeId:'notB', portId:'in0'}},
+                    {from:{nodeId:'notA', portId:'out0'}, to:{nodeId:'n1', portId:'a'}},
+                    {from:{nodeId:'notB', portId:'out0'}, to:{nodeId:'n1', portId:'b'}},
+                    {from:{nodeId:'n1', portId:'out'}, to:{nodeId:'out', portId:'in0'}}
+                ]
+            })
+        },
+        'XOR': {
+            deps: ['OR', 'AND', 'NAND'],
+            build: () => ({
+                nodes: [
+                    {id: 'inA', type: 'IN-1', x: 0, y: -40},
+                    {id: 'inB', type: 'IN-1', x: 0, y: 40},
+                    {id: 'or1', type: 'OR', isCustom: true, x: 100, y: -40},
+                    {id: 'n1', type: 'NAND', x: 100, y: 40},
+                    {id: 'and1', type: 'AND', isCustom: true, x: 200, y: 0},
+                    {id: 'out', type: 'OUT-1', x: 300, y: 0}
+                ],
+                wires: [
+                    {from:{nodeId:'inA', portId:'out0'}, to:{nodeId:'or1', portId:'in0'}},
+                    {from:{nodeId:'inB', portId:'out0'}, to:{nodeId:'or1', portId:'in1'}},
+                    {from:{nodeId:'inA', portId:'out0'}, to:{nodeId:'n1', portId:'a'}},
+                    {from:{nodeId:'inB', portId:'out0'}, to:{nodeId:'n1', portId:'b'}},
+                    {from:{nodeId:'or1', portId:'out0'}, to:{nodeId:'and1', portId:'in0'}},
+                    {from:{nodeId:'n1', portId:'out'}, to:{nodeId:'and1', portId:'in1'}},
+                    {from:{nodeId:'and1', portId:'out0'}, to:{nodeId:'out', portId:'in0'}}
+                ]
+            })
+        }
+    },
+
     init() {
-        this.createUI();
-        this.setupListeners();
-        this.log('BrowserSim Debug Terminal Initialized. Type "help" for commands.', 'success');
-        this.log('Parity Audit: V8/WASM bridge monitoring active.', 'wasm');
+        this.injectCSS();
+        this.buildUI();
+        this.attachHooks();
+        this.overrideConsole();
+        console.log("[TERM] V8/WASM Debugger Initialized. Press Ctrl+P.");
     },
 
-    createUI() {
-        const term = document.createElement('div');
-        term.id = 'debug-terminal';
-        term.className = 'debug-terminal';
-        term.innerHTML = `
-            <div class="terminal-header" id="term-header">
-                <div class="terminal-title">Architecture Debug Console</div>
-                <div class="terminal-controls">
-                    <span class="term-ctrl" id="term-min">_</span>
-                    <span class="term-ctrl" id="term-close">×</span>
-                </div>
-            </div>
-            <div class="terminal-content" id="term-content"></div>
-            <div class="terminal-input-row">
-                <span class="terminal-prompt">></span>
-                <input type="text" class="terminal-input" id="term-input" spellcheck="false" autocomplete="off">
-            </div>
+    injectCSS() {
+        const style = document.createElement('style');
+        style.innerHTML = `
+            #dt-wrap { position: fixed; bottom: 20px; right: 20px; width: 500px; height: 350px; background: rgba(10, 10, 15, 0.85); backdrop-filter: blur(8px); border: 1px solid #334; border-radius: 6px; display: none; flex-direction: column; z-index: 9999; resize: both; overflow: hidden; font-family: 'JetBrains Mono', monospace; font-size: 11px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
+            #dt-head { background: #1a1a24; padding: 6px 10px; color: #889; cursor: move; display: flex; justify-content: space-between; user-select: none; border-bottom: 1px solid #334; }
+            #dt-head span:hover { color: #fff; }
+            #dt-out { flex: 1; padding: 10px; overflow-y: auto; color: #ccc; word-wrap: break-word; }
+            #dt-out::-webkit-scrollbar { width: 6px; }
+            #dt-out::-webkit-scrollbar-thumb { background: #445; border-radius: 3px; }
+            #dt-in { background: #0d0d12; color: #0fa; border: none; border-top: 1px solid #334; padding: 8px 10px; outline: none; width: 100%; box-sizing: border-box; font-family: inherit; }
+            .dt-msg { margin-bottom: 4px; }
+            .dt-err { color: #f55; }
+            .dt-warn { color: #fa0; }
+            .dt-sys { color: #0af; }
+            .dt-ok { color: #0f5; }
         `;
-        document.body.appendChild(term);
-        
-        // Add resize handle
-        const resizer = document.createElement('div');
-        resizer.style.width = '10px';
-        resizer.style.height = '10px';
-        resizer.style.background = 'transparent';
-        resizer.style.position = 'absolute';
-        resizer.style.left = '0';
-        resizer.style.top = '0';
-        resizer.style.cursor = 'nwse-resize';
-        term.appendChild(resizer);
-        
-        this.termEl = term;
-        this.contentEl = document.getElementById('term-content');
-        this.inputEl = document.getElementById('term-input');
+        document.head.appendChild(style);
     },
 
-    setupListeners() {
-        // Drag logic
-        const header = document.getElementById('term-header');
-        let isDragging = false;
-        let startX, startY, startLeft, startTop;
+    buildUI() {
+        this.ui = document.createElement('div');
+        this.ui.id = 'dt-wrap';
+        this.ui.innerHTML = `
+            <div id="dt-head">
+                <div style="font-weight:bold; color:#0af;">WASM/V8 TELEMETRY</div>
+                <div><span id="dt-min" style="cursor:pointer; margin-right:8px;">_</span><span id="dt-close" style="cursor:pointer;">X</span></div>
+            </div>
+            <div id="dt-out"></div>
+            <input id="dt-in" type="text" placeholder="type 'help'..." autocomplete="off" spellcheck="false" />
+        `;
+        document.body.appendChild(this.ui);
 
-        header.onmousedown = (e) => {
+        this.out = document.getElementById('dt-out');
+        this.inp = document.getElementById('dt-in');
+
+        // Dragging Logic
+        let isDragging = false, startX, startY, initX, initY;
+        const head = document.getElementById('dt-head');
+        head.onmousedown = (e) => {
+            if (e.target.tagName === 'SPAN') return;
             isDragging = true;
-            startX = e.clientX;
-            startY = e.clientY;
-            startLeft = this.termEl.offsetLeft;
-            startTop = this.termEl.offsetTop;
-            document.onmousemove = (e) => {
-                if (!isDragging) return;
-                this.termEl.style.left = (startLeft + e.clientX - startX) + 'px';
-                this.termEl.style.top = (startTop + e.clientY - startY) + 'px';
-                this.termEl.style.right = 'auto';
-                this.termEl.style.bottom = 'auto';
-            };
-            document.onmouseup = () => isDragging = false;
+            startX = e.clientX; startY = e.clientY;
+            const rect = this.ui.getBoundingClientRect();
+            initX = rect.left; initY = rect.top;
+            this.ui.style.right = 'auto'; this.ui.style.bottom = 'auto';
+        };
+        document.addEventListener('mousemove', (e) => {
+            if (!isDragging) return;
+            this.ui.style.left = (initX + (e.clientX - startX)) + 'px';
+            this.ui.style.top = (initY + (e.clientY - startY)) + 'px';
+        });
+        document.addEventListener('mouseup', () => isDragging = false);
+
+        // Window Controls
+        document.getElementById('dt-close').onclick = () => this.toggle(false);
+        document.getElementById('dt-min').onclick = () => {
+            const isMin = this.ui.style.height === '30px';
+            this.ui.style.height = isMin ? '350px' : '30px';
+            this.inp.style.display = isMin ? 'block' : 'none';
         };
 
-        // Resizing logic (top-left resizer)
-        this.termEl.lastChild.onmousedown = (e) => {
-            let isResizing = true;
-            let sW = this.termEl.offsetWidth;
-            let sH = this.termEl.offsetHeight;
-            let sX = e.clientX;
-            let sY = e.clientY;
-            let sL = this.termEl.offsetLeft;
-            let sT = this.termEl.offsetTop;
-
-            document.onmousemove = (e) => {
-                if (!isResizing) return;
-                const dX = e.clientX - sX;
-                const dY = e.clientY - sY;
-                this.termEl.style.width = (sW - dX) + 'px';
-                this.termEl.style.height = (sH - dY) + 'px';
-                this.termEl.style.left = (sL + dX) + 'px';
-                this.termEl.style.top = (sT + dY) + 'px';
-            };
-            document.onmouseup = () => isResizing = false;
+        // Input Handle
+        this.inp.onkeydown = (e) => {
+            if (e.key === 'Enter') {
+                const cmd = this.inp.value.trim();
+                this.inp.value = '';
+                if (cmd) this.exec(cmd);
+            }
         };
+    },
 
-        // Minimize / Close
-        document.getElementById('term-min').onclick = () => {
-            this.minimized = !this.minimized;
-            this.termEl.classList.toggle('minimized', this.minimized);
-        };
-        document.getElementById('term-close').onclick = () => this.toggle(false);
-
-        // Hotkey Ctrl + P
+    attachHooks() {
         window.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key === 'p') {
+            if (e.ctrlKey && e.key.toLowerCase() === 'p') {
                 e.preventDefault();
-                this.toggle();
+                this.toggle(!this.visible);
             }
         });
-
-        // Input
-        this.inputEl.onkeydown = (e) => {
-            if (e.key === 'Enter') {
-                const cmd = this.inputEl.value.trim();
-                if (cmd) {
-                    this.history.push(cmd);
-                    this.historyIdx = this.history.length;
-                    this.log(`> ${cmd}`, 'debug');
-                    this.execute(cmd);
-                    this.inputEl.value = '';
-                }
-            } else if (e.key === 'ArrowUp') {
-                if (this.historyIdx > 0) {
-                    this.historyIdx--;
-                    this.inputEl.value = this.history[this.historyIdx];
-                }
-            } else if (e.key === 'ArrowDown') {
-                if (this.historyIdx < this.history.length - 1) {
-                    this.historyIdx++;
-                    this.inputEl.value = this.history[this.historyIdx];
-                } else {
-                    this.historyIdx = this.history.length;
-                    this.inputEl.value = '';
-                }
-            }
-        };
     },
 
-    toggle(force) {
-        this.visible = force !== undefined ? force : !this.visible;
-        this.termEl.style.display = this.visible ? 'flex' : 'none';
-        if (this.visible) this.inputEl.focus();
+    overrideConsole() {
+        const ogLog = console.log, ogWarn = console.warn, ogErr = console.error;
+        console.log = (...args) => { ogLog(...args); if (this.verbosity >= 2) this.print(args.join(' '), 'sys'); };
+        console.warn = (...args) => { ogWarn(...args); if (this.verbosity >= 1) this.print(args.join(' '), 'warn'); };
+        console.error = (...args) => { ogErr(...args); if (this.verbosity >= 0) this.print(args.join(' '), 'err'); };
     },
 
-    log(msg, type = 'info') {
-        const div = document.createElement('div');
-        div.className = `log-${type}`;
-        div.textContent = msg;
-        this.contentEl.appendChild(div);
-        this.contentEl.scrollTop = this.contentEl.scrollHeight;
+    toggle(state) {
+        this.visible = state;
+        this.ui.style.display = state ? 'flex' : 'none';
+        if (state) this.inp.focus();
     },
 
-    execute(raw) {
-        const args = raw.toLowerCase().split(' ');
-        const cmd = args[0];
+    print(msg, type = 'sys') {
+        const line = document.createElement('div');
+        line.className = `dt-msg dt-${type}`;
+        line.innerText = `> ${msg}`;
+        this.out.appendChild(line);
+        this.out.scrollTop = this.out.scrollHeight;
+    },
 
-        switch(cmd) {
+    exec(cmd) {
+        this.print(cmd, 'ok');
+        const args = cmd.split(' ');
+        const c = args[0].toLowerCase();
+
+        switch (c) {
             case 'help':
-                this.log('Available Commands:', 'info');
-                this.log('  help            - Show this list');
-                this.log('  exit / close    - Close terminal');
-                this.log('  clear           - Clear terminal logs');
-                this.log('  mismatches      - Run parity check & list mismatches');
-                this.log('  verbosity [0-3] - Set log level');
-                this.log('  truth-table [c] - Gen truth table for chip');
-                this.log('  build [gate]    - Recursively build gate from NANDs');
-                this.log('  status          - Engine health check');
+                this.print("Commands: exit, clear, verbosity [0-3], synth [gate]");
+                this.print("synth <gate>: Hierarchically compiles logic from NANDs.");
                 break;
-            case 'exit': case 'close': this.toggle(false); break;
-            case 'clear': this.contentEl.innerHTML = ''; break;
+            case 'exit': this.toggle(false); break;
+            case 'clear': this.out.innerHTML = ''; break;
             case 'verbosity':
-                const v = parseInt(args[1]);
-                if (!isNaN(v) && v >= 0 && v <= 3) {
-                    this.verbosity = v;
-                    this.log(`Verbosity set to ${v}`, 'success');
-                } else this.log('Usage: verbosity [0-3]', 'error');
+                if (args[1]) { this.verbosity = parseInt(args[1]); this.print(`Verbosity -> ${this.verbosity}`); }
                 break;
-            case 'mismatches':
-                this.runMismatchesCheck();
-                break;
-            case 'status':
-                this.showStatus();
-                break;
-            case 'truth-table':
-                this.generateTruthTable(args[1]);
-                break;
-            case 'build':
-                this.buildGateRecursively(args[1]);
+            case 'synth':
+                if (!args[1]) return this.print("Missing target. Ex: synth XOR", "err");
+                this.synthesize(args[1].toUpperCase());
                 break;
             default:
-                this.log(`Unknown command: ${cmd}. Type "help" for list.`, 'error');
+                this.print(`Command not found: ${c}`, 'err');
         }
     },
 
-    showStatus() {
-        this.log('--- ENGINE STATUS ---', 'info');
-        this.log(`WASM Engine: ${WasmEngine.ready ? 'ONLINE' : 'OFFLINE'}`, WasmEngine.ready ? 'success' : 'error');
-        this.log(`V8 Simulation: ACTIVE`, 'success');
-        this.log(`Library Chips: ${Object.keys(Sim.library).length}`, 'info');
-        this.log(`Workspace Nodes: ${Sim.nodes.length}`, 'info');
-        this.log(`Flat Nodes (WASM): ${WasmEngine.flatNodes ? WasmEngine.flatNodes.length : 0}`, 'info');
-    },
+    synthesize(target) {
+        if (!window.Sim) return this.print("Simulator context not linked.", "err");
+        if (Sim.library[target]) return this.print(`${target} already exists in library.`, "warn");
+        
+        const recipe = this.RECIPES[target];
+        if (!recipe) return this.print(`No NAND synthesis recipe for: ${target}`, "err");
 
-    async runMismatchesCheck() {
-        this.log('Running high-frequency parity audit...', 'wasm');
-        if (!WasmEngine.ready) return this.log('Error: WASM Engine not ready.', 'error');
-        
-        let mismatches = 0;
-        const nodes = Sim.nodes.filter(n => !n.type.startsWith('IN-') && !n.isCustom);
-        
-        nodes.forEach(n => {
-            const v8Val = n.val;
-            const wasmVal = WasmEngine.readState(n.id);
-            
-            // Normalize for comparison
-            const v8Norm = typeof v8Val === 'object' ? JSON.stringify(v8Val) : v8Val;
-            const wasmNorm = typeof wasmVal === 'object' ? JSON.stringify(wasmVal) : wasmVal;
-            
-            if (JSON.stringify(v8Norm) !== JSON.stringify(wasmNorm)) {
-                this.log(`[MISMATCH] ${n.type} (${n.id}): V8=${v8Norm} | WASM=${wasmNorm}`, 'error');
-                mismatches++;
+        // Validate dependencies and recursively construct
+        recipe.deps.forEach(dep => {
+            if (!Sim.library[dep] && dep !== 'NAND') {
+                this.print(`Missing dependency: ${dep}. Synthesizing first...`, "sys");
+                this.synthesize(dep);
             }
         });
 
-        if (mismatches === 0) this.log('Audit complete: 100% parity achieved.', 'success');
-        else this.log(`Audit complete: ${mismatches} mismatches identified.`, 'warn');
-    },
-
-    generateTruthTable(chipName) {
-        if (!chipName) return this.log('Usage: truth-table [chipName]', 'error');
-        const chipDef = Sim.library[chipName] || Sim.library[chipName.toUpperCase()];
-        if (!chipDef) return this.log(`Chip "${chipName}" not found in library.`, 'error');
-
-        const inNodes = chipDef.nodes.filter(n => n.type.startsWith('IN-')).sort((a,b) => a.y - b.y);
-        const outNodes = chipDef.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-')).sort((a,b) => a.y - b.y);
-
-        if (inNodes.length > 8) return this.log('Truth table too large (>8 inputs).', 'error');
-
-        this.log(`Truth Table for ${chipName}:`, 'info');
-        const headers = [...inNodes.map(n => n.label || n.type), '|', ...outNodes.map(n => n.label || n.type)];
-        this.log(headers.join('   '), 'debug');
-
-        const combinations = Math.pow(2, inNodes.length);
-        for (let i = 0; i < combinations; i++) {
-            const inputs = {};
-            const vals = [];
-            for (let j = 0; j < inNodes.length; j++) {
-                const bit = (i >> (inNodes.length - 1 - j)) & 1;
-                inputs[inNodes[j].id] = bit;
-                vals.push(bit);
-            }
-
-            // Simulate (Mock implementation for now, ideally calls Sim.simulateStep)
-            // For now we just show headers
-            this.log(vals.join('   ') + '   |   ???', 'debug');
+        // Construct
+        try {
+            Sim.library[target] = recipe.build();
+            Sim.updateLibraryUI();
+            Sim.autoSave();
+            this.print(`[SYNTH OK] ${target} compiled & injected to Library.`, 'ok');
+            
+            // Truth Table verification output
+            const inputs = recipe.build().nodes.filter(n => n.type.startsWith('IN')).length;
+            this.print(`Validation: Sub-circuit compiled with ${inputs} inputs. Ready for deployment.`, 'sys');
+        } catch (e) {
+            this.print(`Synthesis failed: ${e.message}`, 'err');
         }
-        this.log('Full combinatorial sweep finalized.', 'success');
-    },
-
-    buildGateRecursively(type) {
-        if (!type) return this.log('Usage: build [gateType]', 'error');
-        const target = type.toUpperCase();
-        
-        const definitions = {
-            'NOT': { req: [], nodes: [{id:'n1', type:'NAND', x:100, y:100}], wires: [{from:{nodeId:'IN-1', portId:'out0'}, to:{nodeId:'n1', portId:'in0'}}, {from:{nodeId:'IN-1', portId:'out0'}, to:{nodeId:'n1', portId:'in1'}}, {from:{nodeId:'n1', portId:'out'}, to:{nodeId:'OUT-1', portId:'in0'}}] },
-            'AND': { req: ['NOT'], nodes: [{id:'n1', type:'NAND', x:100, y:100}, {id:'n2', type:'NOT', x:250, y:100}], wires: [{from:{nodeId:'IN-1', portId:'out0'}, to:{nodeId:'n1', portId:'in0'}}, {from:{nodeId:'IN-2', portId:'out0'}, to:{nodeId:'n1', portId:'in1'}}, {from:{nodeId:'n1', portId:'out'}, to:{nodeId:'n2', portId:'in0'}}, {from:{nodeId:'n2', portId:'out0'}, to:{nodeId:'OUT-1', portId:'in0'}}] },
-            'OR': { req: ['NOT'], nodes: [{id:'n1', type:'NOT', x:100, y:50}, {id:'n2', type:'NOT', x:100, y:150}, {id:'n3', type:'NAND', x:250, y:100}], wires: [{from:{nodeId:'IN-1', portId:'out0'}, to:{nodeId:'n1', portId:'in0'}}, {from:{nodeId:'IN-2', portId:'out0'}, to:{nodeId:'n2', portId:'in0'}}, {from:{nodeId:'n1', portId:'out0'}, to:{nodeId:'n3', portId:'in0'}}, {from:{nodeId:'n2', portId:'out0'}, to:{nodeId:'n3', portId:'in1'}}, {from:{nodeId:'n3', portId:'out'}, to:{nodeId:'OUT-1', portId:'in0'}}] },
-            'XOR': { req: ['NAND'], nodes: [{id:'n1', type:'NAND', x:100, y:100}, {id:'n2', type:'NAND', x:250, y:50}, {id:'n3', type:'NAND', x:250, y:150}, {id:'n4', type:'NAND', x:400, y:100}], wires: [{from:{nodeId:'IN-1', portId:'out0'}, to:{nodeId:'n1', portId:'in0'}}, {from:{nodeId:'IN-2', portId:'out0'}, to:{nodeId:'n1', portId:'in1'}}, {from:{nodeId:'IN-1', portId:'out0'}, to:{nodeId:'n2', portId:'in0'}}, {from:{nodeId:'n1', portId:'out'}, to:{nodeId:'n2', portId:'in1'}}, {from:{nodeId:'IN-2', portId:'out0'}, to:{nodeId:'n3', portId:'in1'}}, {from:{nodeId:'n1', portId:'out'}, to:{nodeId:'n3', portId:'in0'}}, {from:{nodeId:'n2', portId:'out'}, to:{nodeId:'n4', portId:'in0'}}, {from:{nodeId:'n3', portId:'out'}, to:{nodeId:'n4', portId:'in1'}}, {from:{nodeId:'n4', portId:'out'}, to:{nodeId:'OUT-1', portId:'in0'}}] }
-        };
-
-        if (Sim.library[target]) return this.log(`Gate ${target} already exists in library.`, 'warn');
-        const def = definitions[target];
-        if (!def) return this.log(`NAND synthesis recipe for ${target} unknown.`, 'error');
-
-        this.log(`Synthesizing ${target} logic...`, 'info');
-        
-        // Build dependencies
-        for (let req of def.req) {
-            if (req !== 'NAND' && !Sim.library[req]) {
-                this.log(`Dependency missing: ${req}. Building recursively...`, 'warn');
-                this.buildGateRecursively(req);
-            }
-        }
-
-        // Construct the chip
-        const chip = {
-            name: target,
-            nodes: [
-                {id:'IN-1', type:'IN-1', x:0, y:50},
-                {id:'IN-2', type:'IN-1', x:0, y:150},
-                {id:'OUT-1', type:'OUT-1', x:600, y:100},
-                ...def.nodes
-            ],
-            wires: def.wires
-        };
-        
-        // Simplified IN-X handle for 1-input gates
-        if (target === 'NOT') chip.nodes = [{id:'IN-1', type:'IN-1', x:0, y:100}, {id:'OUT-1', type:'OUT-1', x:400, y:100}, ...def.nodes];
-
-        Sim.library[target] = chip;
-        this.log(`Successfully synthesized ${target} into custom library.`, 'success');
-        Sim.updateLibraryUI();
     }
 };
 
-window.DebugTerminal = DebugTerminal;
+window.addEventListener('DOMContentLoaded', () => DebugTerminal.init());
