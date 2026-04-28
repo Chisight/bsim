@@ -1,4 +1,4 @@
-# Exit Trace Audit Log (v1.23.68)
+# Exit Trace Audit Log (v1.23.69)
 
 This document maps every logical exit point and function boundary instrumented with high-density `EXIT_TRACE` markers to isolate signal anomalies.
 
@@ -6,16 +6,16 @@ This document maps every logical exit point and function boundary instrumented w
 | Function | Line | Intent |
 | :--- | :--- | :--- |
 | `calculateNextState` | 457 | State calculated for node. |
-| `processQueue` | 473 | Early exit, simulation queue empty. |
-| `processQueue` | 639 | Wasm-accelerated simulation tick complete. |
-| `processQueue` | 728 | V8-based simulation tick complete. |
-| `runWasmParityCheck` | 741 | Diagnostics aborted, Wasm Engine not linked. |
-| `runWasmParityCheck` | 760 | Diagnostics aborted, mixed-mode netlist detected. |
-| `runWasmParityCheck` | 912 | Parity diagnostics suite finalized. |
-| `addNode` | 1072 | Node added to workspace. |
-| `updateNodeVisual` | 1211 | Node visual state synchronized. |
-| `getDrivingSignal` | 1376 | Driver resolution complete (Floating). |
-| `seedQueue` | 1390 | Queue seeded for full propagation sweep. |
+| `processQueue` | 514 | Early exit, simulation queue empty. |
+| `processQueue` | 680 | Wasm-accelerated simulation tick complete. |
+| `processQueue` | 769 | V8-based simulation tick complete. |
+| `runWasmParityCheck` | 782 | Diagnostics aborted, Wasm Engine not linked. |
+| `runWasmParityCheck` | 801 | Diagnostics aborted, mixed-mode netlist detected. |
+| `runWasmParityCheck` | 953 | Parity diagnostics suite finalized. |
+| `addNode` | 1113 | Node added to workspace. |
+| `updateNodeVisual` | 1252 | Node visual state synchronized. |
+| `getDrivingSignal` | 1417 | Driver resolution complete (Floating). |
+| `seedQueue` | 1431 | Queue seeded for full propagation sweep. |
 | `autoSave` | 273 | AutoSave operation finalized. |
 
 ## 2. WebAssembly Bridge (`js/modules/wasm_bridge.js`)

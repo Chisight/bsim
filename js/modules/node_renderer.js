@@ -4,7 +4,7 @@
  */
 const NodeRenderer = {
     /**
-     * [AUDIT: v1.23.68 | SEC_ARCH_LEAD] - Entry trace for node DOM instantiation.
+     * [AUDIT: v1.23.69 | SEC_ARCH_LEAD] - Entry trace for node DOM instantiation.
      * @ARCH: UI_RENDERING
      * @IO: DOM_FACTORY
      * @INTENT: Dynamically generate and inject the HTML/DOM representation for a specific logic node, including its ports and visual labels.
@@ -139,7 +139,7 @@ const NodeRenderer = {
         document.getElementById('scene').appendChild(div);
         if (window.Sim && Sim._domCacheMap) Sim._domCacheMap.delete(node.id);
         Sim.updateNodeVisual(node);
-        // [AUDIT: v1.23.68 | SEC_ARCH_LEAD] - EXIT_TRACE: Node rendered and appended to DOM: ${node.id} (${node.type}).
+        // [AUDIT: v1.23.69 | SEC_ARCH_LEAD] - EXIT_TRACE: Node rendered and appended to DOM: ${node.id} (${node.type}).
     }
 };
 
