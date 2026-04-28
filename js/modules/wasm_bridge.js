@@ -140,6 +140,8 @@ const WasmEngine = {
                 let indices = [];
                 for (let i = 0; i < bits; i++) indices.push(slot++);
                 this.idMap.set(n.id, indices);
+            } else if (n.type === 'DFF' || n.type === 'TFF') {
+                this.idMap.set(n.id, [slot++, slot++]);
             } else {
                 this.idMap.set(n.id, slot++);
             }
@@ -171,6 +173,8 @@ const WasmEngine = {
         const getSpecificIdx = (id, port) => {
             const mapped = this.idMap.get(id);
             if (Array.isArray(mapped)) {
+                if (port === 'q') return mapped[0];
+                if (port === 'nq') return mapped[1];
                 const bit = parseInt(port.replace(/\D/g, '')) || 0;
                 return mapped[bit] !== undefined ? mapped[bit] : mapped[0];
             }
@@ -434,7 +438,9 @@ const WasmEngine = {
                 } else {
                     const state = this.readState(peerNodeId);
                     if (Array.isArray(state)) {
-                        const bitIdx = parseInt(peerPortId.replace(/\D/g, '')) || 0;
+                        let bitIdx = parseInt(peerPortId.replace(/\D/g, '')) || 0;
+                        if (peerPortId === 'q') bitIdx = 0;
+                        if (peerPortId === 'nq') bitIdx = 1;
                         signals.push(state[bitIdx] !== undefined ? state[bitIdx] : 0);
                     } else {
                         signals.push(state !== null ? state : 0);

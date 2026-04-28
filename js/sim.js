@@ -451,8 +451,32 @@ const Sim = {
 
                 // execute high frequency tick based on structural depth ceiling
                 const execDepth = Math.max(20, this.nodes.length);
+                const seqNodes = this.nodes.filter(n => ['DFF', 'TFF', 'TRISTATE'].includes(n.type) && !n.isCustom);
+                
                 for (let i = 0; i < execDepth; i++) {
                     WasmEngine.executeTick();
+                    
+                    if (seqNodes.length > 0) {
+                        seqNodes.forEach(n => {
+                            if (n.type === 'DFF') {
+                                const clk = WasmEngine.readPinState(n.id, 'clk');
+                                const d = WasmEngine.readPinState(n.id, 'd');
+                                if (clk === 1 && n.lastClk === 0) { n.state = d; }
+                                n.lastClk = clk;
+                                WasmEngine.writeState(n.id, [n.state, n.state === 1 ? 0 : 1]);
+                            } else if (n.type === 'TFF') {
+                                const clk = WasmEngine.readPinState(n.id, 'clk');
+                                const t = WasmEngine.readPinState(n.id, 't');
+                                if (clk === 1 && n.lastClk === 0 && t === 1) { n.state = n.state === 1 ? 0 : 1; }
+                                n.lastClk = clk;
+                                WasmEngine.writeState(n.id, [n.state, n.state === 1 ? 0 : 1]);
+                            } else if (n.type === 'TRISTATE') {
+                                const en = WasmEngine.readPinState(n.id, 'en');
+                                const d = WasmEngine.readPinState(n.id, 'in');
+                                WasmEngine.writeState(n.id, en === 1 ? d : 2);
+                            }
+                        });
+                    }
                 }
 
                 // extract Wasm Memory -> DOM Hardware States
@@ -679,7 +703,31 @@ const Sim = {
             });
 
             // 2. Execute Wasm Array for 20 cycles to propagate signals
-            for (let t = 0; t < 20; t++) WasmEngine.executeTick();
+            const seqNodes = this.nodes.filter(n => ['DFF', 'TFF', 'TRISTATE'].includes(n.type) && !n.isCustom);
+            for (let t = 0; t < 20; t++) {
+                WasmEngine.executeTick();
+                if (seqNodes.length > 0) {
+                    seqNodes.forEach(n => {
+                        if (n.type === 'DFF') {
+                            const clk = WasmEngine.readPinState(n.id, 'clk');
+                            const d = WasmEngine.readPinState(n.id, 'd');
+                            if (clk === 1 && n.lastClk === 0) { n.state = d; }
+                            n.lastClk = clk;
+                            WasmEngine.writeState(n.id, [n.state, n.state === 1 ? 0 : 1]);
+                        } else if (n.type === 'TFF') {
+                            const clk = WasmEngine.readPinState(n.id, 'clk');
+                            const t = WasmEngine.readPinState(n.id, 't');
+                            if (clk === 1 && n.lastClk === 0 && t === 1) { n.state = n.state === 1 ? 0 : 1; }
+                            n.lastClk = clk;
+                            WasmEngine.writeState(n.id, [n.state, n.state === 1 ? 0 : 1]);
+                        } else if (n.type === 'TRISTATE') {
+                            const en = WasmEngine.readPinState(n.id, 'en');
+                            const d = WasmEngine.readPinState(n.id, 'in');
+                            WasmEngine.writeState(n.id, en === 1 ? d : 2);
+                        }
+                    });
+                }
+            }
 
             // 3. Execute V8 Object Graph for 20 cycles to propagate signals
             for (let step = 0; step < 20; step++) {
