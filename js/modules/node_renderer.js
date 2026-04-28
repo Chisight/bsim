@@ -71,8 +71,8 @@ const NodeRenderer = {
             } else if (node.isCustom) {
                 const chipDef = Sim.library[node.type];
                 if (chipDef) {
-                    const ins = chipDef.nodes.filter(n => n.type.startsWith('IN-'));
-                    const outs = chipDef.nodes.filter(n => n.type.startsWith('OUT-'));
+                    const ins = chipDef.nodes.filter(n => n.type.startsWith('IN-')).sort((a, b) => a.y - b.y);
+                    const outs = chipDef.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-')).sort((a, b) => a.y - b.y);
                     
                     let totalIns = 0;
                     ins.forEach(n => totalIns += (parseInt(n.type.split('-')[1]) || 1));
