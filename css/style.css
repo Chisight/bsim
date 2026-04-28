@@ -320,3 +320,92 @@ footer::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px
     stroke-linecap: butt;
 }
 
+/* DEBUG TERMINAL v1.23.59 */
+.debug-terminal {
+    position: fixed;
+    bottom: 60px;
+    right: 20px;
+    width: 500px;
+    height: 350px;
+    background: rgba(11, 11, 14, 0.85);
+    backdrop-filter: blur(12px);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    z-index: 9999;
+    display: none;
+    flex-direction: column;
+    box-shadow: 0 20px 50px rgba(0,0,0,0.6);
+    overflow: hidden;
+    user-select: text !important;
+}
+.debug-terminal.minimized {
+    height: 40px !important;
+}
+.terminal-header {
+    background: #1a1a23;
+    padding: 8px 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    cursor: move;
+    border-bottom: 1px solid var(--border);
+    flex-shrink: 0;
+}
+.terminal-title {
+    font-size: 11px;
+    font-weight: 800;
+    color: var(--accent);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    pointer-events: none;
+}
+.terminal-controls {
+    display: flex;
+    gap: 10px;
+}
+.term-ctrl {
+    cursor: pointer;
+    font-size: 14px;
+    color: #667;
+    transition: 0.1s;
+    width: 20px;
+    text-align: center;
+}
+.term-ctrl:hover { color: #fff; }
+
+.terminal-content {
+    flex-grow: 1;
+    padding: 10px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 11px;
+    overflow-y: auto;
+    color: #aaa;
+    line-height: 1.5;
+    background: rgba(0,0,0,0.2);
+}
+.terminal-input-row {
+    display: flex;
+    padding: 8px 12px;
+    background: rgba(0,0,0,0.4);
+    border-top: 1px solid var(--border);
+    flex-shrink: 0;
+}
+.terminal-prompt { color: var(--accent); margin-right: 8px; font-weight: bold; }
+.terminal-input {
+    background: transparent;
+    border: none;
+    color: #fff;
+    font-family: inherit;
+    font-size: inherit;
+    width: 100%;
+    outline: none;
+}
+
+/* Colorized log levels */
+.log-debug { color: #667; }
+.log-info { color: #889; }
+.log-warn { color: #ffca28; }
+.log-error { color: #ff4757; font-weight: bold; }
+.log-success { color: var(--wire-on); }
+.log-wasm { color: #d633ff; }
+.log-v8 { color: #00d2ff; }

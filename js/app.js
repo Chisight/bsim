@@ -10,6 +10,7 @@ window.onload = () => {
     }
 
     Sim.init();
+    if (window.DebugTerminal) DebugTerminal.init();
     InteractionHandler.initMarquee();
     InteractionHandler.initClipboardListeners();
     

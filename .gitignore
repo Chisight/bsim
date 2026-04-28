@@ -27,7 +27,7 @@ Thumbs.db
 *.swp
 *.swo
 *~
-.git/
+.git/*
 
 # Project Specific
 modular_sim_audit_scratchpad.md
