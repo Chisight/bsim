@@ -1177,8 +1177,11 @@ const Sim = {
             const peerNode = this.nodes.find(n => n.id === peerNodeId);
             if (!peerNode) continue;
 
-            const peerEl = document.getElementById(peerNodeId)?.querySelector(`[data-port="${peerPortId}"]`);
-            const isPeerOutput = peerEl?.classList.contains('output') || peerNode.type.startsWith('IN-') || peerNode.type === 'CLOCK';
+            let isPeerOutput = false;
+            if (peerNode.type.startsWith('IN-') || peerNode.type === 'CLOCK') isPeerOutput = true;
+            if (peerNode.isCustom && peerPortId.startsWith('out')) isPeerOutput = true;
+            const NATIVE_GATES = new Set(['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR']);
+            if (NATIVE_GATES.has(peerNode.type) && (peerPortId === 'out' || peerPortId === 'q' || peerPortId === 'nq')) isPeerOutput = true;
 
             if (peerNode.type === 'JUNCTION' || !isPeerOutput) {
                 // Keep tracing laterally across the net

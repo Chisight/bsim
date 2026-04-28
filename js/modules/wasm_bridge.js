@@ -283,23 +283,80 @@ const WasmEngine = {
             if (dIdx.length > 0) this.wireIdxMap.set(i, dIdx[0]);
         });
 
-        // Implement Kahn's Algorithm for Topological Sorting to prevent 
-        // stale evaluation and recursion issues in nested custom chips.
+        // Implement Robust Kahn's Algorithm for Topological Sorting.
+        // Replaces broken wire-direction assumptions with true logical dependency tracing.
         let inDegree = new Map();
         let adjList = new Map();
-        this.flatNodes.forEach(n => { inDegree.set(n.id, 0); adjList.set(n.id, []); });
+        this.flatNodes.forEach(n => { inDegree.set(n.id, 0); adjList.set(n.id, new Set()); });
 
-        this.flatWires.forEach(w => {
-            const u = w.from.nodeId;
-            const v = w.to.nodeId;
-            const toNode = this.flatNodes.find(n => n.id === v);
-            // Sequential elements (DFF/TFF/CLOCK) act as boundaries and break combinatorial cycles
-            const isSequential = toNode && ['DFF', 'TFF', 'CLOCK'].includes(toNode.type);
-            
-            if (adjList.has(u) && adjList.has(v) && !isSequential) {
-                adjList.get(u).push(v);
-                inDegree.set(v, inDegree.get(v) + 1);
+        const findDriverNodes = (startNodeId, startPortId) => {
+            let visited = new Set();
+            let drivers = new Set();
+            const trace = (currNodeId, currPortId) => {
+                const stepKey = currNodeId + ':' + currPortId;
+                if (visited.has(stepKey)) return;
+                visited.add(stepKey);
+
+                const node = this.flatNodes.find(n => n.id === currNodeId);
+                if (!node) return;
+
+                const isInternalIO = (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) && currNodeId.includes(':');
+                const isPassThrough = node.type === 'JUNCTION' || isInternalIO;
+                
+                let isOutput = false;
+                if (node.type === 'CLOCK' && currPortId === 'out0') isOutput = true;
+                const NATIVE_GATES = new Set(['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR']);
+                if (NATIVE_GATES.has(node.type) && (currPortId === 'out' || currPortId === 'q' || currPortId === 'nq')) isOutput = true;
+                if (node.type.startsWith('IN-') && !currNodeId.includes(':')) isOutput = true;
+
+                if (isOutput && !isPassThrough) {
+                    drivers.add(currNodeId);
+                    return;
+                }
+
+                if (isInternalIO) {
+                    const isInputProxy = node.type.startsWith('IN-');
+                    const bIdx = currPortId.replace(/\D/g, '') || '0';
+                    const targetPort = isInputProxy ? `in${bIdx}` : `out${bIdx}`;
+                    const sourcePort = isInputProxy ? `out${bIdx}` : `in${bIdx}`;
+                    if (currPortId === sourcePort) trace(currNodeId, targetPort);
+                    else if (currPortId === targetPort) trace(currNodeId, sourcePort);
+                }
+
+                this.flatWires.forEach(w => {
+                    if (w.to.nodeId === currNodeId && w.to.portId === currPortId) trace(w.from.nodeId, w.from.portId);
+                    else if (w.from.nodeId === currNodeId && w.from.portId === currPortId) trace(w.to.nodeId, w.to.portId);
+                });
+            };
+            trace(startNodeId, startPortId);
+            return Array.from(drivers);
+        };
+
+        this.flatNodes.forEach(receiverNode => {
+            const isSequential = ['DFF', 'TFF', 'CLOCK'].includes(receiverNode.type);
+            if (isSequential) return; // Sequential nodes act as bounds
+            const t = receiverNode.type;
+            let inputPorts = [];
+            if (['NAND', 'AND', 'OR', 'XOR', 'NOR', 'XNOR'].includes(t)) inputPorts = ['a', 'b'];
+            else if (t === 'NOT') inputPorts = ['a'];
+            else if (t === 'TRISTATE') inputPorts = ['in', 'en'];
+            else if (t.startsWith('OUT-') || t.startsWith('PROBE-')) {
+                const bits = parseInt(t.split('-')[1]) || 1;
+                for (let i=0; i<bits; i++) inputPorts.push(`in${i}`);
             }
+
+            inputPorts.forEach(port => {
+                const drivers = findDriverNodes(receiverNode.id, port);
+                drivers.forEach(driverId => {
+                    if (driverId !== receiverNode.id && adjList.has(driverId)) {
+                        const targets = adjList.get(driverId);
+                        if (!targets.has(receiverNode.id)) {
+                            targets.add(receiverNode.id);
+                            inDegree.set(receiverNode.id, inDegree.get(receiverNode.id) + 1);
+                        }
+                    }
+                });
+            });
         });
 
         let sortedNodes = [];
