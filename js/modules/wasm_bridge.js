@@ -572,6 +572,9 @@ const WasmEngine = {
                 if (drv) {
                     targetNodeId = drv.id;
                     targetPortId = drv.port;
+                } else {
+                    // Force ground (0) on unconnected sterile pins to prevent parity drift
+                    return 0; 
                 }
             }
         }

@@ -300,11 +300,9 @@ const Sim = {
                 ext[p.id] = getDriveFn(`in${cIn++}`);
             } else {
                 const arr = new Array(bits).fill(0);
-                // Custom chip renders top (in0) as MSB and bottom as LSB
-                // Internal IN-X nodes store arr[0] as LSB, arr[MSB] as MSB
                 for (let i = 0; i < bits; i++) {
-                    const bIdx = bits - 1 - i;
-                    arr[bIdx] = getDriveFn(`in${cIn++}`);
+                    // Align with internal [0]=LSB convention for consistency
+                    arr[i] = getDriveFn(`in${cIn++}`); 
                 }
                 ext[p.id] = arr;
             }
