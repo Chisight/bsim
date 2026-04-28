@@ -14,19 +14,19 @@ This document details the Modular Runtime Architectural Protocol (MRAP) taxonomy
 ## 1. Simulator Kernel (`js/sim.js`)
 | Location | Tags | Intent |
 | :--- | :--- | :--- |
-| L33 | `@ARCH: KERNEL_ORCHESTRATOR`, `@STATE: SIM_GLOBAL_CONTEXT` | Global singleton management for simulation state, library, and netlist. |
-| L115 | `@IO: WORKSPACE_INITIALIZATION` | Setup global event listeners and DOM state for the simulation session. |
-| L375 | `@ARCH: SIGNAL_RESOLVER`, `@STATE: NODE_UPDATE` | Calculate and propagate logical signals through the netlist graph. |
-| L451 | `@ARCH: SCHEDULER`, `@CONSTRAINT: TIME_STEP_QUANTIZATION` | Manage the discrete time steps and processing queue for the simulation engine. |
-| L223 | `@ARCH: PERSISTENCE_MANAGER`, `@STATE: WORKSPACE_SERIAL` | Periodically synchronize workspace state to local storage. |
+| L36 | `@ARCH: KERNEL_ORCHESTRATOR`, `@IO: WORKSPACE_INITIALIZATION` | Entry trace for simulation kernel bootstrap and global event listeners. |
+| L219 | `@ARCH: PERSISTENCE_MANAGER`, `@STATE: WORKSPACE_SERIAL` | Periodically synchronize current workspace state to local storage. |
+| L379 | `@ARCH: SIGNAL_RESOLVER`, `@STATE: NODE_UPDATE` | Evaluate logical transfer functions and propagate signals through the netlist. |
+| L465 | `@ARCH: SCHEDULER`, `@CONSTRAINT: TIME_STEP_QUANTIZATION` | Orchestrate main simulation loop, delegating to Wasm for native logic blocks. |
+| L732 | `@ARCH: DIAGNOSTIC_ORCHESTRATOR`, `@CONSTRAINT: ENGINE_PARITY` | Stress-test comparison between V8 and Wasm kernels to ensure state parity. |
 
 ## 2. WebAssembly Bridge (`js/modules/wasm_bridge.js`)
 | Location | Tags | Intent |
 | :--- | :--- | :--- |
-| L13 | `@ARCH: KERNEL_LOADER`, `@IO: WASM_FETCH` | Asynchronously initialize the WASM execution environment. |
-| L60 | `@ARCH: NETLIST_EXPANDER`, `@CONSTRAINT: RECURSIVE_RESOLUTION` | Recursively expand hierarchical macros into primitive gates. |
-| L145 | `@ARCH: MEMORY_INITIALIZER`, `@STATE: LINEAR_ALLOCATION` | Synchronize JS object graph with WASM linear memory. |
-| L223 | `@ARCH: SYNC_BRIDGE`, `@IO: WASM_TO_HOST` | Read signal state from Wasm linear memory into the JS host environment. |
+| L13 | `@ARCH: KERNEL_LOADER`, `@IO: WASM_FETCH` | Asynchronously initialize the Wasm execution environment and memory buffer. |
+| L46 | `@ARCH: NETLIST_EXPANDER`, `@CONSTRAINT: RECURSIVE_RESOLUTION` | Recursively expand hierarchical macros into primitive gates for the kernel. |
+| L132 | `@ARCH: SYNC_BRIDGE`, `@STATE: LINEAR_ALLOCATION` | Synchronize the JS object graph with Wasm linear memory (Region A/B). |
+| L583 | `@ARCH: SYNC_BRIDGE`, `@STATE: MEMORY_READBACK` | Retrieve state vectors from Wasm linear memory into the JS host environment. |
 
 ## 3. Storage & Migration (`js/modules/persistence.js`)
 | Location | Tags | Intent |

@@ -5,15 +5,17 @@ This document maps every logical exit point and function boundary instrumented w
 ## 1. Simulation Kernel (`js/sim.js`)
 | Function | Line | Intent |
 | :--- | :--- | :--- |
-| `calculateNextState` | 470 | State calculated for node. |
-| `processQueue` | 733 | Early exit, simulation queue empty. |
-| `processQueue` | 749 | Wasm-accelerated simulation tick complete. |
-| `processQueue` | 896 | V8-based simulation tick complete. |
-| `addNode` | 911 | Node added to workspace. |
-| `updateNodeVisual` | 1030 | Node visual state synchronized. |
-| `getDrivingSignal` | 1211 | Driver resolution complete (Floating). |
-| `seedQueue` | 1257 | Queue seeded for full propagation sweep. |
-| `autoSave` | 1397 | AutoSave operation finalized. |
+| `calculateNextState` | 456 | State calculated for node. |
+| `processQueue` | 472 | Early exit, simulation queue empty. |
+| `processQueue` | 638 | Wasm-accelerated simulation tick complete. |
+| `processQueue` | 727 | V8-based simulation tick complete. |
+| `runWasmParityCheck` | 740 | Diagnostics aborted, Wasm Engine not linked. |
+| `runWasmParityCheck` | 759 | Diagnostics aborted, mixed-mode netlist detected. |
+| `addNode` | 1068 | Node added to workspace. |
+| `updateNodeVisual` | 1207 | Node visual state synchronized. |
+| `getDrivingSignal` | 1372 | Driver resolution complete (Floating). |
+| `seedQueue` | 1386 | Queue seeded for full propagation sweep. |
+| `autoSave` | 273 | AutoSave operation finalized. |
 
 ## 2. WebAssembly Bridge (`js/modules/wasm_bridge.js`)
 | Function | Line | Intent |
