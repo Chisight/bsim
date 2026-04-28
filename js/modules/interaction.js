@@ -538,6 +538,54 @@ const InteractionHandler = {
                 }
             }
         });
+    },
+
+    /**
+     * @IO: SIGNAL_INTERCONNECT
+     * @INTENT: Establish a logical bridge between node ports with strict width parity enforcement.
+     */
+    // [AUDIT: v1.23.62 | SEC_ARCH_LEAD] - Workflow 10: Strict Bus Widths (SBW).
+    createWire(sourceNodeId, sourcePortId, targetNodeId, targetPortId) {
+        const srcNode = Sim.nodes.find(n => n.id === sourceNodeId);
+        const tgtNode = Sim.nodes.find(n => n.id === targetNodeId);
+        
+        if (!srcNode || !tgtNode) return false;
+
+        const getWidth = (node, portId) => {
+            if (node.type.includes('-')) return parseInt(node.type.split('-')[1]) || 1;
+            if (node.isCustom && Sim.library[node.type]) {
+                const lib = Sim.library[node.type];
+                const isIn = portId.startsWith('in');
+                const ioNodes = lib.nodes.filter(x => x.type.startsWith(isIn ? 'IN-' : 'OUT-') || (isIn && x.type.startsWith('PROBE-')));
+                ioNodes.sort((a, b) => a.y - b.y);
+                
+                let bitIdx = 0;
+                for (const io of ioNodes) {
+                    const bits = parseInt(io.type.split('-')[1]) || 1;
+                    const bPref = isIn ? 'in' : 'out';
+                    if (portId === `${bPref}${bitIdx}`) return bits;
+                    bitIdx += bits;
+                }
+            }
+            return 1;
+        };
+
+        const srcWidth = getWidth(srcNode, sourcePortId);
+        const tgtWidth = getWidth(tgtNode, targetPortId);
+
+        if (srcWidth !== tgtWidth) {
+            console.error(`[BUS_WIDTH_MISMATCH] Cannot connect ${srcWidth}-bit output to ${tgtWidth}-bit input.`);
+            throw new Error(`[BUS_WIDTH_MISMATCH] Halting connection to prevent memory boundary overflow.`);
+        }
+
+        const wire = {
+            id: 'wire-' + Math.random().toString(36).substr(2, 9),
+            from: { nodeId: sourceNodeId, portId: sourcePortId },
+            to: { nodeId: targetNodeId, portId: targetPortId }
+        };
+        Sim.wires.push(wire);
+        Sim.updateWireVisuals();
+        return true;
     }
 };
 

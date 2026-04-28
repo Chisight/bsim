@@ -143,6 +143,26 @@ const Analyzer = {
         html += `</div>`;
 
         Sim.modal('Hardware BOM Estimation', html, 'alert');
+    },
+    
+    /**
+     * @ARCH: HIERARCHY_COMPILER
+     * @CONSTRAINT: MAX_DEPTH=256
+     * @INTENT: Flatten nested macro hierarchies into primitive signal nodes with recursion depth safety.
+     */
+    // [AUDIT: v1.23.62 | SEC_ARCH_LEAD] - Workflow 09: Hierarchical Recursion Limits (HRL).
+    flattenHierarchy(node, depth = 0) {
+        if (depth > 256) {
+            console.error(`[FATAL_RECURSION_ERROR] Macro depth exceeded safety limit (MAX_DEPTH=256).`);
+            throw new Error(`[FATAL_RECURSION_ERROR] Halting execution to prevent V8 stack smash.`);
+        }
+        if (!node.isMacro) return [node];
+        
+        let subNodes = [];
+        node.internalNodes.forEach(sub => {
+            subNodes.push(...this.flattenHierarchy(sub, depth + 1));
+        });
+        return subNodes;
     }
 };
 

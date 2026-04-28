@@ -29,8 +29,12 @@ window.onload = () => {
         console.error(`[ModularSim Error] ${msg} at ${url}:${line}`);
     };
     
-    // [AUDIT: v1.23.61 | SEC_ARCH_LEAD] - Semantic version increment for terminal patch.
-    window.LOADED_BSIM_VERSION = "1.23.61";
+    /**
+     * @STATE: BSIM_METADATA
+     * @INTENT: Define the application semantic versioning for runtime compatibility checks.
+     */
+    // [AUDIT: v1.23.62 | SEC_ARCH_LEAD] - Semantic version increment for Zero Trust boundary constraints.
+    window.LOADED_BSIM_VERSION = "1.23.62";
     console.log(`BrowserSim v${window.LOADED_BSIM_VERSION} Modular Professional Initialized.`);
     
     if (window.EXPECTED_BSIM_VERSION && window.EXPECTED_BSIM_VERSION !== window.LOADED_BSIM_VERSION) {
