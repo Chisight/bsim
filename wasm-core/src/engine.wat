@@ -108,8 +108,9 @@
               (else
                 ;; op 1=DFF, 2=CLOCK, 3=TRISTATE, 4=TFF are handled by JS
                 ;; side-effects (they write directly into Region A via writeState).
-                ;; The kernel just passes through the current val_a for these.
-                local.get $val_a
+                ;; The kernel must preserve the current state for these.
+                local.get $target_addr
+                i32.load
               )
             )
             )
