@@ -28,7 +28,7 @@ window.onload = () => {
         console.error(`[ModularSim Error] ${msg} at ${url}:${line}`);
     };
     
-    window.LOADED_BSIM_VERSION = "1.23.55";
+    window.LOADED_BSIM_VERSION = "1.23.56";
     console.log(`BrowserSim v${window.LOADED_BSIM_VERSION} Modular Professional Initialized.`);
     
     if (window.EXPECTED_BSIM_VERSION && window.EXPECTED_BSIM_VERSION !== window.LOADED_BSIM_VERSION) {

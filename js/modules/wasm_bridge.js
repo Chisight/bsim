@@ -170,7 +170,7 @@ const WasmEngine = {
         const OP_BUS_RESOLVE = 11;
 
         let virtualNodeCount = slot + 10;
-        const getSpecificIdx = (id, port) => {
+        this.getSpecificIdx = (id, port) => {
             const mapped = this.idMap.get(id);
             if (Array.isArray(mapped)) {
                 if (port === 'q') return mapped[0];
@@ -191,9 +191,9 @@ const WasmEngine = {
                 const isInternalIO = (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) && nId.includes(':');
                 if (isInternalIO || node.type === 'JUNCTION') return;
                 const NATIVE_GATES = new Set(['NAND', 'DFF', 'CLOCK', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR']);
-                if (node.type === 'CLOCK' && pId === 'out0') drivers.add(getSpecificIdx(nId, pId));
-                if (NATIVE_GATES.has(node.type) && (pId === 'q' || pId === 'nq' || pId === 'out')) drivers.add(getSpecificIdx(nId, pId));
-                if (node.type.startsWith('IN-') && !nId.includes(':')) drivers.add(getSpecificIdx(nId, pId));
+                if (node.type === 'CLOCK' && pId === 'out0') drivers.add(this.getSpecificIdx(nId, pId));
+                if (NATIVE_GATES.has(node.type) && (pId === 'q' || pId === 'nq' || pId === 'out')) drivers.add(this.getSpecificIdx(nId, pId));
+                if (node.type.startsWith('IN-') && !nId.includes(':')) drivers.add(this.getSpecificIdx(nId, pId));
             };
             checkDriver(startNodeId, startPortId);
 
@@ -497,94 +497,64 @@ const WasmEngine = {
         }
     },
 
-    readPinState(nodeId, portId = 'in0') {
-        if (!this.ready || !this.flatNodes || !this.flatWires) return null;
+    readPinState(nodeId, portId) {
+        if (!this.ready || !this.memArray) return null;
+        
+        let targetNodeId = nodeId;
+        let targetPortId = portId;
 
-        if (window.Sim && Sim.nodes.find(n => n.id === nodeId)?.isCustom) {
-            const chipNode = Sim.nodes.find(n => n.id === nodeId);
-            const lib = Sim.library[chipNode.type];
-            const isInput = portId.startsWith('in');
-            const ioNodes = lib.nodes.filter(x => x.type.startsWith(isInput ? 'IN-' : 'OUT-') || (!isInput && x.type.startsWith('PROBE-')));
-            ioNodes.sort((a, b) => a.y - b.y);
-            const targetIdx = parseInt(portId.replace(/\D/g, '')) || 0;
-            let currentIdx = 0;
-            for (const io of ioNodes) {
-                const bits = parseInt(io.type.split('-')[1]) || 1;
-                if (targetIdx < currentIdx + bits) {
-                    const bitOffset = targetIdx - currentIdx;
-                    const bIdx = bits > 1 ? (bits - 1 - bitOffset) : 0;
-                    const innerId = `${nodeId}:${io.id}`;
-                    const state = this.readState(innerId);
-                    if (Array.isArray(state)) return state[bIdx] !== undefined ? state[bIdx] : 0;
-                    return state !== null ? state : 0;
+        // Auto-resolve sterile proxy nodes to their evaluated hardware drivers
+        if (this.flatNodes && this.flatWires) {
+            const startNode = this.flatNodes.find(n => n.id === targetNodeId);
+            if (startNode && (startNode.type.startsWith('OUT-') || startNode.type.startsWith('PROBE-') || startNode.type === 'JUNCTION')) {
+                let visited = new Set();
+                const trace = (cId, cPort) => {
+                    const key = cId + ':' + cPort;
+                    if (visited.has(key)) return null;
+                    visited.add(key);
+                    
+                    const cNode = this.flatNodes.find(n => n.id === cId);
+                    if (!cNode) return null;
+                    
+                    let isDriver = false;
+                    if (cNode.type === 'CLOCK' && cPort === 'out0') isDriver = true;
+                    if (['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR'].includes(cNode.type) && (cPort === 'out' || cPort === 'q' || cPort === 'nq')) isDriver = true;
+                    if (cNode.type.startsWith('IN-') && !cId.includes(':') && cPort.startsWith('out')) isDriver = true; 
+
+                    if (isDriver) return { id: cId, port: cPort };
+
+                    if (cNode.type.startsWith('IN-') || cNode.type.startsWith('OUT-') || cNode.type.startsWith('PROBE-') || cNode.type === 'JUNCTION') {
+                        if (cPort.startsWith('out')) {
+                            const bIdx = cPort.replace(/\D/g, '') || '0';
+                            const nxt = trace(cId, `in${bIdx}`);
+                            if (nxt) return nxt;
+                        }
+                    }
+
+                    for (let w of this.flatWires) {
+                        if (w.to.nodeId === cId && w.to.portId === cPort) {
+                            const nxt = trace(w.from.nodeId, w.from.portId);
+                            if (nxt) return nxt;
+                        } else if (w.from.nodeId === cId && w.from.portId === cPort) {
+                            const nxt = trace(w.to.nodeId, w.to.portId);
+                            if (nxt) return nxt;
+                        }
+                    }
+                    return null;
+                };
+                
+                const startPort = targetPortId.startsWith('out') ? `in${targetPortId.replace(/\D/g, '') || '0'}` : targetPortId;
+                const drv = trace(targetNodeId, startPort);
+                if (drv) {
+                    targetNodeId = drv.id;
+                    targetPortId = drv.port;
                 }
-                currentIdx += bits;
             }
-            return 0;
         }
 
-        let visited = new Set();
-        let signals = [];
-        
-        const trace = (currId, currPort) => {
-            const stepKey = currId + ':' + currPort;
-            if (visited.has(stepKey)) return;
-            visited.add(stepKey);
-
-            const node = this.flatNodes.find(n => n.id === currId);
-            if (!node) return;
-
-            if (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
-                if (currId.includes(':')) {
-                    const bIdx = currPort.replace(/\D/g, '') || '0';
-                    if (currPort.startsWith('out')) trace(currId, `in${bIdx}`);
-                }
-            }
-            
-            const connectedWires = this.flatWires.filter(w => 
-                (w.to.nodeId === currId && w.to.portId === currPort) || 
-                (w.from.nodeId === currId && w.from.portId === currPort)
-            );
-            
-            for (const w of connectedWires) {
-                const peerNodeId = (w.to.nodeId === currId && w.to.portId === currPort) ? w.from.nodeId : w.to.nodeId;
-                const peerPortId = (w.to.nodeId === currId && w.to.portId === currPort) ? w.from.portId : w.to.portId;
-                
-                const peerNode = this.flatNodes.find(n => n.id === peerNodeId);
-                if (!peerNode) continue;
-                
-                const isInternalIO = (peerNode.type.startsWith('IN-') || peerNode.type.startsWith('OUT-') || peerNode.type.startsWith('PROBE-')) && peerNodeId.includes(':');
-                const isPassThrough = peerNode.type === 'JUNCTION' || isInternalIO;
-                
-                const NATIVE_GATES = new Set(['NAND', 'DFF', 'CLOCK', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR']);
-                let isPeerOutput = false;
-                if (peerNode.type === 'CLOCK' && peerPortId === 'out0') isPeerOutput = true;
-                if (NATIVE_GATES.has(peerNode.type) && (peerPortId === 'q' || peerPortId === 'nq' || peerPortId === 'out')) isPeerOutput = true;
-                if (peerNode.type.startsWith('IN-') && !peerNodeId.includes(':')) isPeerOutput = true;
-                
-                if (isPassThrough || !isPeerOutput) {
-                    let nextPort = peerPortId;
-                    if (peerNode.type === 'JUNCTION') nextPort = 'j';
-                    trace(peerNodeId, nextPort);
-                } else {
-                    const state = this.readState(peerNodeId);
-                    if (Array.isArray(state)) {
-                        let bitIdx = parseInt(peerPortId.replace(/\D/g, '')) || 0;
-                        if (peerPortId === 'q') bitIdx = 0;
-                        if (peerPortId === 'nq') bitIdx = 1;
-                        signals.push(state[bitIdx] !== undefined ? state[bitIdx] : 0);
-                    } else {
-                        signals.push(state !== null ? state : 0);
-                    }
-                }
-            }
-        };
-        trace(nodeId, portId);
-        if (signals.length === 0) return this.readState(nodeId) || 0;
-        
-        // Resolve High-Z and contention via last-priority reduction
-        const activeSigs = signals.filter(s => s !== 2 && s !== 'Z');
-        return activeSigs.length > 0 ? activeSigs[0] : 2;
+        let idx = this.getSpecificIdx(targetNodeId, targetPortId);
+        if (idx === undefined) return null;
+        return this.memArray[idx];
     }
 };
 
