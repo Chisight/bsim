@@ -318,12 +318,8 @@ const WasmEngine = {
                 }
 
                 if (isInternalIO) {
-                    const isInputProxy = node.type.startsWith('IN-');
                     const bIdx = currPortId.replace(/\D/g, '') || '0';
-                    const targetPort = isInputProxy ? `in${bIdx}` : `out${bIdx}`;
-                    const sourcePort = isInputProxy ? `out${bIdx}` : `in${bIdx}`;
-                    if (currPortId === sourcePort) trace(currNodeId, targetPort);
-                    else if (currPortId === targetPort) trace(currNodeId, sourcePort);
+                    if (currPortId.startsWith('out')) trace(currNodeId, `in${bIdx}`);
                 }
 
                 this.flatWires.forEach(w => {
@@ -540,16 +536,8 @@ const WasmEngine = {
 
             if (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
                 if (currId.includes(':')) {
-                    const isInputProxy = node.type.startsWith('IN-');
                     const bIdx = currPort.replace(/\D/g, '') || '0';
-                    const targetPort = isInputProxy ? `in${bIdx}` : `out${bIdx}`;
-                    const sourcePort = isInputProxy ? `out${bIdx}` : `in${bIdx}`;
-                    
-                    if (currPort === sourcePort) {
-                        trace(currId, targetPort);
-                    } else if (currPort === targetPort) {
-                        trace(currId, sourcePort);
-                    }
+                    if (currPort.startsWith('out')) trace(currId, `in${bIdx}`);
                 }
             }
             

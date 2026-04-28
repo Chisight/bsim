@@ -1074,7 +1074,20 @@ const Sim = {
             const ports = el.querySelectorAll('.port');
             ports.forEach(p => {
                 const pid = p.dataset.port;
-                const drive = this.getDrivingSignal(n.id, pid);
+                let drive = null;
+                
+                if (pid.startsWith('out')) {
+                    drive = this.getSignal(n.id, pid);
+                } else {
+                    const isPure = this.nodes.every(no => new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']).has(no.type) || no.isCustom);
+                    if (this.useWasm && isPure && window.WasmEngine && WasmEngine.ready) {
+                        drive = WasmEngine.readPinState(n.id, pid);
+                        if (drive === 2) drive = 'Z';
+                    } else {
+                        drive = this.getDrivingSignal(n.id, pid);
+                    }
+                }
+                
                 p.classList.toggle('on', drive === 1);
                 p.classList.toggle('off', drive === 0);
                 p.classList.toggle('float', drive === null || drive === 'Z');
