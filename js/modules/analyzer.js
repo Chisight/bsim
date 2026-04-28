@@ -171,7 +171,7 @@ const Analyzer = {
             subNodes.push(...this.flattenHierarchy(sub, depth + 1));
         });
         return subNodes;
-    }
+    },
     /**
      * @ARCH: PORT_MAPPER
      * @INTENT: Ensure deterministic LSB-to-MSB (0-to-n) port mapping for macro inputs/outputs.
