@@ -21,6 +21,7 @@ const History = {
         if (this.stack.length > this.max) this.stack.shift(); else this.index++;
         this.updateButtons();
         Sim.autoSave();
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Command execution history updated: ${cmd.constructor.name}.
     },
 
     /**
@@ -30,10 +31,14 @@ const History = {
      */
     undo() {
         if (this.index >= 0) {
-            this.stack[this.index].undo();
+            const cmd = this.stack[this.index];
+            cmd.undo();
             this.index--;
             this.updateButtons();
             Sim.autoSave();
+            // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Undo operation finalized for ${cmd.constructor.name}.
+        } else {
+            // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Undo ignored, history stack empty.
         }
     },
 
@@ -45,9 +50,13 @@ const History = {
     redo() {
         if (this.index < this.stack.length - 1) {
             this.index++;
-            this.stack[this.index].do();
+            const cmd = this.stack[this.index];
+            cmd.do();
             this.updateButtons();
             Sim.autoSave();
+            // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Redo operation finalized for ${cmd.constructor.name}.
+        } else {
+            // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Redo ignored, end of stack reached.
         }
     },
 

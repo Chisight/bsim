@@ -466,7 +466,10 @@ const Sim = {
      * @INTENT: Orchestrate the main simulation loop, delegating to Wasm for native logic blocks when possible.
      */
     processQueue() {
-        if (!this.eventQueue || this.eventQueue.size === 0) return;
+        if (!this.eventQueue || this.eventQueue.size === 0) {
+            // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Early exit, simulation queue empty.
+            return;
+        }
 
         // Wasm engine intercept
         if (this.useWasm && window.WasmEngine && WasmEngine.ready) {
@@ -730,7 +733,10 @@ const Sim = {
      */
     async runWasmParityCheck(iterations = 1000) {
         // check if WasmEngine is loaded
-        if (!window.WasmEngine || !WasmEngine.ready) return this.toast('Wasm Engine not linked.', 'danger');
+        if (!window.WasmEngine || !WasmEngine.ready) {
+            // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Diagnostics aborted, Wasm Engine not linked.
+            return this.toast('Wasm Engine not linked.', 'danger');
+        }
         // show toast notification
         this.toast('Diagnostics Running. Press F12 to monitor console.', 'warning');
         // Yield execution to allow the DOM to repaint the toast notification
@@ -746,7 +752,10 @@ const Sim = {
         });
         const isPureNative = checkPure(this.nodes);
         // if not pure native, return toast
-        if (!isPureNative) return this.toast('Parity check requires native logic components only.', 'warning');
+        if (!isPureNative) {
+            // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Diagnostics aborted, mixed-mode netlist detected.
+            return this.toast('Parity check requires native logic components only.', 'warning');
+        }
         // start console group
         console.group(`[Diagnostics] Wasm vs V8 State Parity Sweep (${iterations} Cycles)`);
         // compile netlist
@@ -893,6 +902,7 @@ const Sim = {
         this.toast(passed ? 'Parity Suite: PASSED' : 'Parity Suite: FAILED (Check Console)', passed ? 'success' : 'danger');
         // update wire visuals
         this.updateWireVisuals();
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Parity diagnostics suite finalized. Result: ${passed ? 'PASSED' : 'FAILED'}.
     },
 
     // simulate internal circuit (sub-circuit simulation)
@@ -906,7 +916,10 @@ const Sim = {
         if (this.debugToasts) console.debug(`[SimTrace] Executing Sub-Circuit: ${typeof chipTypeOrMeta === 'string' ? chipTypeOrMeta : 'Custom'} | Inputs:`, externalInputs);
         let meta = typeof chipTypeOrMeta === 'string' ? this.library[chipTypeOrMeta] : chipTypeOrMeta.meta;
         // if meta not found, return
-        if (!meta) return {};
+        if (!meta) {
+            // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Sub-circuit simulation aborted, metadata missing for ${chipTypeOrMeta}.
+            return {};
+        }
 
         // Use a deep copy for simulation to avoid corrupting the library definition
         meta = JSON.parse(JSON.stringify(meta));
@@ -1028,6 +1041,7 @@ const Sim = {
         const res = {};
         meta.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-')).forEach(out => res[out.id] = out.val === undefined ? 0 : out.val);
         if (this.debugToasts) console.debug(`[SimTrace] Sub-Circuit Result: ${typeof chipTypeOrMeta === 'string' ? chipTypeOrMeta : 'Custom'} | Outputs:`, res);
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Sub-simulation complete for ${typeof chipTypeOrMeta === 'string' ? chipTypeOrMeta : 'Custom'}.
         return res;
     },
 
@@ -1047,7 +1061,9 @@ const Sim = {
         }
         if (this.snapNodes) { x = Math.round(x / 20) * 20; y = Math.round(y / 20) * 20; }
         if (this.debugToasts) this.toast(`Added ${type} node`);
-        return this._finalizeAddNode(type, x, y, label || type);
+        const newNode = this._finalizeAddNode(type, x, y, label || type);
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Node added to workspace: ${newNode.id} (${type}).
+        return newNode;
     },
 
     /**
@@ -1066,6 +1082,7 @@ const Sim = {
         const NATIVE_TYPES = new Set(['NAND', 'CLOCK', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'JUNCTION', 'TRISTATE', 'DFF', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR']);
         if (this.library[type] && !NATIVE_TYPES.has(type)) { node.isCustom = true; }
         History.execute(new AddNodeCommand(node));
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Node command dispatched for ${node.id}.
         return node;
     },
 
@@ -1080,6 +1097,7 @@ const Sim = {
             div.style.top = node.y + 'px';
             div.style.transform = 'none';
         }
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: DOM position updated for node ${node.id}.
     },
 
     /**
@@ -1183,6 +1201,7 @@ const Sim = {
         }
 
         if (n._oscillating) el.classList.add('oscillating');
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Node visual state synchronized for ${n.id}.
     },
 
     /**
@@ -1209,6 +1228,8 @@ const Sim = {
             x: (r.left - sr.left + r.width / 2) / View.scale,
             y: (r.top - sr.top + r.height / 2) / View.scale
         };
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Port coordinates resolved for ${nodeId}:${portId}.
+        return coords;
     },
 
     /**
@@ -1255,6 +1276,7 @@ const Sim = {
             this.clearSnapState();
             WireRenderer.drawWires();
         }
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Port interaction state machine cycle complete.
     },
 
     /**
@@ -1395,6 +1417,7 @@ const Sim = {
             this.updateNodeVisual(n);
         });
         this.seedQueue(); this.processQueue();
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Input bit(s) toggled and propagation triggered.
     },
 
     /**

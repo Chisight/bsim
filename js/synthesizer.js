@@ -44,7 +44,7 @@ const LogicSynthesizer = {
         });
 
         console.log(`[DEBUG] Signature map generation complete. Found ${signatures.size} distinct patterns.`);
-        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Signature map generated with ${signatures.size} entries.
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Signature map generated with ${signatures.size} entries.
         return signatures;
     },
 
@@ -58,7 +58,11 @@ const LogicSynthesizer = {
         console.log(`[DEBUG] synthesizeToChip triggered | Inputs: ${inputLabels.length} | Outputs: ${outputsData.length}`);
         Sim.toast('Analyzing truth table...', 'info');
         Sim.modal('Package Synthesized Logic', 'Enter name for custom chip:', 'prompt', (chipName) => {
-            if (!chipName) { console.warn("[DEBUG] Synthesis aborted: No chip name provided."); return; }
+            if (!chipName) { 
+                console.warn("[DEBUG] Synthesis aborted: No chip name provided.");
+                // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Synthesis aborted, missing chip name.
+                return;
+            }
             chipName = chipName.toUpperCase().trim().replace(/\s+/g, '_');
             console.log(`[DEBUG] Starting synthesis for chip: ${chipName}`);
             Sim.toast(`Generating logic for ${chipName}...`, 'success');
@@ -417,7 +421,7 @@ const LogicSynthesizer = {
 
         Sim.seedQueue();
         Sim.wakeQueue();
-        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Logic synthesis finalized and simulation queue re-seeded.
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Logic synthesis finalized and simulation queue re-seeded.
     }
 };
 

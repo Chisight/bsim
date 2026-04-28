@@ -259,7 +259,7 @@ const DebugTerminal = {
             default:
                 this.print(`Command not found: ${c}`, 'err');
         }
-        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Command execution finalized: ${cmd}.
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Command execution finalized: ${cmd}.
     },
 
     /**
@@ -272,7 +272,10 @@ const DebugTerminal = {
         if (Sim.library[target]) return this.print(`${target} already exists in library.`, "warn");
         
         const recipe = this.RECIPES[target];
-        if (!recipe) return this.print(`No NAND synthesis recipe for: ${target}`, "err");
+        if (!recipe) {
+            // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Synthesis aborted, no recipe for ${target}.
+            return this.print(`No NAND synthesis recipe for: ${target}`, "err");
+        }
 
         // Validate dependencies and recursively construct
         recipe.deps.forEach(dep => {
@@ -295,6 +298,7 @@ const DebugTerminal = {
         } catch (e) {
             this.print(`Synthesis failed: ${e.message}`, 'err');
         }
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Synthesis process finalized for ${target}.
     }
 };
 

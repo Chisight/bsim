@@ -16,7 +16,7 @@ const Analyzer = {
         const rawOutNodes = Sim.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-'));
 
         if (rawInNodes.length === 0 || rawOutNodes.length === 0) {
-            // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Truth table generation aborted (missing IO).
+            // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Truth table generation aborted (missing IO).
             return Sim.modal('Error', 'Requires at least 1 IN and 1 OUT/PROBE.', 'alert');
         }
 
@@ -31,7 +31,7 @@ const Analyzer = {
         });
 
         if (totalBits > 8) {
-            // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Truth table generation aborted (bit limit exceeded).
+            // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Truth table generation aborted (bit limit exceeded).
             return Sim.modal('Error', 'Limit 8 input bits total to prevent stack overflow.', 'alert');
         }
 
@@ -111,7 +111,7 @@ const Analyzer = {
 
         // Display diagnostic table
         Sim.modal('Truth Table Analysis', html, 'alert');
-        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Truth table generation complete. Input bits: ${totalBits}.
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Truth table generation complete. Input bits: ${totalBits}.
     },
 
     /**
@@ -160,7 +160,7 @@ const Analyzer = {
         html += `</div>`;
 
         Sim.modal('Hardware BOM Estimation', html, 'alert');
-        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: BOM estimation complete. Total ICs: ${totalICs}.
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: BOM estimation complete. Total ICs: ${totalICs}.
     },
     
     /**
@@ -176,7 +176,7 @@ const Analyzer = {
             throw new Error(`[FATAL_RECURSION_ERROR] Halting execution to prevent V8 stack smash.`);
         }
         if (!node.isMacro) {
-            // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Leaf node reached during flattening: ${node.id}.
+            // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Leaf node reached during flattening: ${node.id}.
             return [node];
         }
         
@@ -184,7 +184,7 @@ const Analyzer = {
         node.internalNodes.forEach(sub => {
             subNodes.push(...this.flattenHierarchy(sub, depth + 1));
         });
-        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Macro flattening complete for ${node.id} at depth ${depth}.
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Macro flattening complete for ${node.id} at depth ${depth}.
         return subNodes;
     },
     /**
@@ -209,7 +209,7 @@ const Analyzer = {
                 }
             }
         });
-        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Port mapping complete for macro ${macroNode.id}.
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Port mapping complete for macro ${macroNode.id}.
         return mapping;
     }
 };

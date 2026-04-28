@@ -11,12 +11,18 @@ const InteractionHandler = {
      */
     handleNodeDrag(e, node, div) {
         console.debug('[DEBUG] Node onmousedown triggered. Node ID:', node.id, '| Button pressed:', e.button);
-        if (e.target.classList.contains('port')) return;
+        if (e.target.classList.contains('port')) {
+            // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Drag aborted, port interaction detected.
+            return;
+        }
         
         if (e.button === 2) { 
             e.preventDefault(); e.stopPropagation();
             const menu = document.getElementById('context-menu');
-            if (!menu) return;
+            if (!menu) {
+                // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Context menu aborted, DOM target missing.
+                return;
+            }
 
             menu.style.display = 'block';
             menu.style.left = e.clientX + 'px';
@@ -31,6 +37,7 @@ const InteractionHandler = {
                 <div class="menu-item ${isNative ? 'disabled' : ''}" ${editAction}>Edit Internals</div>
                 <div class="menu-item danger" onclick="History.execute(new DeleteNodeCommand(Sim.nodes.find(n=>n.id==='${node.id}'))); document.getElementById('context-menu').style.display='none';">Delete</div>
             `;
+            // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Context menu displayed for node ${node.id}.
             return; 
         }
         
@@ -97,6 +104,7 @@ const InteractionHandler = {
             const boundaryMoves = boundaryWires.map(item => ({ wire: item.wire, ox: item.ox, oy: item.oy, nx: undefined, ny: undefined }));
 
             if (moves.length > 0) History.execute(new MoveNodeCommand(moves, [...wMoves, ...boundaryMoves]));
+            // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Node translation finalized. Commands dispatched: ${moves.length}.
         };
         document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp, { once: true });
         // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Node drag lifecycle initialized for ${node.id}.

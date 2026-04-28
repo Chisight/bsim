@@ -33,7 +33,7 @@ const SynthUI = {
         `;
         Sim.modal('Manual Logic Synthesizer [Advanced]', html, 'custom');
         this.render();
-        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Synthesis UI opened and table reset.
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Synthesis UI opened and table reset.
     },
     /**
      * @STATE: SYNTHESIS_STATE
@@ -49,7 +49,7 @@ const SynthUI = {
                 outs: Array(this.state.out).fill(0), visible: true
             });
         }
-        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Truth table state reinitialized for ${this.state.in} inputs.
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Truth table state reinitialized for ${this.state.in} inputs.
     },
     /**
      * @IO: UI_INTERACTION
@@ -92,6 +92,7 @@ const SynthUI = {
                 if (isCovered) this.state.table[j].visible = false;
             }
         }
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Logic folding pass complete.
     },
     /**
      * @IO: UI_RENDERING
@@ -153,7 +154,7 @@ const SynthUI = {
             });
             outputsData.push({ label: this.state.labels.outs[o], truthArray });
         }
-        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Dispatched logic data for synthesis.
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Dispatched logic data for synthesis.
         LogicSynthesizer.synthesizeToChip(outputsData, this.state.labels.ins, "");
     }
 };

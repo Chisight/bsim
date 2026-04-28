@@ -10,9 +10,15 @@ const ProjectManager = {
          * @INTENT: Convert semantic version strings into a comparable integer format for migration logic.
          */
         parseVer(vStr) {
-            if (!vStr) return 0;
+            if (!vStr) {
+                // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Early exit, version string empty.
+                return 0;
+            }
             const m = vStr.match(/v?(\d+)\.(\d+)\.(\d+)/);
-            if (!m) return 0;
+            if (!m) {
+                // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Early exit, version format invalid.
+                return 0;
+            }
             // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Version parsed successfully.
             return parseInt(m[1]) * 1000000 + parseInt(m[2]) * 1000 + parseInt(m[3]);
         },
@@ -22,7 +28,10 @@ const ProjectManager = {
          * @INTENT: Upgrade legacy project schemas to the current runtime standard, including port remapping.
          */
         migrate(data) {
-            if (!data) return data;
+            if (!data) {
+                // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Migration aborted, data payload null.
+                return data;
+            }
             const fileVer = this.parseVer(data.meta?.version || "1.0.0");
 
 
