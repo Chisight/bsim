@@ -9,7 +9,8 @@
   (import "env" "memory" (memory 1))
 
   (global $REGION_A_BASE i32 (i32.const 0))      ;; start of node states
-  (global $REGION_B_BASE i32 (i32.const 16384))  ;; start of instructions
+  ;; [AUDIT: v1.23.70 | SEC_ARCH_LEAD] - Expanded instruction boundary to 1MB to prevent macro flattening overflows.
+  (global $REGION_B_BASE i32 (i32.const 1048576))  ;; start of instructions
 
   ;; -----------------------------------------------------------------------
   ;; ATOMIC PRIMITIVE: $nand

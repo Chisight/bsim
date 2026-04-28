@@ -1,4 +1,4 @@
-# Exit Trace Audit Log (v1.23.69)
+# Exit Trace Audit Log (v1.23.70)
 
 This document maps every logical exit point and function boundary instrumented with high-density `EXIT_TRACE` markers to isolate signal anomalies.
 
@@ -12,10 +12,10 @@ This document maps every logical exit point and function boundary instrumented w
 | `runWasmParityCheck` | 782 | Diagnostics aborted, Wasm Engine not linked. |
 | `runWasmParityCheck` | 801 | Diagnostics aborted, mixed-mode netlist detected. |
 | `runWasmParityCheck` | 953 | Parity diagnostics suite finalized. |
-| `addNode` | 1113 | Node added to workspace. |
-| `updateNodeVisual` | 1252 | Node visual state synchronized. |
-| `getDrivingSignal` | 1417 | Driver resolution complete (Floating). |
-| `seedQueue` | 1431 | Queue seeded for full propagation sweep. |
+| `addNode` | 1118 | Node added to workspace. |
+| `updateNodeVisual` | 1257 | Node visual state synchronized. |
+| `getDrivingSignal` | 1422 | Driver resolution complete (Floating). |
+| `seedQueue` | 1436 | Queue seeded for full propagation sweep. |
 | `autoSave` | 273 | AutoSave operation finalized. |
 
 ## 2. WebAssembly Bridge (`js/modules/wasm_bridge.js`)
