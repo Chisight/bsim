@@ -2,7 +2,7 @@
  * App Main Module
  */
 /**
- * [AUDIT: v1.23.66 | SEC_ARCH_LEAD] - Entry trace for main application bootstrap.
+ * [AUDIT: v1.23.67 | SEC_ARCH_LEAD] - Entry trace for main application bootstrap.
  * @ARCH: APP_INITIALIZER
  * @INTENT: Initialize the simulator, UI components, and global event listeners on window load.
  */
@@ -38,8 +38,8 @@ window.onload = () => {
      * @STATE: BSIM_METADATA
      * @INTENT: Define the application semantic versioning for runtime compatibility checks.
      */
-    // [AUDIT: v1.23.66 | SEC_ARCH_LEAD] - Semantic version increment for memory boundary and diagnostic export parity.
-    window.LOADED_BSIM_VERSION = "1.23.66";
+    // [AUDIT: v1.23.67 | SEC_ARCH_LEAD] - Semantic version increment for main-thread crash resolution during parity execution.
+    window.LOADED_BSIM_VERSION = "1.23.67";
     console.log(`BrowserSim v${window.LOADED_BSIM_VERSION} Modular Professional Initialized.`);
     
     if (window.EXPECTED_BSIM_VERSION && window.EXPECTED_BSIM_VERSION !== window.LOADED_BSIM_VERSION) {
@@ -48,5 +48,5 @@ window.onload = () => {
             Sim.toast(`VERSION MISMATCH: Stale cache detected. Press Ctrl+Shift+R to update.`, 'danger', 0);
         }, 1000);
     }
-    // [AUDIT: v1.23.66 | SEC_ARCH_LEAD] - EXIT_TRACE: Application bootstrap sequence finalized.
+    // [AUDIT: v1.23.67 | SEC_ARCH_LEAD] - EXIT_TRACE: Application bootstrap sequence finalized.
 };
