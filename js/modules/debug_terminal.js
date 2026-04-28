@@ -84,7 +84,7 @@ const DebugTerminal = {
     },
 
     /**
-     * [AUDIT: v1.23.67 | SEC_ARCH_LEAD] - Entry trace for debug terminal bootstrap.
+     * [AUDIT: v1.23.68 | SEC_ARCH_LEAD] - Entry trace for debug terminal bootstrap.
      * @ARCH: APP_INITIALIZER
      * @IO: TERMINAL_BOOT
      * @INTENT: Initialize the debug terminal subsystem, including UI construction and console interception.
@@ -95,7 +95,7 @@ const DebugTerminal = {
         this.attachHooks();
         this.overrideConsole();
         console.log("[TERM] V8/WASM Debugger Initialized. Press Ctrl+P.");
-        // [AUDIT: v1.23.67 | SEC_ARCH_LEAD] - EXIT_TRACE: Debug terminal subsystem operational.
+        // [AUDIT: v1.23.68 | SEC_ARCH_LEAD] - EXIT_TRACE: Debug terminal subsystem operational.
     },
 
     /**
@@ -229,7 +229,7 @@ const DebugTerminal = {
         line.innerText = `> ${msg}`;
         this.out.appendChild(line);
         this.out.scrollTop = this.out.scrollHeight;
-        // [AUDIT: v1.23.67 | SEC_ARCH_LEAD] - EXIT_TRACE: Message appended to terminal buffer.
+        // [AUDIT: v1.23.68 | SEC_ARCH_LEAD] - EXIT_TRACE: Message appended to terminal buffer.
     },
 
     /**
@@ -259,7 +259,7 @@ const DebugTerminal = {
             default:
                 this.print(`Command not found: ${c}`, 'err');
         }
-        // [AUDIT: v1.23.67 | SEC_ARCH_LEAD] - EXIT_TRACE: Command execution finalized: ${cmd}.
+        // [AUDIT: v1.23.68 | SEC_ARCH_LEAD] - EXIT_TRACE: Command execution finalized: ${cmd}.
     },
 
     /**
@@ -273,7 +273,7 @@ const DebugTerminal = {
         
         const recipe = this.RECIPES[target];
         if (!recipe) {
-            // [AUDIT: v1.23.67 | SEC_ARCH_LEAD] - EXIT_TRACE: Synthesis aborted, no recipe for ${target}.
+            // [AUDIT: v1.23.68 | SEC_ARCH_LEAD] - EXIT_TRACE: Synthesis aborted, no recipe for ${target}.
             return this.print(`No NAND synthesis recipe for: ${target}`, "err");
         }
 
@@ -298,7 +298,7 @@ const DebugTerminal = {
         } catch (e) {
             this.print(`Synthesis failed: ${e.message}`, 'err');
         }
-        // [AUDIT: v1.23.67 | SEC_ARCH_LEAD] - EXIT_TRACE: Synthesis process finalized for ${target}.
+        // [AUDIT: v1.23.68 | SEC_ARCH_LEAD] - EXIT_TRACE: Synthesis process finalized for ${target}.
     }
 };
 
