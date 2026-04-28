@@ -338,7 +338,7 @@ const Sim = {
             const ext = this._assembleChipInputs(chipDef, (portId) => this.getDrivingSignal(node.id, portId));
             const internalRes = this.simulateInternalCircuit(node.type, ext);
             node.outputs = this._mapChipOutputs(chipDef, internalRes);
-            return JSON.stringify(node.outputs);
+            return node.outputs;
         }
         // primitive gates
         switch (node.type) {
