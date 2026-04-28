@@ -1,12 +1,12 @@
 /**
- * Logic Analyzer Module v1.23.64 (Modular Professional)
+ * Logic Analyzer Module v1.23.65 (Modular Professional)
  * Handles truth table generation, BOM estimation, and signal tracing.
  */
 const Analyzer = {
     _lastTruthTable: null,
 
     /**
-     * [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for truth table generation.
+     * [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - Entry trace for truth table generation.
      * @ARCH: LOGIC_ANALYZER
      * @IO: TRUTH_TABLE_GEN
      * @INTENT: Exhaustively iterate through all input permutations to generate a deterministic truth table of the current netlist.
@@ -115,7 +115,7 @@ const Analyzer = {
     },
 
     /**
-     * [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for hardware bill-of-materials estimation.
+     * [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - Entry trace for hardware bill-of-materials estimation.
      * @ARCH: HARDWARE_BOM_ANALYZER
      * @IO: HARDWARE_ESTIMATOR
      * @INTENT: Calculate the bill of materials (BOM) based on standard 74-series logic IC capacities.
@@ -164,7 +164,7 @@ const Analyzer = {
     },
     
     /**
-     * [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for recursive hierarchy flattening.
+     * [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - Entry trace for recursive hierarchy flattening.
      * @ARCH: HIERARCHY_COMPILER
      * @CONSTRAINT: MAX_DEPTH=256
      * @INTENT: Flatten nested macro hierarchies into primitive signal nodes with recursion depth safety.
@@ -188,7 +188,7 @@ const Analyzer = {
         return subNodes;
     },
     /**
-     * [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for deterministic port mapping.
+     * [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - Entry trace for deterministic port mapping.
      * @ARCH: PORT_MAPPER
      * @INTENT: Ensure deterministic LSB-to-MSB (0-to-n) port mapping for macro inputs/outputs.
      */

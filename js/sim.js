@@ -33,7 +33,7 @@ const Sim = {
     MAX_TRANSITIONS: 100,
 
     /**
-     * [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for simulation kernel bootstrap.
+     * [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - Entry trace for simulation kernel bootstrap.
      * @ARCH: APP_INITIALIZER
      * @IO: UI_BOOT
      * @INTENT: Initialize simulation kernel, viewport, and global event listeners for the workspace.
@@ -122,7 +122,7 @@ const Sim = {
 
             this.updateWireVisuals();
         });
-        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Simulation kernel initialization complete.
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Simulation kernel initialization complete.
     },
 
     /**
@@ -375,7 +375,7 @@ const Sim = {
     },
 
     /**
-     * [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for logical signal evaluation.
+     * [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - Entry trace for logical signal evaluation.
      * @ARCH: LOGIC_ENGINE
      * @CONSTRAINT: TRUTH_TABLE
      * @STATE: SIGNAL_RESOLUTION
@@ -460,7 +460,7 @@ const Sim = {
     // =========================================================================
 
     /**
-     * [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for simulation tick.
+     * [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - Entry trace for simulation tick.
      * @ARCH: SIMULATION_KERNEL
      * @IO: WASM_INTERCEPT
      * @INTENT: Orchestrate the main simulation loop, delegating to Wasm for native logic blocks when possible.
@@ -633,7 +633,7 @@ const Sim = {
                 WireRenderer.drawWires();
                 // clear the queue
                 this.eventQueue.clear();
-                // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Wasm-accelerated simulation tick complete.
+                // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Wasm-accelerated simulation tick complete.
                 return;
             }
         }
@@ -722,7 +722,7 @@ const Sim = {
         }
         // update HUD
         this.updateHUD();
-        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: V8-based simulation tick complete. Iterations: ${iterations}.
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: V8-based simulation tick complete. Iterations: ${iterations}.
     },
 
     // [wasm] parity check
@@ -1325,7 +1325,7 @@ const Sim = {
     },
 
     /**
-     * [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for driving signal resolution.
+     * [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - Entry trace for driving signal resolution.
      * @ARCH: SIGNAL_RESOLVER
      * @STATE: NETLIST_TRAVERSAL
      * @INTENT: Trace a net backwards to find the driving signal for a given input port.
@@ -1366,12 +1366,12 @@ const Sim = {
                 if (sig !== null) return sig;
             }
         }
-        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Driver resolution complete for ${nodeId}:${portId}. No driver found (Floating).
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Driver resolution complete for ${nodeId}:${portId}. No driver found (Floating).
         return null;
     },
 
     /**
-     * [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for full simulation reset.
+     * [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - Entry trace for full simulation reset.
      * @ARCH: SIMULATION_KERNEL
      * @STATE: SIMULATION_RESET
      * @INTENT: Reset transition histories and force a full-netlist propagation sweep.
@@ -1380,7 +1380,7 @@ const Sim = {
         this._transitions.clear(); 
         this.nodes.forEach(n => { n._oscillating = false; n._forcePropagate = true; }); 
         this.eventQueue = new Set(this.nodes); 
-        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Queue seeded for full propagation sweep.
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Queue seeded for full propagation sweep.
     },
     /**
      * @IO: UI_INTERACTION

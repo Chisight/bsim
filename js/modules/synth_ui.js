@@ -1,7 +1,7 @@
 const SynthUI = {
     state: { in: 3, out: 1, table: [], labels: { ins: [], outs: [] } },
     /**
-     * [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for logic synthesis UI activation.
+     * [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - Entry trace for logic synthesis UI activation.
      * @IO: UI_MODAL
      * @ARCH: SYNTHESIS_UI
      * @INTENT: Open the advanced logic synthesizer modal and initialize the truth table UI.

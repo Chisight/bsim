@@ -5,83 +5,113 @@ This document maps every logical exit point and function boundary instrumented w
 ## 1. Simulation Kernel (`js/sim.js`)
 | Function | Line | Intent |
 | :--- | :--- | :--- |
-| `init` | 125 | Simulation kernel initialization complete. |
-| `autoSave` | 224 | AutoSave deferred (active editing chip detected). |
-| `autoSave` | 255 | AutoSave operation finalized. |
-| `calculateNextState` | 448 | State calculated for node. |
-| `processQueue` | 459 | Early exit, simulation queue empty. |
-| `processQueue` | 628 | Wasm-accelerated simulation tick complete. |
-| `processQueue` | 715 | V8-based simulation tick complete. |
-| `getDrivingSignal` | 1339 | Driver resolution complete (Floating). |
-| `seedQueue` | 1349 | Queue seeded for full propagation sweep. |
-| `uiExitChipEdit` | 2022 | Workspace exit and return to parent. |
+| `calculateNextState` | 470 | State calculated for node. |
+| `processQueue` | 733 | Early exit, simulation queue empty. |
+| `processQueue` | 749 | Wasm-accelerated simulation tick complete. |
+| `processQueue` | 896 | V8-based simulation tick complete. |
+| `addNode` | 911 | Node added to workspace. |
+| `updateNodeVisual` | 1030 | Node visual state synchronized. |
+| `getDrivingSignal` | 1211 | Driver resolution complete (Floating). |
+| `seedQueue` | 1257 | Queue seeded for full propagation sweep. |
+| `autoSave` | 1397 | AutoSave operation finalized. |
 
 ## 2. WebAssembly Bridge (`js/modules/wasm_bridge.js`)
 | Function | Line | Intent |
 | :--- | :--- | :--- |
-| `init` | 47 | WASM kernel successfully linked. |
-| `syncLayout` | 124 | Netlist expansion and address mapping finalized. |
-| `readPinState` | 249 | Signal bit-index resolved from linear memory. |
-| `executeTick` | 543 | Wasm cycle finalized. |
-| `getSpecificIdx` | 694 | Local bit-index resolved from node-relative offset. |
-| `exportMemoryMap` | 741 | Memory map exported to console. |
+| `init` | 42 | Wasm kernel initialization lifecycle termination. |
+| `_flattenNetlist` | 127 | Returning flattened object graph with prefix context. |
+| `syncLayout` | 139 | syncLayout aborted, engine not ready. |
+| `resolveAllDriverIndices` | 258 | Returning drivers for node:port. |
+| `buildBusTree` | 275 | Bus resolution tree built. |
+| `executeTick` | 510 | Early exit, Wasm engine not ready. |
+| `executeTick` | 514 | Wasm tick executed successfully. |
+| `writeState` | 537 | Node state written to Wasm memory. |
+| `readWireState` | 546 | Wire state read failure. |
+| `readWireState` | 549 | Wire state read success. |
+| `getSpecificIdx` | 561 | Mapping failure for node:port. |
+| `getSpecificIdx` | 577 | Linear mapping for node:port. |
+| `readState` | 590 | Read failure for node. |
+| `readState` | 598 | Scalar read success for node. |
+| `readPinState` | 611 | Pin probe failure (system offline). |
+| `readPinState` | 709 | Unconnected sterile pin detected. |
+| `readPinState` | 717 | Pin probe failed (resolution failed). |
+| `readPinState` | 720 | SYNC_BRIDGE pin probe success. |
+| `exportMemoryMap` | 749 | Memory map exported to console. |
 
 ## 3. Analysis Engine (`js/modules/analyzer.js`)
 | Function | Line | Intent |
 | :--- | :--- | :--- |
-| `flattenHierarchy` | 108 | Macro recursion finalized. |
-| `generateTruthTable` | 197 | Truth table generation finalized. |
+| `generateTruthTable` | 19 | Truth table generation aborted (missing IO). |
+| `generateTruthTable` | 114 | Truth table generation complete. |
+| `estimateBOM` | 163 | BOM estimation complete. |
+| `flattenHierarchy` | 179 | Leaf node reached during flattening. |
+| `flattenHierarchy` | 187 | Macro flattening complete. |
+| `mapPorts` | 212 | Port mapping complete for macro. |
 
 ## 4. UI Interaction (`js/modules/interaction.js`)
 | Function | Line | Intent |
 | :--- | :--- | :--- |
-| `injectSignal` | 132 | Signal injection sequence finalized. |
-| `handleNodeDrag` | 617 | UI coordinate synchronization finalized. |
+| `onNodeMouseDown` | 15 | Drag aborted, port interaction detected. |
+| `onNodeContextMenu` | 23 | Context menu aborted, DOM target missing. |
+| `onNodeContextMenu` | 40 | Context menu displayed for node. |
+| `MoveCommand.execute` | 107 | Node translation finalized. |
 
 ## 5. Persistence Layer (`js/modules/persistence.js`)
 | Function | Line | Intent |
 | :--- | :--- | :--- |
-| `MigrationEngine.parseVer` | 16 | Version parsed successfully. |
-| `MigrationEngine.migrate` | 95 | Migration complete. |
-| `exportProject` | 234 | Project serialization complete. |
-| `importProject` | 271 | Import process initiated. |
+| `MigrationEngine.parseVer` | 14 | Early exit, version string empty. |
+| `MigrationEngine.parseVer` | 19 | Early exit, version format invalid. |
+| `MigrationEngine.migrate` | 32 | Migration aborted, data payload null. |
 
 ## 6. Synthesis UI (`js/modules/synth_ui.js`)
 | Function | Line | Intent |
 | :--- | :--- | :--- |
-| `open` | 14 | Synthesis UI opened. |
-| `resetTable` | 50 | Truth table state reinitialized. |
-| `build` | 154 | Dispatched logic data for synthesis. |
+| `open` | 36 | Synthesis UI opened and table reset. |
+| `resetTable` | 52 | Truth table state reinitialized. |
+| `foldLogic` | 95 | Logic folding pass complete. |
+| `build` | 157 | Dispatched logic data for synthesis. |
 
 ## 7. Rendering Pipeline (`js/modules/node_renderer.js` & `js/modules/wire_renderer.js`)
 | Function | Line | Intent |
 | :--- | :--- | :--- |
-| `NodeRenderer.renderNode` | 141 | Node rendered and appended to DOM. |
-| `WireRenderer.drawWires` | 87 | SVG wire layer update complete. |
+| `NodeRenderer.renderNode` | 142 | Node rendered and appended to DOM. |
+| `WireRenderer.drawWires` | 25 | Wire redraw aborted, SVG layer missing. |
+| `WireRenderer.drawWires` | 91 | SVG wire layer update complete. |
 
 ## 8. Logic Synthesis Engine (`js/synthesizer.js`)
 | Function | Line | Intent |
 | :--- | :--- | :--- |
-| `generateSignatureMap` | 46 | Signature map generated. |
-| `synthesize` | 416 | Logic synthesis finalized and simulation queue re-seeded. |
+| `generateSignatureMap` | 47 | Signature map generated. |
+| `synthesizeToChip` | 61 | Synthesis orchestration finalized. |
+| `synthesize` | 425 | Logic synthesis finalized. |
 
 ## 9. App Orchestration & Viewport (`js/app.js`, `js/view.js`)
 | Function | Line | Intent |
 | :--- | :--- | :--- |
-| `window.onload` | 49 | Application bootstrap sequence finalized. |
-| `View.init` | 70 | Viewport event listeners operational. |
-| `View.apply` | 85 | Viewport transformation applied to DOM/SVG. |
+| `window.onload` | 50 | Application bootstrap sequence finalized. |
+| `History.execute` | 16 | History execute sequence finalized. |
+| `History.undo` | 32 | History undo sequence finalized. |
+| `History.redo` | 46 | History redo sequence finalized. |
+| `View.init` | 71 | Viewport event listeners operational. |
+| `View.apply` | 88 | Viewport transformation applied to DOM/SVG. |
 
 ## 10. Interactive Tutorial System (`js/modules/tutorial.js`)
 | Function | Line | Intent |
 | :--- | :--- | :--- |
 | `makeDraggable` | 37 | Tutorial panel made draggable. |
-| `showMenu` | 111 | Tutorial selection menu displayed. |
-| `start` | 120 | Tutorial session initialized. |
-| `quit` | 129 | Tutorial session terminated and panel hidden. |
-| `render` | 140 | Tutorial completion view rendered. |
-| `render` | 157 | Tutorial step rendered. |
-| `checkProgress` | 173 | Tutorial progress check finalized. |
+| `showMenu` | 113 | Tutorial selection menu displayed. |
+| `start` | 124 | Tutorial session initialized. |
+| `quit` | 135 | Tutorial session terminated and panel hidden. |
+| `render` | 148 | Tutorial completion view rendered. |
+| `render` | 166 | Tutorial step rendered. |
+| `checkProgress` | 184 | Tutorial progress check finalized. |
+
+## 11. Debug Terminal (`js/modules/debug_terminal.js`)
+| Function | Line | Intent |
+| :--- | :--- | :--- |
+| `execute` | 262 | Command execution finalized. |
+| `synthesize` | 276 | Synthesis aborted, no recipe. |
+| `synthesize` | 301 | Synthesis process finalized. |
 
 ---
 **Audit Status**: VERIFIED

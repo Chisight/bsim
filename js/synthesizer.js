@@ -1,11 +1,11 @@
 /**
- * Logic Synthesizer v1.23.64 (Modular Professional)
+ * Logic Synthesizer v1.23.65 (Modular Professional)
  * Implements Quine-McCluskey SOP minimization and Parity Extraction.
  * FIXED: Uses only defined library chips and loops for equivalents.
  */
 const LogicSynthesizer = {
     /**
-     * [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for signature map generation.
+     * [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - Entry trace for signature map generation.
      * @ARCH: SYNTHESIS_ANALYZER
      * @STATE: LIBRARY_SIGNATURES
      * @INTENT: Scan the library and native gates to generate unique truth-table signatures for logical matching.
@@ -49,7 +49,7 @@ const LogicSynthesizer = {
     },
 
     /**
-     * [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for chip synthesis orchestration.
+     * [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - Entry trace for chip synthesis orchestration.
      * @ARCH: SYNTHESIS_ORCHESTRATOR
      * @IO: UI_MODAL
      * @INTENT: High-level orchestration for converting a truth table into a named library chip.
@@ -84,7 +84,7 @@ const LogicSynthesizer = {
     },
 
     /**
-     * [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for QM logic minimization.
+     * [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - Entry trace for QM logic minimization.
      * @ARCH: LOGIC_SYNTHESIZER
      * @CONSTRAINT: QUINE_MCCLUSKEY
      * @INTENT: Primary logic synthesis engine using Quine-McCluskey minimization to generate an optimized netlist.

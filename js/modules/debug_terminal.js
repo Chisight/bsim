@@ -84,7 +84,7 @@ const DebugTerminal = {
     },
 
     /**
-     * [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for debug terminal bootstrap.
+     * [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - Entry trace for debug terminal bootstrap.
      * @ARCH: APP_INITIALIZER
      * @IO: TERMINAL_BOOT
      * @INTENT: Initialize the debug terminal subsystem, including UI construction and console interception.
@@ -95,7 +95,7 @@ const DebugTerminal = {
         this.attachHooks();
         this.overrideConsole();
         console.log("[TERM] V8/WASM Debugger Initialized. Press Ctrl+P.");
-        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Debug terminal subsystem operational.
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Debug terminal subsystem operational.
     },
 
     /**
@@ -229,7 +229,7 @@ const DebugTerminal = {
         line.innerText = `> ${msg}`;
         this.out.appendChild(line);
         this.out.scrollTop = this.out.scrollHeight;
-        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Message appended to terminal buffer.
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Message appended to terminal buffer.
     },
 
     /**
