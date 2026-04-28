@@ -194,17 +194,17 @@ const WasmEngine = {
                 const node = this.flatNodes.find(n => n.id === currNodeId);
                 if (!node) return;
 
+                // [AUDIT: v1.23.60 | SEC_ARCH_LEAD] - Standardize proxy port mapping for hierarchical netlist traversal.
                 if (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
                     if (currNodeId.includes(':')) {
                         const isInputProxy = node.type.startsWith('IN-');
-                        const bIdx = currPortId.replace(/\D/g, '') || '0';
-                        const targetPort = isInputProxy ? `in${bIdx}` : `out${bIdx}`;
-                        const sourcePort = isInputProxy ? `out${bIdx}` : `in${bIdx}`;
-                        
-                        if (currPortId === sourcePort) {
-                            trace(currNodeId, targetPort);
-                        } else if (currPortId === targetPort) {
-                            trace(currNodeId, sourcePort);
+                        const num = currPortId.replace(/\D/g, '') || '0';
+                        if (isInputProxy) {
+                            if (currPortId.startsWith('out')) trace(currNodeId, `in${num}`);
+                            else if (currPortId.startsWith('in')) trace(currNodeId, node.type === 'IN-1' ? 'out' : `out${num}`);
+                        } else {
+                            if (currPortId.startsWith('in')) trace(currNodeId, `out${num}`);
+                            else if (currPortId.startsWith('out')) trace(currNodeId, `in${num}`);
                         }
                     }
                 }
@@ -306,9 +306,17 @@ const WasmEngine = {
                     return;
                 }
 
+                // [AUDIT: v1.23.60 | SEC_ARCH_LEAD] - Unified proxy port mapping for internal IO nodes.
                 if (isInternalIO) {
-                    const bIdx = currPortId.replace(/\D/g, '') || '0';
-                    if (currPortId.startsWith('out')) trace(currNodeId, `in${bIdx}`);
+                    const isInputProxy = node.type.startsWith('IN-');
+                    const num = currPortId.replace(/\D/g, '') || '0';
+                    if (isInputProxy) {
+                        if (currPortId.startsWith('out')) trace(currNodeId, `in${num}`);
+                        else if (currPortId.startsWith('in')) trace(currNodeId, node.type === 'IN-1' ? 'out' : `out${num}`);
+                    } else {
+                        if (currPortId.startsWith('in')) trace(currNodeId, `out${num}`);
+                        else if (currPortId.startsWith('out')) trace(currNodeId, `in${num}`);
+                    }
                 }
 
                 this.flatWires.forEach(w => {
@@ -548,11 +556,31 @@ const WasmEngine = {
 
                     if (isDriver) return { id: cId, port: cPort };
 
+                    // [AUDIT: v1.23.60 | SEC_ARCH_LEAD] - Handle junction and multi-bit proxy port unwinding.
                     if (cNode.type.startsWith('IN-') || cNode.type.startsWith('OUT-') || cNode.type.startsWith('PROBE-') || cNode.type === 'JUNCTION') {
-                        if (cPort.startsWith('out')) {
-                            const bIdx = cPort.replace(/\D/g, '') || '0';
-                            const nxt = trace(cId, `in${bIdx}`);
+                        if (cNode.type === 'JUNCTION') {
+                            const nxt = trace(cId, 'j');
                             if (nxt) return nxt;
+                        } else {
+                            const isInputProxy = cNode.type.startsWith('IN-');
+                            const num = cPort.replace(/\D/g, '') || '0';
+                            if (isInputProxy) {
+                                if (cPort.startsWith('out')) {
+                                    const nxt = trace(cId, `in${num}`);
+                                    if (nxt) return nxt;
+                                } else if (cPort.startsWith('in')) {
+                                    const nxt = trace(cId, cNode.type === 'IN-1' ? 'out' : `out${num}`);
+                                    if (nxt) return nxt;
+                                }
+                            } else {
+                                if (cPort.startsWith('out')) {
+                                    const nxt = trace(cId, `in${num}`);
+                                    if (nxt) return nxt;
+                                } else if (cPort.startsWith('in')) {
+                                    const nxt = trace(cId, `out${num}`);
+                                    if (nxt) return nxt;
+                                }
+                            }
                         }
                     }
 
