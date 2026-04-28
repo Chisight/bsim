@@ -9,6 +9,11 @@ const WasmEngine = {
     flatNodes: [],
     flatWires: [],
 
+    /**
+     * @ARCH: KERNEL_LOADER
+     * @IO: WASM_FETCH
+     * @INTENT: Asynchronously initialize the WebAssembly execution environment and linear memory buffer.
+     */
     async init() {
         try {
             const response = await fetch('js/wasm-bin/engine.wasm');
@@ -35,6 +40,11 @@ const WasmEngine = {
         }
     },
 
+    /**
+     * @ARCH: NETLIST_EXPANDER
+     * @CONSTRAINT: RECURSIVE_RESOLUTION
+     * @INTENT: Recursively expand hierarchical macros into primitive gates for the linear execution kernel.
+     */
     _flattenNetlist(nodes, wires, prefix = "") {
         // Kernel primitives: pass through without expansion.
         // EVERYTHING else is expanded via Sim.library (user-defined chips).
@@ -113,6 +123,11 @@ const WasmEngine = {
         return { nodes: fNodes, wires: fWires };
     },
 
+    /**
+     * @ARCH: MEMORY_INITIALIZER
+     * @STATE: LINEAR_ALLOCATION
+     * @INTENT: Synchronize the JS object graph with Wasm linear memory, assigning static slots and building instructions.
+     */
     syncLayout(nodes, wires) {
         if (!this.ready) return;
         const flattened = this._flattenNetlist(nodes, wires);
@@ -170,6 +185,11 @@ const WasmEngine = {
         const OP_BUS_RESOLVE = 11;
 
         let virtualNodeCount = slot + 10;
+        /**
+         * @ARCH: SIGNAL_RESOLVER
+         * @STATE: DRIVER_GRAPH
+         * @INTENT: Perform a deep-search through the netlist to identify all logical drivers for a specific port.
+         */
         const resolveAllDriverIndices = (startNodeId, startPortId) => {
             let visited = new Set();
             let drivers = new Set();
@@ -195,15 +215,20 @@ const WasmEngine = {
                 if (!node) return;
 
                 // [AUDIT: v1.23.60 | SEC_ARCH_LEAD] - Standardize proxy port mapping for hierarchical netlist traversal.
+                // [AUDIT: v1.23.63 | SEC_ARCH_LEAD] - Correct bit-order and hierarchical port resolution for bus proxies.
                 if (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
                     if (currNodeId.includes(':')) {
                         const isInputProxy = node.type.startsWith('IN-');
-                        const num = currPortId.replace(/\D/g, '') || '0';
+                        const num = currPortId.match(/\d+/) ? currPortId.match(/\d+/)[0] : '0';
+                        const parentId = currNodeId.substring(0, currNodeId.lastIndexOf(':'));
+                        
                         if (isInputProxy) {
-                            if (currPortId.startsWith('out')) trace(currNodeId, `in${num}`);
+                            // IN-n: outX (internal) maps to parent macro inX (external)
+                            if (currPortId.startsWith('out')) trace(parentId, `in${num}`);
                             else if (currPortId.startsWith('in')) trace(currNodeId, node.type === 'IN-1' ? 'out' : `out${num}`);
                         } else {
-                            if (currPortId.startsWith('in')) trace(currNodeId, `out${num}`);
+                            // OUT-n: inX (internal) maps to parent macro outX (external)
+                            if (currPortId.startsWith('in')) trace(parentId, `out${num}`);
                             else if (currPortId.startsWith('out')) trace(currNodeId, `in${num}`);
                         }
                     }
@@ -461,11 +486,21 @@ const WasmEngine = {
         console.log(`[WasmEngine] Optimized execution graph built with ${this.instructionCount} instructions.`);
     },
 
+    /**
+     * @IO: KERNEL_STEP
+     * @CONSTRAINT: DETERMINISTIC_TICK
+     * @INTENT: Trigger a single simulation cycle in the Wasm engine.
+     */
     executeTick() {
         if (!this.ready || !this.instance) return;
         this.instance.exports.tick(this.instructionCount);
     },
 
+    /**
+     * @STATE: MEMORY_UPDATE
+     * @IO: HOST_TO_WASM
+     * @INTENT: Write external signal values (user inputs, clocks) into Wasm linear memory.
+     */
     writeState(nodeId, value) {
         if (!this.ready) return;
         const mapped = this.idMap.get(nodeId);
@@ -506,6 +541,11 @@ const WasmEngine = {
         }
     },
 
+    /**
+     * @IO: SIGNAL_PROBE
+     * @ARCH: HIERARCHY_PROBE
+     * @INTENT: Probe a specific pin state, resolving through hierarchical proxy nodes to find the physical driver.
+     */
     readPinState(nodeId, portId) {
         if (!this.ready || !this.memArray) return null;
         
