@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>BrowserSim v1.23.45 - Modular Professional Simulator</title>
+    <link rel="stylesheet" href="css/style.css">
+    <script>window.EXPECTED_BSIM_VERSION = "1.23.45";</script>
+</head>
+
+<body oncontextmenu="return false;">
+    <nav>
+        <div class="nav-brand">BrowserSim <span style="font-size:10px; color:var(--wire-on)">v1.23.45</span></div>
+        <span onclick="Sim.uiNewProject()">New Project</span>
+        <span onclick="Sim.uiNewChip()">New Chip</span>
+
+        <div style="position:relative; display:inline-block;">
+            <span
+                onclick="document.getElementById('export-proj-menu').style.display = document.getElementById('export-proj-menu').style.display === 'none' ? 'flex' : 'none'">Export</span>
+            <div id="export-proj-menu"
+                style="display:none; position:absolute; top:35px; left:0; background:var(--panel); border:1px solid var(--border); padding:8px; border-radius:6px; z-index:2000; gap:8px; align-items:center; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+                <input type="text" id="export-proj-name" placeholder="Project Name" class="ui-input"
+                    style="margin:0; padding:6px; font-size:12px; width:140px;"
+                    onkeydown="if(event.key==='Enter') { ProjectManager.exportProject(document.getElementById('export-proj-name').value); document.getElementById('export-proj-menu').style.display='none'; }">
+                <button class="ui-btn primary" style="padding:6px 12px; font-size:12px;"
+                    onclick="ProjectManager.exportProject(document.getElementById('export-proj-name').value); document.getElementById('export-proj-menu').style.display='none';">Save</button>
+            </div>
+        </div>
+
+        <div style="position:relative; display:inline-block;">
+            <span
+                onclick="document.getElementById('export-img-menu').style.display = document.getElementById('export-img-menu').style.display === 'none' ? 'flex' : 'none'">Image</span>
+            <div id="export-img-menu"
+                style="display:none; position:absolute; top:35px; left:0; background:var(--panel); border:1px solid var(--border); padding:8px; border-radius:6px; z-index:2000; gap:8px; align-items:center; box-shadow: 0 10px 25px rgba(0,0,0,0.5);">
+                <input type="text" id="export-img-name" placeholder="Image Name" class="ui-input"
+                    style="margin:0; padding:6px; font-size:12px; width:140px;"
+                    onkeydown="if(event.key==='Enter') { ProjectManager.exportImage(document.getElementById('export-img-name').value); document.getElementById('export-img-menu').style.display='none'; }">
+                <button class="ui-btn primary" style="padding:6px 12px; font-size:12px;"
+                    onclick="ProjectManager.exportImage(document.getElementById('export-img-name').value); document.getElementById('export-img-menu').style.display='none';">Save</button>
+            </div>
+        </div>
+
+        <span onclick="ProjectManager.importProject()">Load</span>
+        <div style="width:1px; height:15px; background:var(--border); margin:0 5px;"></div>
+        <span id="btn-undo" class="disabled" onclick="History.undo()">Undo</span>
+        <span id="btn-redo" class="disabled" onclick="History.redo()">Redo</span>
+        <div style="width:1px; height:15px; background:var(--border); margin:0 5px;"></div>
+        <span onclick="Sim.uiSaveAsGate()" style="color:var(--wire-on); font-weight:bold;">Save Chip</span>
+        <span onclick="Analyzer.generateTruthTable()" style="color:var(--wire-on)">Logic Table</span>
+        <span onclick="SynthUI.open()" style="color:#a855f7; font-weight:bold;">Synthesize</span>
+        <!-- Parity Diagnostics -->
+        <span onclick="Sim.runWasmParityCheck()" style="color:#ffca28; font-weight:bold;">Parity Diagnostics</span>
+        <span onclick="Analyzer.generateBOM()">Hardware BOM</span>
+        <div style="flex-grow:1"></div>
+        <span onclick="TutorialEngine.showMenu()" style="color:#00ffaa; font-weight:bold;">Instructor</span>
+        <span id="btn-exit-chip" style="display:none; color:#fbbf24; font-weight:bold"
+            onclick="Sim.uiExitChipEdit()">Exit Chip Edit</span>
+        <span onclick="Sim.showPrefs()">Preferences</span>
+        <span onclick="Sim.uiQuit()" style="color:#ff6b6b">Quit</span>
+    </nav>
+
+    <div id="main">
+        <div id="workspace">
+            <div id="grid-layer"></div>
+            <div id="scene"></div>
+            <svg id="svg-layer"></svg>
+        </div>
+    </div>
+
+    <footer>
+        <div id="chip-lib" style="display:flex; gap:10px; flex-grow:1; align-items:center;">
+            <span class="status-chip" onclick="Sim.addNode('NAND')">NAND</span>
+        </div>
+    </footer>
+
+    <!-- Overlay / Modal -->
+    <div id="ui-overlay">
+        <div class="ui-modal" id="modal-body">
+            <h3 id="ui-title">Title</h3>
+            <p id="ui-msg" style="font-size:14px; color:#aaa; margin-bottom:25px; line-height:1.6"></p>
+            <div id="ui-input-container">
+                <input type="text" id="ui-input-el" class="ui-input" spellcheck="false" autocomplete="off">
+            </div>
+            <div class="ui-actions" id="ui-buttons" style="display:flex; gap:12px; justify-content:flex-end"></div>
+        </div>
+    </div>
+
+    <!-- Floating UI Panels -->
+    <div id="tutorial-panel"
+        style="position:fixed; bottom:60px; right:20px; background:var(--panel); border:1px solid var(--border); padding:20px; border-radius:12px; width:300px; display:none; z-index:2000;">
+    </div>
+
+    <!-- Core Modules -->
+    <script src="js/history.js"></script>
+    <script src="js/view.js"></script>
+
+    <!-- Analysis & Project Modules -->
+    <script src="js/modules/persistence.js"></script>
+    <script src="js/modules/analyzer.js"></script>
+    <script src="js/modules/node_renderer.js"></script>
+    <script src="js/modules/wire_renderer.js"></script>
+    <!-- wasm bridge -->
+    <script type="module">
+        import WasmEngine from './js/modules/wasm_bridge.js';
+        window.WasmEngine = WasmEngine; // Expose to global scope for dev console access
+        WasmEngine.init();
+    </script>
+
+    <script src="js/modules/interaction.js"></script>
+    <script src="js/modules/tutorial.js"></script>
+    <script src="js/modules/synth_ui.js"></script>
+
+    <!-- Core Engine -->
+    <script src="js/synthesizer.js"></script>
+    <script src="js/sim.js"></script>
+    <script src="js/app.js"></script>
+</body>
+
+</html>
