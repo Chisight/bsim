@@ -3,6 +3,11 @@
  * Handles drawing of gates, ports, and visual labels.
  */
 const NodeRenderer = {
+    /**
+     * @ARCH: UI_RENDERING
+     * @IO: DOM_FACTORY
+     * @INTENT: Dynamically generate and inject the HTML/DOM representation for a specific logic node, including its ports and visual labels.
+     */
     renderNode(node) {
         const div = document.createElement('div');
         div.id = node.id; 

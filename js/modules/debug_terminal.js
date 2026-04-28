@@ -83,6 +83,11 @@ const DebugTerminal = {
         }
     },
 
+    /**
+     * @ARCH: APP_INITIALIZER
+     * @IO: TERMINAL_BOOT
+     * @INTENT: Initialize the debug terminal subsystem, including UI construction and console interception.
+     */
     init() {
         this.injectCSS();
         this.buildUI();
@@ -91,6 +96,10 @@ const DebugTerminal = {
         console.log("[TERM] V8/WASM Debugger Initialized. Press Ctrl+P.");
     },
 
+    /**
+     * @ARCH: UI_STYLING
+     * @INTENT: Inject terminal-specific CSS into the document head for the telemetry interface.
+     */
     injectCSS() {
         const style = document.createElement('style');
         style.innerHTML = `
@@ -110,6 +119,11 @@ const DebugTerminal = {
         document.head.appendChild(style);
     },
 
+    /**
+     * @IO: UI_INTERACTION
+     * @STATE: TERMINAL_STATE
+     * @INTENT: Build the terminal DOM elements and attach dragging/resize event listeners.
+     */
     buildUI() {
         this.ui = document.createElement('div');
         this.ui.id = 'dt-wrap';
@@ -168,6 +182,10 @@ const DebugTerminal = {
         };
     },
 
+    /**
+     * @IO: KEYBOARD_INTERACTION
+     * @INTENT: Attach global keyboard shortcuts (e.g., Ctrl+P) to toggle terminal visibility.
+     */
     attachHooks() {
         window.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.key.toLowerCase() === 'p') {
@@ -177,6 +195,11 @@ const DebugTerminal = {
         });
     },
 
+    /**
+     * @ARCH: LOGGING_INTERCEPTOR
+     * @IO: TELEMETRY
+     * @INTENT: Redirect standard console methods to the terminal output buffer for in-app debugging.
+     */
     overrideConsole() {
         const ogLog = console.log, ogWarn = console.warn, ogErr = console.error;
         console.log = (...args) => { ogLog(...args); if (this.verbosity >= 2) this.print(args.join(' '), 'sys'); };
@@ -184,12 +207,20 @@ const DebugTerminal = {
         console.error = (...args) => { ogErr(...args); if (this.verbosity >= 0) this.print(args.join(' '), 'err'); };
     },
 
+    /**
+     * @STATE: TERMINAL_VISIBILITY
+     * @INTENT: Toggle the display state of the debug terminal and manage focus transitions.
+     */
     toggle(state) {
         this.visible = state;
         this.ui.style.display = state ? 'flex' : 'none';
         if (state) this.inp.focus();
     },
 
+    /**
+     * @IO: TERMINAL_OUTPUT
+     * @INTENT: Append a formatted message line to the terminal output display.
+     */
     print(msg, type = 'sys') {
         const line = document.createElement('div');
         line.className = `dt-msg dt-${type}`;
@@ -198,6 +229,11 @@ const DebugTerminal = {
         this.out.scrollTop = this.out.scrollHeight;
     },
 
+    /**
+     * @ARCH: COMMAND_PROCESSOR
+     * @IO: TERMINAL_INPUT
+     * @INTENT: Parse and execute user-entered terminal commands for simulator control.
+     */
     exec(cmd) {
         this.print(cmd, 'ok');
         const args = cmd.split(' ');
@@ -222,6 +258,11 @@ const DebugTerminal = {
         }
     },
 
+    /**
+     * @ARCH: HARDWARE_SYNTHESIZER
+     * @CONSTRAINT: RECURSIVE_BUILD
+     * @INTENT: Compile high-level gates from primitive NAND representations and inject into the simulator library.
+     */
     synthesize(target) {
         if (!window.Sim) return this.print("Simulator context not linked.", "err");
         if (Sim.library[target]) return this.print(`${target} already exists in library.`, "warn");

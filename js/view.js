@@ -9,6 +9,11 @@ const View = {
     zoomIdx: 2,
     zoomLevels: [0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
 
+    /**
+     * @ARCH: VIEWPORT_INITIALIZATION
+     * @IO: MOUSE_EVENT_LISTENERS
+     * @INTENT: Initialize global event listeners for workspace panning and mouse-wheel zooming.
+     */
     init() {
         const ws = document.getElementById('workspace');
         let isPanning = false;
@@ -64,6 +69,11 @@ const View = {
         }, { passive: false });
     },
 
+    /**
+     * @IO: CSS_TRANSFORM_SYNC
+     * @STATE: VIEWPORT_MATRIX
+     * @INTENT: Synchronize the DOM and SVG layers with the current internal pan/zoom transformation matrix.
+     */
     apply() {
         document.getElementById('scene').style.transform = `translate(${this.x}px, ${this.y}px) scale(${this.scale})`;
         document.getElementById('svg-layer').style.transform = `translate(${this.x}px, ${this.y}px) scale(${this.scale})`;

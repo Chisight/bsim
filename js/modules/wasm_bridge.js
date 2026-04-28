@@ -514,11 +514,19 @@ const WasmEngine = {
         }
     },
 
+    /**
+     * @IO: SIGNAL_PROBE
+     * @INTENT: Read the current logical state of a specific wire from Wasm linear memory.
+     */
     readWireState(wireIndex) {
         if (!this.ready || !this.wireIdxMap.has(wireIndex)) return null;
         return this.memArray[this.REGION_A_OFFSET + this.wireIdxMap.get(wireIndex)];
     },
 
+    /**
+     * @ARCH: MEMORY_MAPPER
+     * @INTENT: Map a specific node and port pair to its exact index in the Wasm linear memory buffer.
+     */
     getSpecificIdx(id, port) {
         const mapped = this.idMap.get(id);
         if (mapped === undefined) return undefined;
@@ -531,6 +539,11 @@ const WasmEngine = {
         return mapped;
     },
 
+    /**
+     * @STATE: MEMORY_READBACK
+     * @IO: WASM_TO_HOST
+     * @INTENT: Retrieve the entire state vector for a node from Wasm linear memory.
+     */
     readState(nodeId) {
         if (!this.ready) return 0;
         const mapped = this.idMap.get(nodeId);

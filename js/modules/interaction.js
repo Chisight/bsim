@@ -2,6 +2,11 @@
  * Interaction Handler Module
  */
 const InteractionHandler = {
+    /**
+     * @IO: UI_INTERACTION
+     * @STATE: NODE_POSITION
+     * @INTENT: Handle mouse-driven node translation and group dragging for selected components.
+     */
     handleNodeDrag(e, node, div) {
         console.debug('[DEBUG] Node onmousedown triggered. Node ID:', node.id, '| Button pressed:', e.button);
         if (e.target.classList.contains('port')) return;
@@ -94,6 +99,11 @@ const InteractionHandler = {
         document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp, { once: true });
     },
 
+    /**
+     * @IO: UI_INTERACTION
+     * @STATE: NODE_STATE
+     * @INTENT: Toggle logical state of input nodes and frequency of clock nodes on click.
+     */
     handleNodeClick(e, node, div, bits) {
         if (e.target.classList.contains('port') || e.target.classList.contains('bit-dot')) return;
         if (e.shiftKey) return; // Reserved for Port Interaction
@@ -121,6 +131,11 @@ const InteractionHandler = {
         }
     },
 
+    /**
+     * @IO: UI_INTERACTION
+     * @ARCH: UI_MODAL
+     * @INTENT: Trigger configuration modals for components (clocks, multi-bit inputs) on double-click.
+     */
     handleNodeDblClick(e, node, div) {
         Sim.wakeQueue();
         e.stopPropagation();
@@ -156,6 +171,10 @@ const InteractionHandler = {
         }
     },
 
+    /**
+     * @ARCH: NETLIST_MUTATION
+     * @INTENT: Split an existing wire by inserting a logical JUNCTION node at the specified coordinates.
+     */
     _splitWire(fromNodeId, fromPortId, toNodeId, toPortId, clickX, clickY) {
         const wire = Sim.wires.find(w => w.from.nodeId === fromNodeId && w.to.nodeId === toNodeId && w.from.portId === fromPortId && w.to.portId === toPortId);
         if (!wire) return;
@@ -179,6 +198,11 @@ const InteractionHandler = {
         Sim.autoSave();
     },
 
+    /**
+     * @IO: UI_INTERACTION
+     * @ARCH: NETLIST_MUTATION
+     * @INTENT: Manage context-menu actions and manual routing adjustments for individual wires.
+     */
     handleWireInteraction(e, wire, p1, p2) {
         console.debug('[DEBUG] handleWireInteraction invoked. Button:', e.button);
         if (e.button === 2) {
@@ -257,6 +281,11 @@ const InteractionHandler = {
         }
     },
 
+    /**
+     * @IO: UI_INTERACTION
+     * @STATE: SELECTION_STATE
+     * @INTENT: Initialize and manage the marquee selection box for group operations on nodes.
+     */
     initMarquee() {
         const ws = document.getElementById('workspace');
         const marquee = document.getElementById('selection-marquee');
@@ -473,6 +502,10 @@ const InteractionHandler = {
         });
     },
 
+    /**
+     * @STATE: CLIPBOARD_MANAGEMENT
+     * @INTENT: Serialize selected nodes and wires into the internal clipboard buffer.
+     */
     copySelection() {
         if (Sim.selection.size === 0) return;
         const nodesToCopy = Sim.nodes.filter(n => Sim.selection.has(n.id));
@@ -480,6 +513,11 @@ const InteractionHandler = {
         Sim._clipboard = { nodes: JSON.parse(JSON.stringify(nodesToCopy)), wires: JSON.parse(JSON.stringify(wiresToCopy)) };
     },
 
+    /**
+     * @ARCH: NETLIST_MUTATION
+     * @STATE: SELECTION_STATE
+     * @INTENT: Instantiate and reconnect components from the internal clipboard into the active netlist.
+     */
     pasteSelection() {
         if (!Sim._clipboard || !Sim._clipboard.nodes) return;
         const idMap = {};
@@ -519,6 +557,10 @@ const InteractionHandler = {
         });
     },
 
+    /**
+     * @IO: KEYBOARD_INTERACTION
+     * @INTENT: Register global keyboard shortcuts for clipboard (Ctrl+C/V) and deletion operations.
+     */
     initClipboardListeners() {
         window.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();

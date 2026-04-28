@@ -32,6 +32,11 @@ const Sim = {
     _clipboard: null,
     MAX_TRANSITIONS: 100,
 
+    /**
+     * @ARCH: APP_INITIALIZER
+     * @IO: UI_BOOT
+     * @INTENT: Initialize simulation kernel, viewport, and global event listeners for the workspace.
+     */
     init() {
         let running = false;
         this.wakeQueue = () => { if (!running) { running = true; requestAnimationFrame(runQueue); } };
@@ -118,6 +123,11 @@ const Sim = {
         });
     },
 
+    /**
+     * @IO: UI_FEEDBACK
+     * @STATE: TOOLTIP_ENGINE
+     * @INTENT: Update dynamic tooltip descriptions based on node state and type.
+     */
     refreshTooltips() {
         this.nodes.forEach(n => {
             const el = document.getElementById(n.id);
@@ -142,6 +152,11 @@ const Sim = {
         });
     },
 
+    /**
+     * @IO: KEYBOARD_INTERACTION
+     * @ARCH: COMMAND_DISPATCHER
+     * @INTENT: Map global hotkeys to simulator commands (Undo, Redo, Delete).
+     */
     applyKeybinds() {
         window.addEventListener('keydown', (e) => {
             if (e.target.tagName === 'INPUT') return;
@@ -163,6 +178,10 @@ const Sim = {
         });
     },
 
+    /**
+     * @STATE: CLIPBOARD_MANAGEMENT
+     * @INTENT: Snapshot the current selection into the clipboard buffer.
+     */
     copySelection() {
         if (this.selection.size === 0) return;
         const nodesToCopy = this.nodes.filter(n => this.selection.has(n.id));
@@ -170,6 +189,10 @@ const Sim = {
         this._clipboard = { nodes: JSON.parse(JSON.stringify(nodesToCopy)), wires: JSON.parse(JSON.stringify(wiresToCopy)) };
     },
 
+    /**
+     * @ARCH: NETLIST_MUTATION
+     * @INTENT: Instantiate components from the clipboard with new unique identifiers.
+     */
     pasteSelection() {
         if (!this._clipboard || !this._clipboard.nodes) return;
         const idMap = {};
@@ -190,6 +213,11 @@ const Sim = {
         newNodes.forEach(n => { this.selection.add(n.id); document.getElementById(n.id)?.classList.add('selected'); });
     },
 
+    /**
+     * @IO: LOCAL_STORAGE
+     * @STATE: PERSISTENCE_SYNC
+     * @INTENT: Periodically synchronize the current workspace state to local storage for crash recovery.
+     */
     autoSave() {
         if (this._autoSaveTimer) clearTimeout(this._autoSaveTimer);
         this._autoSaveTimer = setTimeout(() => {
@@ -245,6 +273,11 @@ const Sim = {
         }, 500);
     },
 
+    /**
+     * @IO: LOCAL_STORAGE
+     * @ARCH: WORKSPACE_RECOVERY
+     * @INTENT: Restore the last known workspace state and library from local storage on boot.
+     */
     loadAutoSave() {
         try {
             const raw = localStorage.getItem('bsim_autosave');
@@ -290,6 +323,11 @@ const Sim = {
         }
     },
 
+    /**
+     * @ARCH: COMPONENT_ADAPTER
+     * @STATE: PORT_SIGNAL_MAPPING
+     * @INTENT: Aggregate signals for macro internal ports during hierarchical simulation.
+     */
     _assembleChipInputs(chipDef, getDriveFn) {
         const ext = {};
         const inNodes = chipDef.nodes.filter(n => n.type.startsWith('IN-')).sort((a, b) => a.y - b.y);
@@ -310,6 +348,11 @@ const Sim = {
         return ext;
     },
 
+    /**
+     * @ARCH: COMPONENT_ADAPTER
+     * @STATE: PORT_SIGNAL_MAPPING
+     * @INTENT: Distribute internal signals to macro output terminals.
+     */
     _mapChipOutputs(chipDef, internalRes) {
         const mapped = {};
         const outNodes = chipDef.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-')).sort((a, b) => a.y - b.y);
@@ -329,6 +372,11 @@ const Sim = {
         return mapped;
     },
 
+    /**
+     * @ARCH: LOGIC_ENGINE
+     * @CONSTRAINT: TRUTH_TABLE
+     * @INTENT: Evaluate the logical transfer function for a single node based on its driving signals.
+     */
     calculateNextState(node) {
         if (node.isCustom) {
             const chipDef = this.library[node.type];
@@ -406,6 +454,11 @@ const Sim = {
     // DESC: processes the queue of nodes that need to be evaluated
     // =========================================================================
 
+    /**
+     * @ARCH: SIMULATION_KERNEL
+     * @IO: WASM_INTERCEPT
+     * @INTENT: Orchestrate the main simulation loop, delegating to Wasm for native logic blocks when possible.
+     */
     processQueue() {
         if (!this.eventQueue || this.eventQueue.size === 0) return;
 
@@ -662,6 +715,11 @@ const Sim = {
     },
 
     // [wasm] parity check
+    /**
+     * @ARCH: DIAGNOSTIC_ENGINE
+     * @CONSTRAINT: PARITY_VALIDATION
+     * @INTENT: Perform a stress-test comparison between the V8 JS engine and the Wasm kernel to ensure state parity.
+     */
     async runWasmParityCheck(iterations = 1000) {
         // check if WasmEngine is loaded
         if (!window.WasmEngine || !WasmEngine.ready) return this.toast('Wasm Engine not linked.', 'danger');
@@ -830,6 +888,11 @@ const Sim = {
     },
 
     // simulate internal circuit (sub-circuit simulation)
+    /**
+     * @ARCH: SUB_SIMULATOR
+     * @CONSTRAINT: RECURSIVE_EVAL
+     * @INTENT: Execute a synchronous logical sweep of a sub-circuit (custom chip) to resolve its outputs.
+     */
     simulateInternalCircuit(chipTypeOrMeta, externalInputs) {
         // debug message
         if (this.debugToasts) console.debug(`[SimTrace] Executing Sub-Circuit: ${typeof chipTypeOrMeta === 'string' ? chipTypeOrMeta : 'Custom'} | Inputs:`, externalInputs);
@@ -960,6 +1023,11 @@ const Sim = {
         return res;
     },
 
+    /**
+     * @ARCH: NETLIST_FACTORY
+     * @IO: UI_MUTATION
+     * @INTENT: Add a new node to the workspace with optional coordinate snapping and collision detection.
+     */
     addNode(type, x = null, y = null, label = null) {
         if (x === null) {
             const scene = document.getElementById('scene');
@@ -974,6 +1042,11 @@ const Sim = {
         return this._finalizeAddNode(type, x, y, label || type);
     },
 
+    /**
+     * @ARCH: NETLIST_FACTORY
+     * @STATE: NODE_INITIALIZATION
+     * @INTENT: Construct the internal node object representation and trigger the AddNodeCommand.
+     */
     _finalizeAddNode(type, x, y, label) {
         const node = {
             id: 'node-' + Math.random().toString(36).substr(2, 9),
@@ -988,6 +1061,10 @@ const Sim = {
         return node;
     },
 
+    /**
+     * @IO: UI_POSITIONING
+     * @INTENT: Synchronize the DOM element's CSS position with the internal node coordinates.
+     */
     updateNodePosition(node, el = null) {
         const div = el || document.getElementById(node.id);
         if (div) {
@@ -997,6 +1074,11 @@ const Sim = {
         }
     },
 
+    /**
+     * @IO: UI_RENDERING
+     * @STATE: NODE_VISUAL_STATE
+     * @INTENT: Update a node's visual representation (colors, labels, bit-dots) based on its logical value.
+     */
     updateNodeVisual(n) {
         const el = document.getElementById(n.id); if (!el) return;
         const bits = parseInt(n.type.split('-')[1]) || 1;
@@ -1095,11 +1177,20 @@ const Sim = {
         if (n._oscillating) el.classList.add('oscillating');
     },
 
+    /**
+     * @ARCH: RENDERING_DISPATCHER
+     * @STATE: NETLIST_DIRTY
+     * @INTENT: Trigger a redraw of the SVG wire layer and mark the netlist for Wasm recompilation.
+     */
     updateWireVisuals() {
         this._netlistDirty = true; // Forces WASM engine to recognize the new layout
         if (typeof WireRenderer !== 'undefined') WireRenderer.drawWires();
     },
 
+    /**
+     * @IO: UI_COORDINATE_RESOLVER
+     * @INTENT: Resolve the viewport-relative coordinates of a specific port on a node.
+     */
     getPortCoords(nodeId, portId) {
         const scene = document.getElementById('scene');
         const pEl = document.getElementById(nodeId)?.querySelector(`[data-port="${portId}"]`);
@@ -1112,6 +1203,11 @@ const Sim = {
         };
     },
 
+    /**
+     * @IO: UI_INTERACTION
+     * @ARCH: WIRING_MANAGER
+     * @INTENT: Manage the state machine for manual wire creation between ports.
+     */
     handlePortInteraction(e, nodeId, portId) {
         const pEl = document.getElementById(nodeId)?.querySelector(`[data-port="${portId}"]`);
         if (e.shiftKey && !this.wiring.active) {
@@ -1153,6 +1249,11 @@ const Sim = {
         }
     },
 
+    /**
+     * @ARCH: NETLIST_MUTATION
+     * @STATE: WIRE_ALLOCATION
+     * @INTENT: Programmatically create a wire connection between two specific ports.
+     */
     connectNodes(n1Id, p1Id, n2Id, p2Id) {
         if (this.debugToasts) this.toast(`Connecting ${n1Id} to ${n2Id}`, 'debug');
         console.log(`[DEBUG] connectNodes triggered | From: ${n1Id}[${p1Id}] -> To: ${n2Id}[${p2Id}]`);
@@ -1163,6 +1264,11 @@ const Sim = {
         }
     },
 
+    /**
+     * @ARCH: SIGNAL_RESOLVER
+     * @STATE: NODE_OUTPUT_STATE
+     * @INTENT: Retrieve the current logical signal value emitted by a specific port.
+     */
     getSignal(nodeId, portId) {
         const node = this.nodes.find(n => n.id === nodeId);
         if (!node) return null;
@@ -1188,6 +1294,11 @@ const Sim = {
         return node.val === undefined ? null : node.val;
     },
 
+    /**
+     * @ARCH: SIGNAL_RESOLVER
+     * @STATE: NETLIST_TRAVERSAL
+     * @INTENT: Trace a net backwards to find the driving signal for a given input port.
+     */
     getDrivingSignal(nodeId, portId, visited = new Set()) {
         const netKey = `${nodeId}:${portId}`;
         if (visited.has(netKey)) return null;
@@ -1227,11 +1338,20 @@ const Sim = {
         return null;
     },
 
+    /**
+     * @STATE: SIMULATION_RESET
+     * @INTENT: Reset transition histories and force a full-netlist propagation sweep.
+     */
     seedQueue() { 
         this._transitions.clear(); 
         this.nodes.forEach(n => { n._oscillating = false; n._forcePropagate = true; }); 
         this.eventQueue = new Set(this.nodes); 
     },
+    /**
+     * @IO: UI_INTERACTION
+     * @STATE: INPUT_MUTATION
+     * @INTENT: Toggle a specific bit of an input node and trigger a simulation tick.
+     */
     toggleBit(e, nodeId, bitIndex) {
         if (typeof e === 'string') {
             bitIndex = nodeId;
@@ -1264,12 +1384,20 @@ const Sim = {
         this.seedQueue(); this.processQueue();
     },
 
+    /**
+     * @ARCH: ENGINE_SWITCH
+     * @INTENT: Switch between V8 (JavaScript) and Wasm simulation kernels.
+     */
     setEngine(type) {
         this.useWasm = (type === 'wasm');
         this.toast('Engine switched to ' + type.toUpperCase(), 'info');
         this.updateHUD();
     },
 
+    /**
+     * @IO: HUD_DISPLAY
+     * @INTENT: Update the Heads-Up Display with current netlist statistics and engine status.
+     */
     updateHUD() {
         let hud = document.getElementById('ui-hud');
         if (!this.showStats) { if (hud) hud.remove(); return; }
@@ -1310,6 +1438,10 @@ const Sim = {
         hud.innerHTML = `GATES: ${this.nodes.length} | WIRES: ${this.wires.length}<br>CHIP : ${this.activeEditingChip || 'MAIN'}<br>ENGINE: ${engineStatus}`;
     },
 
+    /**
+     * @IO: SIDEBAR_DISPLAY
+     * @INTENT: Populate the component sidebar with categorized native gate buttons.
+     */
     updateSidebar() {
         const sb = document.getElementById('sidebar');
         if (!sb) return;
@@ -1340,6 +1472,10 @@ const Sim = {
         sb.innerHTML = html;
     },
 
+    /**
+     * @IO: LIBRARY_DISPLAY
+     * @INTENT: Synchronize the custom chip library UI with the internal library state.
+     */
     updateLibraryUI() {
         // 1. Ensure Context Menu DOM Element Exists
         let menu = document.getElementById('context-menu');
@@ -1435,6 +1571,10 @@ const Sim = {
         });
     },
 
+    /**
+     * @ARCH: WORKSPACE_CONTEXT_SWITCH
+     * @INTENT: Push the current board to the workspace stack and enter the internal logic editor for a custom chip.
+     */
     uiEditChip(name, isSwitching = false) {
         if (!this.library[name]) return;
         if (this.activeEditingChip) {
@@ -1492,6 +1632,11 @@ const Sim = {
         if (!isSwitching) this.toast(`Editing internal logic of ${name}`, 'info');
         this.autoSave();
     },
+    /**
+     * @ARCH: NETLIST_MUTATION
+     * @IO: MODAL_CONFIRM
+     * @INTENT: Prompt for confirmation and delete a chip definition from the library, purging all instances.
+     */
     uiDeleteChip(name) {
         this.modal('Delete Chip', `Delete ${name}? This will remove all instances from the board.`, 'danger', ok => {
             if (ok) {
@@ -1532,6 +1677,10 @@ const Sim = {
             }
         });
     },
+    /**
+     * @IO: UI_MODAL
+     * @INTENT: Display a customizable modal dialog for alerts, prompts, or confirmations.
+     */
     modal(title, content, type, callback, val) {
         const overlay = document.getElementById('ui-overlay');
         const mTitle = document.getElementById('ui-title');
@@ -1566,6 +1715,10 @@ const Sim = {
         if (type === 'prompt') { mInput.focus(); mInput.select(); }
     },
 
+    /**
+     * @IO: UI_TOAST
+     * @INTENT: Display a transient notification message in the UI with optional type-specific styling.
+     */
     toast(msg, type = 'info', duration = 3000) {
         if (!this.showToasts) return;
         if (type === 'debug' && !this.debugToasts) return;
@@ -1585,6 +1738,11 @@ const Sim = {
         }
     },
 
+    /**
+     * @IO: UI_MODAL
+     * @STATE: PREFERENCES
+     * @INTENT: Display the global simulator preferences modal and synchronize user adjustments.
+     */
     showPrefs() {
         this.modal('Simulator Preferences', `
             <div style="display:flex; flex-direction:column; gap:12px;">
@@ -1630,6 +1788,11 @@ const Sim = {
         `, 'confirm');
     },
 
+    /**
+     * @ARCH: WORKSPACE_RESET
+     * @IO: LOCAL_STORAGE_DELETE
+     * @INTENT: Completely wipe the active workspace, library, and autosave to start a fresh project.
+     */
     uiNewProject() {
         this.modal('New Project', 'Warning: This will wipe your library, workspace, and autosave. Continue?', 'confirm', (ok) => {
             if (ok) {
@@ -1638,11 +1801,20 @@ const Sim = {
             }
         });
     },
+    /**
+     * @ARCH: UI_STYLING
+     * @INTENT: Synchronize dynamic CSS variables (e.g., port size) with current application preferences.
+     */
     applyStyles() {
         // UNDERLYING LOGIC: Map portSize preference to CSS variable
         const sizeMap = { 'small': '15%', 'medium': '25%', 'large': '35%' };
         document.documentElement.style.setProperty('--port-size', sizeMap[this.portSize || 'medium']);
     },
+    /**
+     * @ARCH: NETLIST_FACTORY
+     * @STATE: LIBRARY_PERSISTENCE
+     * @INTENT: Snapshot the current workspace into a new custom chip definition and register it in the library.
+     */
     uiSaveAsGate() {
         this.modal('Save Custom Chip', 'Enter unique name for this logic:', 'prompt', (name) => {
             if (name && name.trim()) {
@@ -1663,6 +1835,11 @@ const Sim = {
     },
 
 
+    /**
+     * @IO: UI_PROMPT
+     * @STATE: INPUT_MUTATION
+     * @INTENT: Prompt the user for a numeric value (Hex, Dec, Bin) and apply it to a multi-bit input node.
+     */
     uiEnterValue(id, format = 'D') {
         const n = this.nodes.find(node => node.id === id);
         if (!n || !n.type.startsWith('IN-')) return;
@@ -1718,6 +1895,10 @@ const Sim = {
     },
 
 
+    /**
+     * @ARCH: WORKSPACE_RESET
+     * @INTENT: Clear the active workspace to prepare for a new logic design without wiping the library.
+     */
     uiNewChip() {
         this.modal('New Chip', 'Clear workspace? Your saved library will be kept.', 'confirm', (ok) => {
             if (ok) {
@@ -1729,6 +1910,10 @@ const Sim = {
         });
     },
 
+    /**
+     * @ARCH: SESSION_TERMINATION
+     * @INTENT: Terminate the current simulation session and optionally clear persistence.
+     */
     uiQuit() {
         this.modal('Quit', 'Discard current session and clear autosave before exiting?', 'danger', (discard) => {
             if (discard) localStorage.removeItem('bsim_autosave');
@@ -1736,6 +1921,11 @@ const Sim = {
         });
     },
 
+    /**
+     * @IO: UI_COORDINATE_RESOLVER
+     * @ARCH: RENDERING_QUERIES
+     * @INTENT: Identify a wire at a specific coordinate for interaction handling.
+     */
     getWireAt(x, y) {
         return this.wires.find(w => {
             const p1 = this.getPortCoords(w.from.nodeId, w.from.portId);
@@ -1756,6 +1946,10 @@ const Sim = {
         });
     },
 
+    /**
+     * @CONSTRAINT: GEOMETRIC_MATH
+     * @INTENT: Calculate the minimum distance between a point and a line segment.
+     */
     distToSegment(px, py, x1, y1, x2, y2) {
         const l2 = Math.hypot(x2 - x1, y2 - y1);
         if (l2 === 0) return Math.hypot(px - x1, py - y1);
@@ -1763,6 +1957,10 @@ const Sim = {
         return Math.hypot(px - (x1 + t * (x2 - x1)), py - (y1 + t * (y2 - y1)));
     },
 
+    /**
+     * @STATE: NETLIST_INDEXING
+     * @INTENT: Rebuild the internal wireMap index for fast signal resolution lookups.
+     */
     reindexWires() {
         this.wireMap.clear();
         this.wires.forEach(w => {
@@ -1771,12 +1969,21 @@ const Sim = {
         });
     },
 
+    /**
+     * @STATE: UI_FEEDBACK_RESET
+     * @INTENT: Clear all active port-snapping highlights and reset the snapping state.
+     */
     clearSnapState() {
         document.querySelectorAll('.snap-hover').forEach(el => el.classList.remove('snap-hover'));
         this.wiring.snapTarget = null;
     },
 
 
+    /**
+     * @ARCH: WORKSPACE_CONTEXT_SWITCH
+     * @STATE: LIBRARY_SYNC
+     * @INTENT: Save current chip logic to the library and return to the parent workspace context.
+     */
     uiExitChipEdit() {
         if (this.workspaceStack.length === 0 || !this.activeEditingChip) return;
 

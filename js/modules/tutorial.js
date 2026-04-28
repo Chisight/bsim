@@ -1,5 +1,10 @@
 const TutorialEngine = {
     active: null, step: 0,
+    /**
+     * @IO: UI_INTERACTION
+     * @ARCH: UI_UX_HELPER
+     * @INTENT: Enable manual dragging for the tutorial panel via mouse events.
+     */
     makeDraggable(el) {
         let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
         const dragMouseDown = (e) => {
@@ -91,6 +96,11 @@ const TutorialEngine = {
             ]
         }
     },
+    /**
+     * @IO: UI_MODAL
+     * @ARCH: TUTORIAL_DISPATCHER
+     * @INTENT: Display the tutorial selection menu to the user.
+     */
     showMenu() {
         if (!Sim.tutorialMode) { Sim.toast('Enable Tutorial Mode in Preferences first.'); return; }
         let html = '<div style="margin-bottom:15px; color:#aaa; font-size:13px;">Select a module to begin guided construction:</div>';
@@ -99,16 +109,28 @@ const TutorialEngine = {
         });
         Sim.modal('Interactive Instructor', html, 'alert');
     },
+    /**
+     * @STATE: TUTORIAL_SESSION
+     * @INTENT: Initialize a specific tutorial session and reset the progress counter.
+     */
     start(id) {
         this.active = id; this.step = 0;
         document.getElementById('ui-overlay').style.display = 'none';
         this.render();
     },
+    /**
+     * @STATE: TUTORIAL_SESSION
+     * @INTENT: Terminate the active tutorial session and hide the panel.
+     */
     quit() {
         this.active = null;
         const panel = document.getElementById('tutorial-panel');
         if (panel) panel.style.display = 'none';
     },
+    /**
+     * @IO: UI_RENDERING
+     * @INTENT: Redraw the tutorial panel content based on the current step and completion state.
+     */
     render() {
         const panel = document.getElementById('tutorial-panel');
         if (!this.active || !panel) return;
@@ -133,6 +155,11 @@ const TutorialEngine = {
         `;
         this.makeDraggable(panel);
     },
+    /**
+     * @ARCH: TUTORIAL_VALIDATOR
+     * @CONSTRAINT: STEP_VALIDATION
+     * @INTENT: Evaluate the current workspace state against the active tutorial step requirements.
+     */
     checkProgress() {
         if (!this.active) return;
         const tut = this.tutorials[this.active];

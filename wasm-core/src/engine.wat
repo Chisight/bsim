@@ -15,6 +15,9 @@
   ;; ATOMIC PRIMITIVE: $nand
   ;; Strict 1-bit: only (1 AND 1) -> 0, everything else -> 1
   ;; -----------------------------------------------------------------------
+  ;; @ARCH: ATOMIC_PRIMITIVE
+  ;; @CONSTRAINT: TRUTH_TABLE
+  ;; @INTENT: Define the fundamental logical NAND operation as the system's singular primitive.
   (func $nand (param $a i32) (param $b i32) (result i32)
     local.get $a
     i32.const 1
@@ -47,6 +50,9 @@
   ;; All other gates (NOT, AND, OR, NOR, XOR, XNOR) are decomposed into
   ;; sequences of NAND instructions by the JS bridge before reaching here.
   ;; -----------------------------------------------------------------------
+  ;; @ARCH: CORE_KERNEL
+  ;; @CONSTRAINT: LINEAR_EXECUTION
+  ;; @INTENT: Main execution loop for redrawing the logical state across all synthesized primitive gates in linear memory.
   (func $tick (param $instruction_count i32)
     (local $i i32)            ;; loop index
     (local $ptr i32)          ;; address for current inst

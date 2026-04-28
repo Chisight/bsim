@@ -1,5 +1,10 @@
 const SynthUI = {
     state: { in: 3, out: 1, table: [], labels: { ins: [], outs: [] } },
+    /**
+     * @IO: UI_MODAL
+     * @ARCH: SYNTHESIS_UI
+     * @INTENT: Open the advanced logic synthesizer modal and initialize the truth table UI.
+     */
     open() {
         const mBody = document.getElementById('modal-body');
         if (mBody) {
@@ -28,6 +33,10 @@ const SynthUI = {
         Sim.modal('Manual Logic Synthesizer [Advanced]', html, 'custom');
         this.render();
     },
+    /**
+     * @STATE: SYNTHESIS_STATE
+     * @INTENT: Reinitialize the internal truth table state based on the current number of inputs and outputs.
+     */
     resetTable() {
         this.state.table = [];
         this.state.labels.ins = Array.from({ length: this.state.in }, (_, i) => String.fromCharCode(65 + i));
@@ -39,16 +48,30 @@ const SynthUI = {
             });
         }
     },
+    /**
+     * @IO: UI_INTERACTION
+     * @STATE: SYNTHESIS_STATE
+     * @INTENT: Cycle an input bit between 0, 1, and X (Don't Care) and re-process table folding.
+     */
     toggleIn(r, b) {
         const cur = this.state.table[r].ins[b];
         this.state.table[r].ins[b] = (cur === 0) ? 1 : (cur === 1 ? 'X' : 0);
         this.processFolding(); this.render();
     },
+    /**
+     * @IO: UI_INTERACTION
+     * @STATE: SYNTHESIS_STATE
+     * @INTENT: Cycle an output bit between 0, 1, and X (Don't Care).
+     */
     toggleOut(r, o) {
         const cur = this.state.table[r].outs[o];
         this.state.table[r].outs[o] = (cur === 0) ? 1 : (cur === 1 ? 'X' : 0);
         this.render();
     },
+    /**
+     * @CONSTRAINT: LOGIC_FOLDING
+     * @INTENT: Identify and hide truth table rows that are covered by higher-level "Don't Care" (X) patterns.
+     */
     processFolding() {
         this.state.table.forEach(row => row.visible = true);
         for (let i = 0; i < this.state.table.length; i++) {
@@ -67,6 +90,10 @@ const SynthUI = {
             }
         }
     },
+    /**
+     * @IO: UI_RENDERING
+     * @INTENT: Redraw the truth table DOM elements based on the current synthesis state.
+     */
     render() {
         const cont = document.getElementById('synth-table-container');
         if (!cont) return;
@@ -96,6 +123,10 @@ const SynthUI = {
         html += '</tbody></table>';
         cont.innerHTML = html;
     },
+    /**
+     * @ARCH: SYNTHESIS_DISPATCHER
+     * @INTENT: Extract the truth table data and dispatch it to the LogicSynthesizer for netlist generation.
+     */
     build() {
         const ins = this.state.in;
         const outs = this.state.out;

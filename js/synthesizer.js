@@ -4,6 +4,11 @@
  * FIXED: Uses only defined library chips and loops for equivalents.
  */
 const LogicSynthesizer = {
+    /**
+     * @ARCH: SYNTHESIS_ANALYZER
+     * @STATE: LIBRARY_SIGNATURES
+     * @INTENT: Scan the library and native gates to generate unique truth-table signatures for logical matching.
+     */
     generateSignatureMap() {
         console.log("[DEBUG] Generating library signature map for synthesis...");
         const signatures = new Map();
@@ -41,6 +46,11 @@ const LogicSynthesizer = {
         return signatures;
     },
 
+    /**
+     * @ARCH: SYNTHESIS_ORCHESTRATOR
+     * @IO: UI_MODAL
+     * @INTENT: High-level orchestration for converting a truth table into a named library chip.
+     */
     synthesizeToChip(outputsData, inputLabels, defaultName) {
         console.log(`[DEBUG] synthesizeToChip triggered | Inputs: ${inputLabels.length} | Outputs: ${outputsData.length}`);
         Sim.toast('Analyzing truth table...', 'info');
@@ -66,6 +76,11 @@ const LogicSynthesizer = {
         }, defaultName);
     },
 
+    /**
+     * @ARCH: LOGIC_SYNTHESIZER
+     * @CONSTRAINT: QUINE_MCCLUSKEY
+     * @INTENT: Primary logic synthesis engine using Quine-McCluskey minimization to generate an optimized netlist.
+     */
     synthesize(outputsData, inputLabels, targetChipName = "") {
         console.log(`[DEBUG] LogicSynthesizer.synthesize started for target: ${targetChipName}`);
         const numVars = inputLabels.length;

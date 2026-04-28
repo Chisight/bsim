@@ -9,6 +9,11 @@
 </head>
 
 <body oncontextmenu="return false;">
+    <!-- 
+        @ARCH: UI_SHELL
+        @IO: NAVIGATION_COMMANDS
+        @INTENT: Define the primary application control surface for project management and analysis tools.
+    -->
     <nav>
         <div class="nav-brand">BrowserSim <span style="font-size:10px; color:var(--wire-on)">v1.23.62</span></div>
         <span onclick="Sim.uiNewProject()">New Project</span>
@@ -60,6 +65,11 @@
     </nav>
 
     <div id="main">
+        <!-- 
+            @ARCH: VIEWPORT_CONTAINER
+            @IO: INTERACTION_SURFACE
+            @INTENT: Host the logical simulation layers (Grid, Nodes, Wires) and capture user input for translation.
+        -->
         <div id="workspace">
             <div id="grid-layer"></div>
             <div id="scene"></div>
@@ -67,6 +77,11 @@
         </div>
     </div>
 
+    <!-- 
+        @ARCH: LIBRARY_VIEW
+        @IO: COMPONENT_INJECTION
+        @INTENT: Display the available component library and enable drag-and-drop or click-to-place instantiation.
+    -->
     <footer>
         <div id="chip-lib" style="display:flex; gap:10px; flex-grow:1; align-items:center;">
             <span class="status-chip" onclick="Sim.addNode('NAND')">NAND</span>

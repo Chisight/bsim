@@ -7,6 +7,11 @@ const History = {
     index: -1,
     max: 50,
 
+    /**
+     * @ARCH: COMMAND_PATTERN_MANAGER
+     * @STATE: HISTORY_STACK
+     * @INTENT: Execute a new command, append to undo stack, and clear the redo history.
+     */
     execute(cmd) {
         console.debug('[DEBUG] History.execute fired for command:', cmd.constructor.name, cmd);
         // Clear redo stack
@@ -18,6 +23,11 @@ const History = {
         Sim.autoSave();
     },
 
+    /**
+     * @ARCH: COMMAND_PATTERN_MANAGER
+     * @STATE: HISTORY_STACK
+     * @INTENT: Revert the last executed command and decrement the history index.
+     */
     undo() {
         if (this.index >= 0) {
             this.stack[this.index].undo();
@@ -27,6 +37,11 @@ const History = {
         }
     },
 
+    /**
+     * @ARCH: COMMAND_PATTERN_MANAGER
+     * @STATE: HISTORY_STACK
+     * @INTENT: Re-execute the next command in the history stack.
+     */
     redo() {
         if (this.index < this.stack.length - 1) {
             this.index++;
@@ -40,6 +55,10 @@ const History = {
         // Virtual command for simple state snaps if needed
     },
 
+    /**
+     * @IO: UI_STATE_SYNC
+     * @INTENT: Update the visual enabled/disabled state of undo/redo buttons.
+     */
     updateButtons() {
         const u = document.getElementById('btn-undo');
         const r = document.getElementById('btn-redo');
@@ -48,6 +67,11 @@ const History = {
     }
 };
 
+/**
+ * @ARCH: COMMAND_PATTERN
+ * @STATE: NETLIST_STATE
+ * @INTENT: Encapsulate the logic for adding a node to the netlist with support for undo/redo.
+ */
 class AddNodeCommand {
     constructor(node) { this.node = node; }
     do() { 
@@ -69,6 +93,11 @@ class AddNodeCommand {
     }
 }
 
+/**
+ * @ARCH: COMMAND_PATTERN
+ * @STATE: NETLIST_STATE
+ * @INTENT: Encapsulate the logic for deleting a node and its associated wires from the netlist.
+ */
 class DeleteNodeCommand {
     constructor(node) {
         this.node = node;
@@ -97,6 +126,11 @@ class DeleteNodeCommand {
     }
 }
 
+/**
+ * @ARCH: COMMAND_PATTERN
+ * @STATE: NETLIST_STATE
+ * @INTENT: Encapsulate the logic for adding a wire connection between two ports.
+ */
 class AddWireCommand {
     constructor(wire) { this.wire = wire; }
     do() {
@@ -114,6 +148,11 @@ class AddWireCommand {
     }
 }
 
+/**
+ * @ARCH: COMMAND_PATTERN
+ * @STATE: NETLIST_STATE
+ * @INTENT: Encapsulate the logic for removing a wire connection.
+ */
 class DeleteWireCommand {
     constructor(wire) { this.wire = wire; }
     do() {
@@ -128,6 +167,11 @@ class DeleteWireCommand {
     }
 }
 
+/**
+ * @ARCH: COMMAND_PATTERN
+ * @STATE: NETLIST_STATE
+ * @INTENT: Encapsulate the logic for moving one or more nodes and their orthogonal wire segments.
+ */
 class MoveNodeCommand {
     constructor(nodeId_or_moves, ox_or_wireMoves, oy, nx, ny) {
         if (Array.isArray(nodeId_or_moves)) {
@@ -162,6 +206,11 @@ class MoveNodeCommand {
     }
 }
 
+/**
+ * @ARCH: COMMAND_PATTERN
+ * @STATE: NETLIST_STATE
+ * @INTENT: Encapsulate the logic for bulk-pasting a set of nodes and wires into the workspace.
+ */
 class PasteCommand {
     constructor(nodes, wires) {
         this.nodes = nodes; this.wires = wires;
