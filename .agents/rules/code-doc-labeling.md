@@ -2,7 +2,6 @@
 trigger: always_on
 ---
 
-# --- BEGIN AGENT DIRECTIVE ---
 task: "GLOBAL_TAXONOMY_INJECTION"
 target_directory: "./browser-sim"
 file_types: ["*.js", "*.wat", "*.css", "*.html"]
@@ -20,4 +19,3 @@ output_requirements:
   - "Commit changes incrementally per architectural boundary."
   - "Generate an mrap_audit.md detailing all injected tags, mapped by file and line number."
   - "Halt and rollback on syntax tree parsing failure."
-# --- END AGENT DIRECTIVE ---
