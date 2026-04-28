@@ -58,6 +58,30 @@ This document maps every logical exit point and function boundary instrumented w
 | `NodeRenderer.renderNode` | 141 | Node rendered and appended to DOM. |
 | `WireRenderer.drawWires` | 87 | SVG wire layer update complete. |
 
+## 8. Logic Synthesis Engine (`js/synthesizer.js`)
+| Function | Line | Intent |
+| :--- | :--- | :--- |
+| `generateSignatureMap` | 46 | Signature map generated. |
+| `synthesize` | 416 | Logic synthesis finalized and simulation queue re-seeded. |
+
+## 9. App Orchestration & Viewport (`js/app.js`, `js/view.js`)
+| Function | Line | Intent |
+| :--- | :--- | :--- |
+| `window.onload` | 49 | Application bootstrap sequence finalized. |
+| `View.init` | 70 | Viewport event listeners operational. |
+| `View.apply` | 85 | Viewport transformation applied to DOM/SVG. |
+
+## 10. Interactive Tutorial System (`js/modules/tutorial.js`)
+| Function | Line | Intent |
+| :--- | :--- | :--- |
+| `makeDraggable` | 37 | Tutorial panel made draggable. |
+| `showMenu` | 111 | Tutorial selection menu displayed. |
+| `start` | 120 | Tutorial session initialized. |
+| `quit` | 129 | Tutorial session terminated and panel hidden. |
+| `render` | 140 | Tutorial completion view rendered. |
+| `render` | 157 | Tutorial step rendered. |
+| `checkProgress` | 173 | Tutorial progress check finalized. |
+
 ---
 **Audit Status**: VERIFIED
 **Compliance**: MRAP_V1_EXIT_PATH Strict Adherence.

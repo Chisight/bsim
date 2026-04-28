@@ -42,6 +42,28 @@ This registry serves as the definitive source-of-truth for all hardening efforts
 | `NodeRenderer.renderNode` | `@ARCH:UI_RENDERING`, `@IO:DOM_FACTORY` | `[AUDIT: v1.23.64] - EXIT_TRACE: Node rendered: ${node.id}` |
 | `WireRenderer.drawWires` | `@ARCH:UI_RENDERING`, `@IO:SVG_MUTATION` | `[AUDIT: v1.23.64] - EXIT_TRACE: SVG wire layer update complete.` |
 
+## 6. Logic Synthesis Engine (`js/synthesizer.js`)
+| Module | MRAP Domains | Audit Trace |
+| :--- | :--- | :--- |
+| `LogicSynthesizer.generateSignatureMap` | `@ARCH:SYNTHESIS_ANALYZER`, `@STATE:LIBRARY_SIGNATURES` | `[AUDIT: v1.23.64] - EXIT_TRACE: Signature map generated with ${signatures.size} entries.` |
+| `LogicSynthesizer.synthesizeToChip` | `@ARCH:SYNTHESIS_ORCHESTRATOR`, `@IO:UI_MODAL` | `[AUDIT: v1.23.64] - Entry trace for chip synthesis orchestration.` |
+| `LogicSynthesizer.synthesize` | `@ARCH:LOGIC_SYNTHESIZER`, `@CONSTRAINT:QUINE_MCCLUSKEY` | `[AUDIT: v1.23.64] - EXIT_TRACE: Logic synthesis finalized and simulation queue re-seeded.` |
+
+## 7. App Orchestration & Viewport (`js/app.js`, `js/view.js`)
+| Module | MRAP Domains | Audit Trace |
+| :--- | :--- | :--- |
+| `window.onload` | `@ARCH:APP_INITIALIZER`, `@INTENT:INITIALIZE_SIM` | `[AUDIT: v1.23.64] - EXIT_TRACE: Application bootstrap sequence finalized.` |
+| `View.init` | `@ARCH:VIEWPORT_INITIALIZATION`, `@IO:MOUSE_EVENT_LISTENERS` | `[AUDIT: v1.23.64] - EXIT_TRACE: Viewport event listeners operational.` |
+| `View.apply` | `@IO:CSS_TRANSFORM_SYNC`, `@STATE:VIEWPORT_MATRIX` | `[AUDIT: v1.23.64] - EXIT_TRACE: Viewport transformation applied to DOM/SVG.` |
+
+## 8. Interactive Tutorial System (`js/modules/tutorial.js`)
+| Module | MRAP Domains | Audit Trace |
+| :--- | :--- | :--- |
+| `TutorialEngine.showMenu` | `@ARCH:TUTORIAL_DISPATCHER`, `@IO:UI_MODAL` | `[AUDIT: v1.23.64] - EXIT_TRACE: Tutorial selection menu displayed.` |
+| `TutorialEngine.start` | `@STATE:TUTORIAL_SESSION` | `[AUDIT: v1.23.64] - EXIT_TRACE: Tutorial session '${id}' initialized.` |
+| `TutorialEngine.render` | `@IO:UI_RENDERING` | `[AUDIT: v1.23.64] - EXIT_TRACE: Tutorial step ${this.step + 1} rendered.` |
+| `TutorialEngine.checkProgress` | `@ARCH:TUTORIAL_VALIDATOR`, `@CONSTRAINT:STEP_VALIDATION` | `[AUDIT: v1.23.64] - EXIT_TRACE: Tutorial progress check finalized.` |
+
 ---
 **Build Version**: 1.23.64
 **Hardening Protocol**: MRAP_V1 + TRACEABILITY_V1

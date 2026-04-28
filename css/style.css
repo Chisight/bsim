@@ -16,7 +16,8 @@
     --font: 'Outfit', 'Inter', 'Segoe UI', system-ui, sans-serif;
 }
 
-/* CUSTOM SCROLLBARS - Professional Design v1.22.0 */
+/* CUSTOM SCROLLBARS - Professional Design v1.23.64 */
+/* [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Design system synchronization for diagnostic hardening. */
 ::-webkit-scrollbar { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: #333344; border-radius: 10px; }

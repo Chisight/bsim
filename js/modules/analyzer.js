@@ -1,5 +1,5 @@
 /**
- * Logic Analyzer Module v1.22.0 (Modular Professional)
+ * Logic Analyzer Module v1.23.64 (Modular Professional)
  * Handles truth table generation, BOM estimation, and signal tracing.
  */
 const Analyzer = {
