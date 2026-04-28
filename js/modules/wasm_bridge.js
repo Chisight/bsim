@@ -724,20 +724,25 @@ const WasmEngine = {
      * @INTENT: Generate and display a structured map of the Wasm linear memory allocation for all flattened nodes.
      */
     exportMemoryMap() {
-        console.group("WASM LINEAR MEMORY MAP (v1.23.64)");
+        console.group("WASM LINEAR MEMORY MAP (v1.23.65)");
         console.log("Base Offset for Node Metadata: 16384");
         console.log("Slot Size: 256 bytes");
         
-        const map = this.flatNodes.map((node, i) => ({
-            id: node.id,
-            type: node.type,
-            offset: 16384 + (i * 256),
-            bitIndices: Array.from({length: this.nodeIdxMap.get(node.id)?.bits || 0}, (_, b) => (this.nodeIdxMap.get(node.id)?.start || 0) + b)
-        }));
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - Correct diagnostic map target to mapped region identifiers.
+        const map = this.flatNodes.map((node, i) => {
+            const mapped = this.idMap.get(node.id);
+            const isArray = Array.isArray(mapped);
+            return {
+                id: node.id,
+                type: node.type,
+                offset: 16384 + (i * 256),
+                bitIndices: isArray ? mapped : [mapped]
+            };
+        });
 
         console.table(map);
         console.groupEnd();
-        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Memory map exported to console.
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Memory map exported to console.
         return map;
     }
 };

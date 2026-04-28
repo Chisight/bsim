@@ -1,4 +1,4 @@
-# Exit Trace Audit Log (v1.23.64)
+# Exit Trace Audit Log (v1.23.65)
 
 This document maps every logical exit point and function boundary instrumented with high-density `EXIT_TRACE` markers to isolate signal anomalies.
 

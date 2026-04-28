@@ -66,6 +66,6 @@ This registry serves as the definitive source-of-truth for all hardening efforts
 | `TutorialEngine.checkProgress` | `@ARCH:TUTORIAL_VALIDATOR`, `@CONSTRAINT:STEP_VALIDATION` | `[AUDIT: v1.23.64] - EXIT_TRACE: Tutorial progress check finalized.` |
 
 ---
-**Build Version**: 1.23.64
+**Build Version**: 1.23.65
 **Hardening Protocol**: MRAP_V1 + TRACEABILITY_V1
-**Security Status**: SEC_ARCH_LEAD Authorized
+**Security Status**: SEC_ARCH_LEAD Authorized (Fault Resolution)

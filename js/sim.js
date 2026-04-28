@@ -451,8 +451,8 @@ const Sim = {
             for (let i = 0; i < bits; i++) state[i] = this.getDrivingSignal(node.id, `in${i}`);
             return JSON.stringify(state);
         }
-        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: State calculated for ${node.id} (${node.type}).
-        return res;
+        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - Prevent ReferenceError on untrapped generic nodes.
+        return node.val !== undefined ? node.val : null;
     },
     // =========================================================================
     // FILE: browser-sim/modular-sim/js/sim.js
