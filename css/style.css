@@ -409,3 +409,9 @@ footer::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px
 .log-success { color: var(--wire-on); }
 .log-wasm { color: #d633ff; }
 .log-v8 { color: #00d2ff; }
+
+/* [AUDIT: v1.23.61 | SEC_ARCH_LEAD] - Enable text selection for terminal log extraction. */
+#dt-out {
+    user-select: text !important;
+    pointer-events: auto;
+}

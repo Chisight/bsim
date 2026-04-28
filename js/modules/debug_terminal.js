@@ -124,6 +124,12 @@ const DebugTerminal = {
         document.body.appendChild(this.ui);
 
         this.out = document.getElementById('dt-out');
+        
+        // [AUDIT: v1.23.61 | SEC_ARCH_LEAD] - Lift mousedown restriction to permit cursor selection of logs.
+        this.out.addEventListener('mousedown', (e) => {
+            e.stopPropagation();
+        });
+
         this.inp = document.getElementById('dt-in');
 
         // Dragging Logic
