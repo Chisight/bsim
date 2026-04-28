@@ -24,6 +24,7 @@ This document maps every logical exit point and function boundary instrumented w
 | `readPinState` | 249 | Signal bit-index resolved from linear memory. |
 | `executeTick` | 543 | Wasm cycle finalized. |
 | `getSpecificIdx` | 694 | Local bit-index resolved from node-relative offset. |
+| `exportMemoryMap` | 741 | Memory map exported to console. |
 
 ## 3. Analysis Engine (`js/modules/analyzer.js`)
 | Function | Line | Intent |

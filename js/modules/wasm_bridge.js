@@ -714,7 +714,31 @@ const WasmEngine = {
             return null;
         }
         // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: SYNC_BRIDGE pin probe success. Mapped bit-index: ${idx}. Relation: [Resolved: ${targetNodeId}:${targetPortId} from original ${nodeId}:${portId}].
-        return this.memArray[idx];
+    return this.memArray[idx];
+    },
+
+    /**
+     * [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for memory map extraction.
+     * @ARCH: DIAGNOSTIC_TOOL
+     * @IO: CONSOLE_EXPORT
+     * @INTENT: Generate and display a structured map of the Wasm linear memory allocation for all flattened nodes.
+     */
+    exportMemoryMap() {
+        console.group("WASM LINEAR MEMORY MAP (v1.23.64)");
+        console.log("Base Offset for Node Metadata: 16384");
+        console.log("Slot Size: 256 bytes");
+        
+        const map = this.flatNodes.map((node, i) => ({
+            id: node.id,
+            type: node.type,
+            offset: 16384 + (i * 256),
+            bitIndices: Array.from({length: this.nodeIdxMap.get(node.id)?.bits || 0}, (_, b) => (this.nodeIdxMap.get(node.id)?.start || 0) + b)
+        }));
+
+        console.table(map);
+        console.groupEnd();
+        // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Memory map exported to console.
+        return map;
     }
 };
 

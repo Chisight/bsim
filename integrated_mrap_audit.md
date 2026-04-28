@@ -23,6 +23,7 @@ This registry serves as the definitive source-of-truth for all hardening efforts
 | `WasmEngine.init` | `@ARCH:KERNEL_LOADER`, `@IO:WASM_FETCH` | `[AUDIT: v1.23.64] - EXIT_TRACE: WASM kernel successfully linked.` |
 | `WasmEngine.syncLayout` | `@ARCH:NETLIST_EXPANDER`, `@STATE:LINEAR_ALLOC` | `[AUDIT: v1.23.64] - EXIT_TRACE: Address mapping finalized.` |
 | `WasmEngine.readPinState` | `@ARCH:SYNC_BRIDGE`, `@IO:WASM_TO_HOST` | `[AUDIT: v1.23.64] - EXIT_TRACE: Mapped bit-index ${globalIdx} -> val ${val}` |
+| `WasmEngine.exportMemoryMap` | `@ARCH:DIAGNOSTIC_TOOL`, `@IO:CONSOLE_EXPORT` | `[AUDIT: v1.23.64] - EXIT_TRACE: Memory map exported to console.` |
 
 ## 3. Storage & Migration (`js/modules/persistence.js`)
 | Module | MRAP Domains | Audit Trace |
