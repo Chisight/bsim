@@ -46,7 +46,7 @@ const WasmEngine = {
         let fWires = [];
 
         const getInternalPort = (lib, gid, portStr, isInput) => {
-            const ioNodes = lib.nodes.filter(x => x.type.startsWith(isInput ? 'IN-' : 'OUT-') || (isInput && x.type.startsWith('PROBE-')));
+            const ioNodes = lib.nodes.filter(x => x.type.startsWith(isInput ? 'IN-' : 'OUT-') || (!isInput && x.type.startsWith('PROBE-')));
             ioNodes.sort((a, b) => a.y - b.y);
             const exactNode = ioNodes.find(x => x.id === portStr);
             if (exactNode) return { nodeId: `${gid}:${exactNode.id}`, portId: isInput ? 'in0' : 'out0' };
@@ -410,7 +410,7 @@ const WasmEngine = {
             const chipNode = Sim.nodes.find(n => n.id === nodeId);
             const lib = Sim.library[chipNode.type];
             const isInput = portId.startsWith('in');
-            const ioNodes = lib.nodes.filter(x => x.type.startsWith(isInput ? 'IN-' : 'OUT-') || (isInput && x.type.startsWith('PROBE-')));
+            const ioNodes = lib.nodes.filter(x => x.type.startsWith(isInput ? 'IN-' : 'OUT-') || (!isInput && x.type.startsWith('PROBE-')));
             ioNodes.sort((a, b) => a.y - b.y);
             const targetIdx = parseInt(portId.replace(/\D/g, '')) || 0;
             let currentIdx = 0;

@@ -314,7 +314,7 @@ const Sim = {
 
     _mapChipOutputs(chipDef, internalRes) {
         const mapped = {};
-        const outNodes = chipDef.nodes.filter(n => n.type.startsWith('OUT-')).sort((a, b) => a.y - b.y);
+        const outNodes = chipDef.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-')).sort((a, b) => a.y - b.y);
         let cOut = 0;
         outNodes.forEach(p => {
             const bits = parseInt(p.type.split('-')[1]) || 1;
@@ -451,7 +451,7 @@ const Sim = {
 
                 // execute high frequency tick based on structural depth ceiling
                 const execDepth = Math.max(20, this.nodes.length);
-                const seqNodes = this.nodes.filter(n => ['DFF', 'TFF', 'TRISTATE'].includes(n.type) && !n.isCustom);
+                const seqNodes = WasmEngine.flatNodes ? WasmEngine.flatNodes.filter(n => ['DFF', 'TFF', 'TRISTATE'].includes(n.type)) : [];
                 
                 for (let i = 0; i < execDepth; i++) {
                     WasmEngine.executeTick();
@@ -511,8 +511,9 @@ const Sim = {
                     if (n.isCustom && this.library[n.type]) {
                         if (!n.outputs) n.outputs = {};
                         let chipChanged = false;
+                        let rawInnerState = {};
                         this.library[n.type].nodes.forEach(inner => {
-                            if (inner.type.startsWith('OUT-')) {
+                            if (inner.type.startsWith('OUT-') || inner.type.startsWith('PROBE-')) {
                                 const bits = parseInt(inner.type.split('-')[1]) || 1;
                                 let outVal;
                                 if (bits === 1) {
@@ -523,13 +524,13 @@ const Sim = {
                                         outVal[b] = WasmEngine.readPinState(`${n.id}:${inner.id}`, `in${b}`);
                                     }
                                 }
-                                if (JSON.stringify(n.outputs[inner.id]) !== JSON.stringify(outVal)) {
-                                    n.outputs[inner.id] = outVal;
-                                    chipChanged = true;
-                                }
+                                rawInnerState[inner.id] = outVal;
                             }
                         });
-                        if (chipChanged || n._forcePropagate) {
+                        
+                        const mappedOuts = this._mapChipOutputs(this.library[n.type], rawInnerState);
+                        if (JSON.stringify(n.outputs) !== JSON.stringify(mappedOuts) || n._forcePropagate) {
+                            n.outputs = mappedOuts;
                             n._forcePropagate = false;
                             n.val = JSON.parse(JSON.stringify(n.outputs));
                             this.updateNodeVisual(n);
@@ -703,7 +704,7 @@ const Sim = {
             });
 
             // 2. Execute Wasm Array for 20 cycles to propagate signals
-            const seqNodes = this.nodes.filter(n => ['DFF', 'TFF', 'TRISTATE'].includes(n.type) && !n.isCustom);
+            const seqNodes = WasmEngine.flatNodes ? WasmEngine.flatNodes.filter(n => ['DFF', 'TFF', 'TRISTATE'].includes(n.type)) : [];
             for (let t = 0; t < 20; t++) {
                 WasmEngine.executeTick();
                 if (seqNodes.length > 0) {
