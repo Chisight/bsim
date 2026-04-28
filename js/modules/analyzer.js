@@ -5,6 +5,10 @@
 const Analyzer = {
     _lastTruthTable: null,
 
+    /**
+     * @IO: TRUTH_TABLE_GEN
+     * @INTENT: Exhaustively iterate through all input permutations to generate a deterministic truth table of the current netlist.
+     */
     generateTruthTable() {
         const rawInNodes = Sim.nodes.filter(n => n.type.startsWith('IN-'));
         const rawOutNodes = Sim.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-'));
@@ -103,6 +107,10 @@ const Analyzer = {
         Sim.modal('Truth Table Analysis', html, 'alert');
     },
 
+    /**
+     * @IO: HARDWARE_ESTIMATOR
+     * @INTENT: Calculate the bill of materials (BOM) based on standard 74-series logic IC capacities.
+     */
     generateBOM() {
         const counts = { NAND: 0, NOR: 0, AND: 0, OR: 0, NOT: 0, TRISTATE: 0, DFF: 0, TFF: 0 };
         Sim.nodes.forEach(n => { if (counts[n.type] !== undefined) counts[n.type]++; });
@@ -163,6 +171,29 @@ const Analyzer = {
             subNodes.push(...this.flattenHierarchy(sub, depth + 1));
         });
         return subNodes;
+    }
+    /**
+     * @ARCH: PORT_MAPPER
+     * @INTENT: Ensure deterministic LSB-to-MSB (0-to-n) port mapping for macro inputs/outputs.
+     */
+    // [AUDIT: v1.23.63 | SEC_ARCH_LEAD] - Ensure deterministic LSB-to-MSB (0-to-n) port mapping for macro inputs/outputs.
+    getMacroPortMapping(macroNode) {
+        const mapping = {};
+        macroNode.internalNodes.forEach(node => {
+            const type = node.type;
+            if (type.startsWith('IN-')) {
+                const width = parseInt(type.split('-')[1]) || 1;
+                for (let i = 0; i < width; i++) {
+                    mapping[`in${i}`] = { nodeId: node.id, portId: width === 1 ? 'out' : `out${i}` };
+                }
+            } else if (type.startsWith('OUT-') || type.startsWith('PROBE-')) {
+                const width = parseInt(type.split('-')[1]) || 1;
+                for (let i = 0; i < width; i++) {
+                    mapping[`out${i}`] = { nodeId: node.id, portId: width === 1 ? 'in' : `in${i}` };
+                }
+            }
+        });
+        return mapping;
     }
 };
 
