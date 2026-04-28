@@ -29,13 +29,12 @@ if (parityError) {
 ```
 
 ## 4. Wasm Linear Memory Mapping (@ARCH:SYNC_BRIDGE)
-Memory is allocated statically during `syncLayout`. Each node occupies a fixed 256-byte slot starting at offset `16384`.
+Memory is allocated statically during `syncLayout`.
 
 | Offset Range | Content | Access Level |
 | :--- | :--- | :--- |
-| `0 - 8191` | Instruction Buffer | Read-Only (Kernel) |
-| `8192 - 16383` | Signal State Buffer | Read/Write (Bridge) |
-| `16384 - END` | Node Metadata Slots | Read-Only (Kernel) |
+| `0 - 16383` | Signal State Buffer (Region A) | Read/Write (Bridge/Kernel) |
+| `16384 - END` | Instruction Buffer (Region B) | Read-Only (Kernel) |
 
 ## 5. Regression Requirements
 Any change to the `LogicSynthesizer` or `WasmEngine` must pass the `v1.23.64` parity suite:

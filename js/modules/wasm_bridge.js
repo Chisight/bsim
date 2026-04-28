@@ -717,8 +717,9 @@ const WasmEngine = {
             // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: Pin probe failed for ${targetNodeId}:${targetPortId} (resolution failed).
             return null;
         }
+        // [AUDIT: v1.23.66 | SEC_ARCH_LEAD] - Enforce REGION_A_OFFSET mapping to prevent layout boundary circumvention.
         // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - EXIT_TRACE: SYNC_BRIDGE pin probe success. Mapped bit-index: ${idx}. Relation: [Resolved: ${targetNodeId}:${targetPortId} from original ${nodeId}:${portId}].
-    return this.memArray[idx];
+    return this.memArray[this.REGION_A_OFFSET + idx];
     },
 
     /**
@@ -728,19 +729,18 @@ const WasmEngine = {
      * @INTENT: Generate and display a structured map of the Wasm linear memory allocation for all flattened nodes.
      */
     exportMemoryMap() {
-        console.group("WASM LINEAR MEMORY MAP (v1.23.65)");
-        console.log("Base Offset for Node Metadata: 16384");
-        console.log("Slot Size: 256 bytes");
+        console.group("WASM LINEAR MEMORY MAP (v1.23.66)");
+        console.log("Region A (States) Offset: 0");
+        console.log("Region B (Instructions) Offset: 16384 (byte)");
         
-        // [AUDIT: v1.23.65 | SEC_ARCH_LEAD] - Correct diagnostic map target to mapped region identifiers.
-        const map = this.flatNodes.map((node, i) => {
+        // [AUDIT: v1.23.66 | SEC_ARCH_LEAD] - Align diagnostic export with true Engine.wat physical memory layout, removing metadata phantom mapping.
+        const map = this.flatNodes.map((node) => {
             const mapped = this.idMap.get(node.id);
             const isArray = Array.isArray(mapped);
             return {
                 id: node.id,
                 type: node.type,
-                offset: 16384 + (i * 256),
-                bitIndices: isArray ? mapped : [mapped]
+                regionA_Idx: isArray ? mapped : [mapped]
             };
         });
 

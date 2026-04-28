@@ -1,4 +1,4 @@
-# Exit Trace Audit Log (v1.23.65)
+# Exit Trace Audit Log (v1.23.66)
 
 This document maps every logical exit point and function boundary instrumented with high-density `EXIT_TRACE` markers to isolate signal anomalies.
 
@@ -35,7 +35,7 @@ This document maps every logical exit point and function boundary instrumented w
 | `readPinState` | 611 | Pin probe failure (system offline). |
 | `readPinState` | 709 | Unconnected sterile pin detected. |
 | `readPinState` | 717 | Pin probe failed (resolution failed). |
-| `readPinState` | 720 | SYNC_BRIDGE pin probe success. |
+| `readPinState` | 721 | SYNC_BRIDGE pin probe success. |
 | `exportMemoryMap` | 749 | Memory map exported to console. |
 
 ## 3. Analysis Engine (`js/modules/analyzer.js`)
@@ -88,7 +88,7 @@ This document maps every logical exit point and function boundary instrumented w
 ## 9. App Orchestration & Viewport (`js/app.js`, `js/view.js`)
 | Function | Line | Intent |
 | :--- | :--- | :--- |
-| `window.onload` | 50 | Application bootstrap sequence finalized. |
+| `window.onload` | 51 | Application bootstrap sequence finalized. |
 | `History.execute` | 16 | History execute sequence finalized. |
 | `History.undo` | 32 | History undo sequence finalized. |
 | `History.redo` | 46 | History redo sequence finalized. |
