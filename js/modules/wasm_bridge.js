@@ -170,17 +170,6 @@ const WasmEngine = {
         const OP_BUS_RESOLVE = 11;
 
         let virtualNodeCount = slot + 10;
-        this.getSpecificIdx = (id, port) => {
-            const mapped = this.idMap.get(id);
-            if (Array.isArray(mapped)) {
-                if (port === 'q') return mapped[0];
-                if (port === 'nq') return mapped[1];
-                const bit = parseInt(port.replace(/\D/g, '')) || 0;
-                return mapped[bit] !== undefined ? mapped[bit] : mapped[0];
-            }
-            return mapped;
-        };
-
         const resolveAllDriverIndices = (startNodeId, startPortId) => {
             let visited = new Set();
             let drivers = new Set();
@@ -485,6 +474,18 @@ const WasmEngine = {
     readWireState(wireIndex) {
         if (!this.ready || !this.wireIdxMap.has(wireIndex)) return null;
         return this.memArray[this.REGION_A_OFFSET + this.wireIdxMap.get(wireIndex)];
+    },
+
+    getSpecificIdx(id, port) {
+        const mapped = this.idMap.get(id);
+        if (mapped === undefined) return undefined;
+        if (Array.isArray(mapped)) {
+            if (port === 'q') return mapped[0];
+            if (port === 'nq') return mapped[1];
+            const bit = parseInt(port.replace(/\D/g, '')) || 0;
+            return mapped[bit] !== undefined ? mapped[bit] : mapped[0];
+        }
+        return mapped;
     },
 
     readState(nodeId) {

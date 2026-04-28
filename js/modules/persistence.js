@@ -14,7 +14,7 @@ const ProjectManager = {
             const fileVer = this.parseVer(data.meta?.version || "1.0.0");
 
 
-            const currentVer = this.parseVer(window.EXPECTED_BSIM_VERSION || "1.23.58");
+            const currentVer = this.parseVer(window.EXPECTED_BSIM_VERSION || "1.23.59");
 
             if (fileVer < currentVer) console.log(`[Migration] Upgrading schema from ${data.meta?.version} to ${window.EXPECTED_BSIM_VERSION}`);
 
@@ -81,7 +81,7 @@ const ProjectManager = {
             if (data.library) Object.values(data.library).forEach(chip => fixNetlist(chip.wires, chip.nodes));
 
             if (!data.meta) data.meta = {};
-            data.meta.version = (window.EXPECTED_BSIM_VERSION || "1.23.58") + "-Modular";
+            data.meta.version = (window.EXPECTED_BSIM_VERSION || "1.23.59") + "-Modular";
             return data;
         },
         remapPorts(data, type, map) {
