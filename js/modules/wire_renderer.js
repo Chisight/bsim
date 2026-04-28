@@ -33,11 +33,15 @@ const WireRenderer = {
             if (p1 && p2) {
                 let sig = null;
                 const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
-                const checkPure = (nodes) => nodes.every(n => {
-                    if (validWasmTypes.has(n.type)) return true;
-                    if (n.isCustom && Sim.library && Sim.library[n.type]) return checkPure(Sim.library[n.type].nodes);
-                    return false;
-                });
+                const checkPure = (nodes, visited = new Set()) => {
+                    if (visited.has(nodes)) return true; // Cycle detected, assume pure to break loop
+                    visited.add(nodes);
+                    return nodes.every(n => {
+                        if (validWasmTypes.has(n.type)) return true;
+                        if (n.isCustom && Sim.library && Sim.library[n.type]) return checkPure(Sim.library[n.type].nodes, visited);
+                        return false;
+                    });
+                };
                 const isPureNative = checkPure(Sim.nodes);
 
                 if (Sim.useWasm && isPureNative && window.WasmEngine && WasmEngine.ready && WasmEngine.wireIdxMap) {
