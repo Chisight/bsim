@@ -38,7 +38,7 @@ const Sim = {
         const runQueue = () => {
             const now = performance.now();
             
-            const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
+            const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
             const checkPure = (nodes) => nodes.every(n => {
                 if (validWasmTypes.has(n.type)) return true;
                 if (n.isCustom && this.library[n.type]) return checkPure(this.library[n.type].nodes);
@@ -414,7 +414,7 @@ const Sim = {
         // Wasm engine intercept
         if (this.useWasm && window.WasmEngine && WasmEngine.ready) {
             // Synchronized native primitive whitelist
-            const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
+            const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
             const checkPure = (nodes) => nodes.every(n => {
                 if (validWasmTypes.has(n.type)) return true;
                 if (n.isCustom && this.library && this.library[n.type]) return checkPure(this.library[n.type].nodes);
@@ -653,7 +653,7 @@ const Sim = {
         // Wait 50ms for the toast to render
         await new Promise(resolve => setTimeout(resolve, 50));
         // validate that the netlist is pure native
-        const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
+        const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
         const checkPure = (nodes) => nodes.every(n => {
             if (validWasmTypes.has(n.type)) return true;
             if (n.isCustom && this.library && this.library[n.type]) return checkPure(this.library[n.type].nodes);
@@ -1253,7 +1253,7 @@ const Sim = {
         else if (pos === 'top-left') { hud.style.top = '15px'; hud.style.left = '15px'; hud.style.right = 'auto'; hud.style.bottom = 'auto'; hud.style.textAlign = 'left'; }
         else if (pos === 'bottom-left') { hud.style.bottom = '15px'; hud.style.left = '15px'; hud.style.right = 'auto'; hud.style.top = 'auto'; hud.style.textAlign = 'left'; }
 
-        const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
+        const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
         const checkPure = (nodes) => nodes.every(n => {
             if (validWasmTypes.has(n.type)) return true;
             if (n.isCustom && this.library && this.library[n.type]) return checkPure(this.library[n.type].nodes);

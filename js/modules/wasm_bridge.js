@@ -40,7 +40,7 @@ const WasmEngine = {
         // EVERYTHING else is expanded via Sim.library (user-defined chips).
         // The bridge has zero knowledge of AND/OR/XOR/etc — if a user wants those
         // gates, they build them from NANDs in the library. Done.
-        const KERNEL = new Set(['NAND','DFF','CLOCK','TFF','TRISTATE','JUNCTION']);
+        const KERNEL = new Set(['NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'DFF', 'CLOCK', 'TFF', 'TRISTATE', 'JUNCTION']);
 
         let fNodes = [];
         let fWires = [];
@@ -304,10 +304,55 @@ const WasmEngine = {
             if (Array.isArray(mapped)) return; // multi-bit IO slot, skip
             const t = n.type;
 
+            const getA = () => buildBusTree(resolveAllDriverIndices(n.id, 'a'));
+            const getB = () => buildBusTree(resolveAllDriverIndices(n.id, 'b'));
+
             if (t === 'NAND') {
-                const inA = buildBusTree(resolveAllDriverIndices(n.id, 'a'));
-                const inB = buildBusTree(resolveAllDriverIndices(n.id, 'b'));
-                emitNAND(mapped, inA, inB);
+                emitNAND(mapped, getA(), getB());
+            } else if (t === 'NOT') {
+                const a = getA();
+                emitNAND(mapped, a, a);
+            } else if (t === 'AND') {
+                const a = getA(), b = getB();
+                const v1 = virtualNodeCount++;
+                emitNAND(v1, a, b);
+                emitNAND(mapped, v1, v1);
+            } else if (t === 'OR') {
+                const a = getA(), b = getB();
+                const v1 = virtualNodeCount++;
+                const v2 = virtualNodeCount++;
+                emitNAND(v1, a, a);
+                emitNAND(v2, b, b);
+                emitNAND(mapped, v1, v2);
+            } else if (t === 'NOR') {
+                const a = getA(), b = getB();
+                const v1 = virtualNodeCount++;
+                const v2 = virtualNodeCount++;
+                const v3 = virtualNodeCount++;
+                emitNAND(v1, a, a);
+                emitNAND(v2, b, b);
+                emitNAND(v3, v1, v2);
+                emitNAND(mapped, v3, v3);
+            } else if (t === 'XOR') {
+                const a = getA(), b = getB();
+                const v1 = virtualNodeCount++;
+                const v2 = virtualNodeCount++;
+                const v3 = virtualNodeCount++;
+                emitNAND(v1, a, b);
+                emitNAND(v2, a, v1);
+                emitNAND(v3, b, v1);
+                emitNAND(mapped, v2, v3);
+            } else if (t === 'XNOR') {
+                const a = getA(), b = getB();
+                const v1 = virtualNodeCount++;
+                const v2 = virtualNodeCount++;
+                const v3 = virtualNodeCount++;
+                const v4 = virtualNodeCount++;
+                emitNAND(v1, a, b);
+                emitNAND(v2, a, v1);
+                emitNAND(v3, b, v1);
+                emitNAND(v4, v2, v3);
+                emitNAND(mapped, v4, v4);
             } else if (t === 'DFF' || t === 'CLOCK' || t === 'TRISTATE' || t === 'TFF') {
                 let pm = { a: 'a', b: 'b' };
                 if (t === 'DFF')           { pm.a = 'd';  pm.b = 'clk'; }
