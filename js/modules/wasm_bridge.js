@@ -503,6 +503,30 @@ const WasmEngine = {
         let targetNodeId = nodeId;
         let targetPortId = portId;
 
+        // Boundary resolution for custom chips: map outer port to internal IO node
+        if (window.Sim && Sim.nodes.find(n => n.id === nodeId)?.isCustom) {
+            const chipNode = Sim.nodes.find(n => n.id === nodeId);
+            const lib = Sim.library[chipNode.type];
+            if (lib) {
+                const isInput = portId.startsWith('in');
+                const ioNodes = lib.nodes.filter(x => x.type.startsWith(isInput ? 'IN-' : 'OUT-') || (!isInput && x.type.startsWith('PROBE-')));
+                ioNodes.sort((a, b) => a.y - b.y);
+                const targetIdx = parseInt(portId.replace(/\D/g, '')) || 0;
+                let currentIdx = 0;
+                for (const io of ioNodes) {
+                    const bits = parseInt(io.type.split('-')[1]) || 1;
+                    if (targetIdx < currentIdx + bits) {
+                        const bitOffset = targetIdx - currentIdx;
+                        const bIdx = bits > 1 ? (bits - 1 - bitOffset) : 0;
+                        targetNodeId = `${nodeId}:${io.id}`;
+                        targetPortId = isInput ? `in${bIdx}` : `out${bIdx}`;
+                        break;
+                    }
+                    currentIdx += bits;
+                }
+            }
+        }
+
         // Auto-resolve sterile proxy nodes to their evaluated hardware drivers
         if (this.flatNodes && this.flatWires) {
             const startNode = this.flatNodes.find(n => n.id === targetNodeId);
