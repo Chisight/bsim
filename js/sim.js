@@ -1,6 +1,6 @@
 /**
- * Simulator Core v1.22.29 (Modular Professional)
- * FIXED: Wired underlying logic for all new Preferences.
+ * Simulator Core v1.22.30 (Modular Professional)
+ * FIXED: Purged stale DOM cache references across workspace context switches.
  */
 const Sim = {
     nodes: [],
@@ -943,6 +943,9 @@ const Sim = {
             
             if (!this._domCacheMap) this._domCacheMap = new Map();
             let cache = this._domCacheMap.get(n.id);
+            if (cache && cache.dec && !document.body.contains(cache.dec)) {
+                cache = null; // Invalidate stale DOM reference
+            }
             if (!cache) {
                 cache = {
                     dec: el.querySelector('.dec'),

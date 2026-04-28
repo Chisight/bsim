@@ -131,6 +131,7 @@ const NodeRenderer = {
         div.ondblclick = (e) => InteractionHandler.handleNodeDblClick(e, node, div);
 
         document.getElementById('scene').appendChild(div);
+        if (window.Sim && Sim._domCacheMap) Sim._domCacheMap.delete(node.id);
         Sim.updateNodeVisual(node);
     }
 };
