@@ -169,7 +169,7 @@ const WasmEngine = {
         const OP_NAND = 0; const OP_DFF = 1; const OP_CLOCK = 2; const OP_TRISTATE = 3; const OP_TFF = 4;
         const OP_BUS_RESOLVE = 11;
 
-        let virtualNodeCount = this.idMap.size * 2 + 10;
+        let virtualNodeCount = slot + 10;
         const getSpecificIdx = (id, port) => {
             const mapped = this.idMap.get(id);
             if (Array.isArray(mapped)) {
