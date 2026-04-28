@@ -32,7 +32,15 @@ const WireRenderer = {
             const p2 = Sim.getPortCoords(w.to.nodeId, w.to.portId);
             if (p1 && p2) {
                 let sig = null;
-                if (window.WasmEngine && WasmEngine.ready && WasmEngine.wireIdxMap) {
+                const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
+                const checkPure = (nodes) => nodes.every(n => {
+                    if (validWasmTypes.has(n.type)) return true;
+                    if (n.isCustom && Sim.library && Sim.library[n.type]) return checkPure(Sim.library[n.type].nodes);
+                    return false;
+                });
+                const isPureNative = checkPure(Sim.nodes);
+
+                if (Sim.useWasm && isPureNative && window.WasmEngine && WasmEngine.ready && WasmEngine.wireIdxMap) {
                     sig = WasmEngine.readWireState(i);
                 }
                 if (sig === null || sig === undefined) {

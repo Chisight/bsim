@@ -224,6 +224,9 @@ const WasmEngine = {
                     if (w.to.nodeId === currNodeId && w.to.portId === currPortId) {
                         checkDriver(w.from.nodeId, w.from.portId);
                         trace(w.from.nodeId, w.from.portId);
+                    } else if (w.from.nodeId === currNodeId && w.from.portId === currPortId) {
+                        checkDriver(w.to.nodeId, w.to.portId);
+                        trace(w.to.nodeId, w.to.portId);
                     }
                 });
             };

@@ -615,12 +615,32 @@ const Sim = {
                     // update node visual
                     this.updateNodeVisual(node);
                     // add driven nodes to queue
-                    this.wires.filter(w => w.from.nodeId === node.id).forEach(w => {
-                        // find the node that is driven by this wire
-                        const ds = this.nodes.find(n => n.id === w.to.nodeId);
-                        // if node is found, add it to the queue
-                        if (ds) nextQueue.add(ds);
-                    });
+                    // add driven nodes to queue bidirectionally (fixes backwards wiring)
+                    let visitedJuncs = new Set();
+                    const traceDriven = (nid) => {
+                        this.wires.forEach(w => {
+                            if (w.from.nodeId === nid) {
+                                const ds = this.nodes.find(n => n.id === w.to.nodeId);
+                                if (ds) {
+                                    nextQueue.add(ds);
+                                    if (ds.type === 'JUNCTION' && !visitedJuncs.has(ds.id)) {
+                                        visitedJuncs.add(ds.id);
+                                        traceDriven(ds.id);
+                                    }
+                                }
+                            } else if (w.to.nodeId === nid) {
+                                const ds = this.nodes.find(n => n.id === w.from.nodeId);
+                                if (ds) {
+                                    nextQueue.add(ds);
+                                    if (ds.type === 'JUNCTION' && !visitedJuncs.has(ds.id)) {
+                                        visitedJuncs.add(ds.id);
+                                        traceDriven(ds.id);
+                                    }
+                                }
+                            }
+                        });
+                    };
+                    traceDriven(node.id);
                     // if editing chip is null and tutorial engine is available, check progress
                     if (this.activeEditingChip === null && window.TutorialEngine) {
                         TutorialEngine.checkProgress();
