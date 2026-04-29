@@ -2425,7 +2425,7 @@ const Sim = {
             target.style.cursor = 'move';
             target.style.transform = 'none'; // Release absolute centering lock for dragging
             
-            // [AUDIT: SEC_ARCH_LEAD] - Dynamic proportional cursor feedback mapping supporting extended hitboxes.
+            // [AUDIT: v1.24.35 | SEC_ARCH_LEAD] - Cursor mapping overriding for symmetric layout stretching.
             this._editHover = (ev) => {
                 const rect = target.getBoundingClientRect();
                 const scale = View.scale || 1;
@@ -2438,7 +2438,8 @@ const Sim = {
                 const hTop = hy < thY;
                 const hBottom = hy > target.offsetHeight - thY;
                 
-                if ((hTop && hLeft) || (hBottom && hRight)) target.style.cursor = 'nwse-resize';
+                if (mode === 'pin-labels' || mode === 'pin-both') target.style.cursor = 'ns-resize';
+                else if ((hTop && hLeft) || (hBottom && hRight)) target.style.cursor = 'nwse-resize';
                 else if ((hTop && hRight) || (hBottom && hLeft)) target.style.cursor = 'nesw-resize';
                 else if (hTop || hBottom) target.style.cursor = 'ns-resize';
                 else if (hLeft || hRight) target.style.cursor = 'ew-resize';
@@ -2466,8 +2467,8 @@ const Sim = {
             const rRight = clickX > target.offsetWidth - thX;
             const rTop = clickY < thY;
             const rBottom = clickY > target.offsetHeight - thY;
-            // [AUDIT: v1.24.34 | SEC_ARCH_LEAD] - Authorized boundary resizing for info readouts, labels, and ports.
-            const isResizing = (mode === 'pins' || mode === 'pin-dots' || mode === 'pin-labels' || mode === 'pin-both' || mode === 'info' || mode === 'label') && (rLeft || rRight || rTop || rBottom);
+            // [AUDIT: v1.24.35 | SEC_ARCH_LEAD] - Authorized boundary resizing for info readouts, labels, and ports.
+            const isResizing = (mode === 'pin-labels' || mode === 'pin-both') ? true : ((mode === 'pins' || mode === 'pin-dots' || mode === 'info' || mode === 'label') && (rLeft || rRight || rTop || rBottom));
             
             const startX = e.clientX;
             const startY = e.clientY;
@@ -2507,7 +2508,21 @@ const Sim = {
                             cW = Math.max(16, mode === 'label' ? Math.min(startNodeW * 3, startPinW + dx) : Math.min(startNodeW - startPinX, startPinW + dx));
                         }
 
-                        if (rTop) {
+                        if (mode === 'pin-labels' || mode === 'pin-both') {
+                            const isCenterDrag = !rTop && !rBottom;
+                            if (isCenterDrag) {
+                                // [AUDIT: v1.24.35 | SEC_ARCH_LEAD] - Expand and compress symmetrically from center layout block.
+                                cY = startPinY - dy;
+                                cH = Math.max(10, startPinH + dy * 2);
+                            } else if (rTop) {
+                                const nextY = startPinY + dy;
+                                const diffY = nextY - startPinY;
+                                cY = nextY;
+                                cH = Math.max(10, startPinH - diffY);
+                            } else if (rBottom) {
+                                cH = Math.max(10, startPinH + dy);
+                            }
+                        } else if (rTop) {
                             const nextY = mode === 'label' ? startPinY + dy : Math.max(0, startPinY + dy);
                             const diffY = nextY - startPinY;
                             cY = nextY;

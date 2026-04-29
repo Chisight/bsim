@@ -149,8 +149,8 @@ window.onload = () => {
      * @STATE: BSIM_METADATA
      * @INTENT: Define the application semantic versioning for runtime compatibility checks.
      */
-    // [AUDIT: v1.24.34 | SEC_ARCH_LEAD] - Version increment for granular port mutators and UI dropdown focus locks.
-    window.LOADED_BSIM_VERSION = "1.24.34";
+    // [AUDIT: v1.24.35 | SEC_ARCH_LEAD] - Version increment for symmetric vertical port resizing.
+    window.LOADED_BSIM_VERSION = "1.24.35";
 
     // [AUDIT: SEC_ARCH_LEAD] - Injected passive workspace boundary validation to catch upgrade mismatches.
     window.addEventListener('load', () => {
