@@ -314,10 +314,43 @@ const Sim = {
                     activeNodes.forEach(n => { 
                         if (n && n.id) {
                             this.nodes.push(n); 
-                            NodeRenderer.renderNode(n); 
+                            if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(n); 
                         }
                     });
                 }
+                
+                // [AUDIT: v1.23.93 | SEC_ARCH_LEAD] - Legacy netlist migration: Auto-resolve absolute pin descriptors to sequential zero-indexed vectors for custom macros, and sanitize corrupted geometric midpoints.
+                const migrateWires = (wires, ctxNodes) => {
+                    if (!Array.isArray(wires)) return;
+                    wires.forEach(w => {
+                        const fromNode = ctxNodes.find(n => n.id === w.from.nodeId);
+                        const toNode = ctxNodes.find(n => n.id === w.to.nodeId);
+                        
+                        if (fromNode && fromNode.isCustom) {
+                            if (w.from.portId === 'in') w.from.portId = 'in0';
+                            if (w.from.portId === 'out') w.from.portId = 'out0';
+                            if (w.from.portId === 'a') w.from.portId = 'in0';
+                            if (w.from.portId === 'b') w.from.portId = 'in1';
+                        }
+                        if (toNode && toNode.isCustom) {
+                            if (w.to.portId === 'in') w.to.portId = 'in0';
+                            if (w.to.portId === 'out') w.to.portId = 'out0';
+                            if (w.to.portId === 'a') w.to.portId = 'in0';
+                            if (w.to.portId === 'b') w.to.portId = 'in1';
+                        }
+                        
+                        if (w.midX === null || isNaN(w.midX)) delete w.midX;
+                        if (w.midY === null || isNaN(w.midY)) delete w.midY;
+                    });
+                };
+                
+                migrateWires(activeWires, this.nodes);
+                if (this.library) {
+                    Object.values(this.library).forEach(chip => {
+                        if (chip && chip.wires && chip.nodes) migrateWires(chip.wires, chip.nodes);
+                    });
+                }
+
                 this.wires = Array.isArray(activeWires) ? activeWires : [];
                 this.updateWireVisuals();
                 this.seedQueue();
@@ -1319,6 +1352,13 @@ const Sim = {
      */
     updateWireVisuals() {
         this._netlistDirty = true; // Forces WASM engine to recognize the new layout
+        // [AUDIT: v1.23.93 | SEC_ARCH_LEAD] - JIT validation: Purge corrupted routing coordinates before SVG dispatch.
+        if (this.wires) {
+            this.wires.forEach(w => {
+                if (w.midX === null || isNaN(w.midX)) delete w.midX;
+                if (w.midY === null || isNaN(w.midY)) delete w.midY;
+            });
+        }
         if (typeof WireRenderer !== 'undefined') WireRenderer.drawWires();
     },
 
