@@ -2860,19 +2860,32 @@ const Sim = {
         if (direction === 'popup') {
             popupWrap = document.createElement('div');
             popupWrap.id = 'popup-editor-wrap';
-            popupWrap.style.cssText = 'position: fixed; top: 100px; left: 100px; width: 600px; height: 400px; background: rgba(10, 10, 15, 0.95); backdrop-filter: blur(8px); border: 1px solid #334; border-radius: 6px; display: flex; flex-direction: column; z-index: 9000; resize: both; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.8);';
+            // [AUDIT: v1.24.40 | SEC_ARCH_LEAD] - Expanded popup editor wrapper with granular edge-resize hitboxes and window control toggles.
+            popupWrap.style.cssText = 'position: fixed; top: 100px; left: 100px; width: 600px; height: 400px; background: rgba(10, 10, 15, 0.95); backdrop-filter: blur(8px); border: 1px solid #334; border-radius: 6px; display: flex; flex-direction: column; z-index: 9000; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.8);';
             
             popupWrap.innerHTML = `
-                <div id="popup-editor-head" style="background: #111; padding: 6px 10px; color: #888; cursor: move; display: flex; justify-content: space-between; user-select: none; border-bottom: 1px solid #222; font-family: 'JetBrains Mono', monospace; font-size: 12px;">
-                    <div style="font-weight:bold; color:#ffca28;">CHIP EDITOR: ${targetChip}</div>
-                    <span onclick="document.getElementById('popup-editor-wrap').remove(); document.querySelector('.tab.has-split')?.classList.remove('has-split'); Sim.activeSplitChip = null;" style="cursor:pointer; font-weight:bold; color:#ff4757;">X</span>
+                <div id="popup-editor-head" style="background: #111; padding: 6px 10px; color: #888; cursor: move; display: flex; justify-content: space-between; align-items: center; user-select: none; border-bottom: 1px solid #222; font-family: 'JetBrains Mono', monospace; font-size: 12px; flex-shrink: 0; height: 28px; box-sizing: border-box;">
+                    <div style="font-weight:bold; color:#ffca28; pointer-events:none;">CHIP EDITOR: ${targetChip}</div>
+                    <div style="display:flex; gap:12px; align-items:center;">
+                        <span onclick="const w = document.getElementById('popup-editor-wrap'); if(w.dataset.minimized==='true') return; w.dataset.ow=w.style.width||w.offsetWidth+'px'; w.dataset.oh=w.style.height||w.offsetHeight+'px'; w.style.width='250px'; w.style.height='28px'; w.dataset.minimized='true';" style="cursor:pointer; font-weight:bold; color:#00ffaa; transform:translateY(-4px);">_</span>
+                        <span onclick="const w = document.getElementById('popup-editor-wrap'); if(w.dataset.minimized!=='true') return; w.style.width=w.dataset.ow; w.style.height=w.dataset.oh; w.dataset.minimized='false';" style="cursor:pointer; font-weight:bold; color:#00ffaa; font-size:16px; transform:translateY(-1px);">□</span>
+                        <span onclick="document.getElementById('popup-editor-wrap').remove(); document.querySelector('.tab.has-split')?.classList.remove('has-split'); Sim.activeSplitChip = null;" style="cursor:pointer; font-weight:bold; color:#ff4757;">X</span>
+                    </div>
                 </div>
+                <div class="pe-resize top" style="position:absolute; top:0; left:0; width:100%; height:6px; cursor:n-resize; z-index:100;"></div>
+                <div class="pe-resize bottom" style="position:absolute; bottom:0; left:0; width:100%; height:6px; cursor:s-resize; z-index:100;"></div>
+                <div class="pe-resize left" style="position:absolute; top:0; left:0; width:6px; height:100%; cursor:w-resize; z-index:100;"></div>
+                <div class="pe-resize right" style="position:absolute; top:0; right:0; width:6px; height:100%; cursor:e-resize; z-index:100;"></div>
+                <div class="pe-resize top-left" style="position:absolute; top:0; left:0; width:10px; height:10px; cursor:nw-resize; z-index:101;"></div>
+                <div class="pe-resize top-right" style="position:absolute; top:0; right:0; width:10px; height:10px; cursor:ne-resize; z-index:101;"></div>
+                <div class="pe-resize bottom-left" style="position:absolute; bottom:0; left:0; width:10px; height:10px; cursor:sw-resize; z-index:101;"></div>
+                <div class="pe-resize bottom-right" style="position:absolute; bottom:0; right:0; width:10px; height:10px; cursor:se-resize; z-index:101;"></div>
                 <iframe src="${chipUrl}" style="flex:1; border:none; width:100%; height:100%; background:var(--bg);"></iframe>
             `;
             document.body.appendChild(popupWrap);
             
             // [AUDIT: v1.24.16 | SEC_ARCH_LEAD] - Hardened popup editor drag state against iframe input swallowing.
-            let isDragging = false, startX, startY, initX, initY;
+            let isDragging = false, isResizing = false, resizeDir = '', startX, startY, initX, initY, initW, initH;
             const head = popupWrap.querySelector('#popup-editor-head');
             head.onmousedown = (e) => {
                 if (e.target.tagName === 'SPAN') return;
@@ -2885,14 +2898,54 @@ const Sim = {
                 popupWrap.style.right = 'auto'; popupWrap.style.bottom = 'auto';
                 document.querySelectorAll('iframe').forEach(ifr => ifr.style.pointerEvents = 'none');
             };
+
+            popupWrap.querySelectorAll('.pe-resize').forEach(h => {
+                h.onmousedown = (e) => {
+                    e.stopPropagation();
+                    if (popupWrap.dataset.minimized === 'true') return;
+                    isResizing = true;
+                    resizeDir = h.className.replace('pe-resize ', '');
+                    startX = e.clientX; startY = e.clientY;
+                    const rect = popupWrap.getBoundingClientRect();
+                    initX = rect.left; initY = rect.top;
+                    initW = rect.width; initH = rect.height;
+                    popupWrap.style.left = initX + 'px';
+                    popupWrap.style.top = initY + 'px';
+                    popupWrap.style.right = 'auto'; popupWrap.style.bottom = 'auto';
+                    document.querySelectorAll('iframe').forEach(ifr => ifr.style.pointerEvents = 'none');
+                };
+            });
+
             document.addEventListener('mousemove', (e) => {
-                if (!isDragging) return;
-                popupWrap.style.left = (initX + (e.clientX - startX)) + 'px';
-                popupWrap.style.top = (initY + (e.clientY - startY)) + 'px';
+                if (isDragging) {
+                    popupWrap.style.left = (initX + (e.clientX - startX)) + 'px';
+                    popupWrap.style.top = (initY + (e.clientY - startY)) + 'px';
+                } else if (isResizing) {
+                    const dx = e.clientX - startX;
+                    const dy = e.clientY - startY;
+                    let newW = initW, newH = initH, newX = initX, newY = initY;
+
+                    if (resizeDir.includes('right')) newW = Math.max(250, initW + dx);
+                    if (resizeDir.includes('bottom')) newH = Math.max(60, initH + dy);
+                    if (resizeDir.includes('left')) {
+                        newW = Math.max(250, initW - dx);
+                        newX = initX + (initW - newW);
+                    }
+                    if (resizeDir.includes('top')) {
+                        newH = Math.max(60, initH - dy);
+                        newY = initY + (initH - newH);
+                    }
+
+                    popupWrap.style.width = newW + 'px';
+                    popupWrap.style.height = newH + 'px';
+                    popupWrap.style.left = newX + 'px';
+                    popupWrap.style.top = newY + 'px';
+                }
             });
             document.addEventListener('mouseup', () => {
-                if (isDragging) {
+                if (isDragging || isResizing) {
                     isDragging = false;
+                    isResizing = false;
                     document.querySelectorAll('iframe').forEach(ifr => ifr.style.pointerEvents = 'auto');
                 }
             });
