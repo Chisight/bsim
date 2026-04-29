@@ -267,7 +267,8 @@ const Sim = {
                     nodes: wsStack.length > 0 ? wsStack[0].nodes : cNodes, 
                     wires: wsStack.length > 0 ? wsStack[0].wires : cWires, 
                     library: safeLib, workspaceStack: wsStack, activeEditingChip: this.activeEditingChip,
-                    prefs: { snapNodes: this.snapNodes, snapWires: this.snapWires, confirmDelete: this.confirmDelete, showStats: this.showStats, showTooltips: this.showTooltips, tutorialMode: this.tutorialMode, hudPos: this.hudPos } 
+                    // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - Append toast positioning to auto-save preferences payload.
+                    prefs: { snapNodes: this.snapNodes, snapWires: this.snapWires, confirmDelete: this.confirmDelete, showStats: this.showStats, showTooltips: this.showTooltips, tutorialMode: this.tutorialMode, hudPos: this.hudPos, toastPos: this.toastPos } 
                 };
                 localStorage.setItem('bsim_autosave', JSON.stringify(project));
                 // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: AutoSave operation finalized.
@@ -1864,8 +1865,11 @@ const Sim = {
     },
 
     /**
-     * @IO: UI_TOAST
-     * @INTENT: Display a transient notification message in the UI with optional type-specific styling.
+     * [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - Overhauled toast engine with global positioning persistence and interaction capture.
+     * @ARCH: UI_TOAST_SYSTEM
+     * @STATE: TOAST_PERSISTENCE
+     * @IO: USER_NOTIFICATION
+     * @INTENT: Display interactive, draggable toast notifications with persistent positioning.
      */
     toast(msg, type = 'info', duration = 3000) {
         if (!this.showToasts) return;
@@ -1876,9 +1880,62 @@ const Sim = {
             el = document.createElement('div');
             el.id = 'ui-toast-el'; el.className = 'ui-toast';
             document.body.appendChild(el);
+
+            let holdTimer;
+            let isDragging = false;
+            let offsetX, offsetY;
+
+            el.addEventListener('mousedown', (e) => {
+                if (e.target.tagName === 'SPAN') return; // Bypass button clicks
+                holdTimer = setTimeout(() => {
+                    isDragging = true;
+                    el.classList.add('draggable');
+                    el.classList.add('dragging');
+                    const rect = el.getBoundingClientRect();
+                    offsetX = e.clientX - rect.left;
+                    offsetY = e.clientY - rect.top;
+                }, 1000);
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                el.style.left = (e.clientX - offsetX) + 'px';
+                el.style.top = (e.clientY - offsetY) + 'px';
+                el.style.bottom = 'auto';
+                el.style.transform = 'none';
+            });
+
+            window.addEventListener('mouseup', (e) => {
+                clearTimeout(holdTimer);
+                if (isDragging) {
+                    isDragging = false;
+                    el.classList.remove('draggable');
+                    el.classList.remove('dragging');
+                    const rect = el.getBoundingClientRect();
+                    Sim.toastPos = { left: rect.left, top: rect.top };
+                    Sim.autoSave(); 
+                }
+            });
+            
+            el.addEventListener('mouseleave', () => {
+                if (!isDragging) clearTimeout(holdTimer);
+            });
         }
-        el.innerText = msg;
+        
+        el.innerHTML = msg; // innerHTML allows nested action buttons
         el.className = `ui-toast show toast-${type}`;
+        
+        if (this.toastPos) {
+            el.style.left = this.toastPos.left + 'px';
+            el.style.top = this.toastPos.top + 'px';
+            el.style.bottom = 'auto';
+            el.style.transform = 'none';
+        } else {
+            el.style.left = '50%';
+            el.style.bottom = '80px';
+            el.style.top = 'auto';
+            el.style.transform = 'translateX(-50%)';
+        }
 
         clearTimeout(this._toastTimer);
         if (duration > 0) {
@@ -2183,6 +2240,7 @@ const Sim = {
             const btn = document.createElement('span');
             btn.innerText = '[Apply Global]';
             btn.style.cssText = 'cursor:pointer; text-decoration:underline; margin-left:10px; font-weight:bold; color:#fff;';
+            // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - Apply persistence write and rigid bounds to global node mutator dispatch.
             btn.onclick = () => {
                 this.nodes.forEach(n => {
                     if (n.type === state.node.type) {
@@ -2193,6 +2251,7 @@ const Sim = {
                     }
                 });
                 this.updateWireVisuals();
+                this.autoSave();
                 this.toast(`Global layout applied to all ${state.node.type} components.`, 'success');
             };
             tEl.appendChild(btn);

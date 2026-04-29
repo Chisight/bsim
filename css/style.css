@@ -206,6 +206,16 @@ footer::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px
 .menu-item.disabled { color: #445; cursor: default; }
 .menu-item.disabled:hover { background: transparent; color: #445; }
 
+/* [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - Injected hierarchical sub-menu tokens. */
+.menu-item.has-sub { position: relative; display: flex; justify-content: space-between; align-items: center; }
+.menu-item.has-sub::after { content: '▸'; opacity: 0.5; margin-left: 10px; font-size: 10px; }
+.sub-menu {
+    position: absolute; left: 100%; top: -1px; background: #1a1a23;
+    border: 1px solid #334; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6);
+    display: none; min-width: 120px; z-index: 10001; padding: 5px 0;
+}
+.menu-item.has-sub:hover .sub-menu { display: block; }
+
 .status-chip { 
     background: #22222b; padding: 5px 14px; border-radius: 5px; 
     border: 1px solid #334; cursor: pointer; font-weight: 700; font-size: 11px; 
@@ -242,14 +252,19 @@ footer::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px
 .bit-val.on { color: var(--wire-on); text-shadow: 0 0 5px rgba(0, 255, 170, 0.4); }
 .bit-val.off { color: #553333; }
 
+/* [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - Upgraded toast notification styles for pointer events and drag-state telemetry. */
 .ui-toast {
-    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(20px);
-    background: rgba(17, 17, 22, 0.85); backdrop-filter: blur(8px);
-    color: #fff; padding: 12px 24px; border-radius: 50px; font-size: 13px; font-weight: 600;
-    z-index: 6000; pointer-events: none; opacity: 0; transition: 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
-    border: 1px solid rgba(255, 255, 255, 0.1); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    position: fixed;
+    background: rgba(17, 17, 22, 0.95); backdrop-filter: blur(8px);
+    color: #fff; padding: 14px 28px; border-radius: 8px; font-size: 13px; font-weight: 600;
+    z-index: 6000; pointer-events: auto; opacity: 0; 
+    transition: all 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    border: 1px solid rgba(255, 255, 255, 0.15); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+    cursor: default; user-select: none;
 }
-.ui-toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.ui-toast.show { opacity: 1; }
+.ui-toast.draggable { cursor: grab; outline: 2px dashed var(--accent); }
+.ui-toast.dragging { cursor: grabbing; transition: none; opacity: 0.9; }
 .toast-debug { background: rgba(0, 0, 0, 0.6); color: var(--wire-on); border-color: rgba(255, 202, 40, 0.2); }
 .toast-success { background: rgba(46, 213, 115, 0.8); }
 .toast-info { border-color: rgba(255, 255, 255, 0.2); }

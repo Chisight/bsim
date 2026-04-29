@@ -359,10 +359,41 @@ const InteractionHandler = {
             menu.style.left = e.clientX + 'px';
             menu.style.top = e.clientY + 'px';
 
+            // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - Context menu expanded with multi-bit I/O sub-menus, NAND primitive, and custom macro spawning.
+            let customChipsHtml = '';
+            const customChips = Object.keys(Sim.library);
+            if (customChips.length > 0) {
+                let chipsList = customChips.map(c => `<div class="menu-item" onclick="Sim.addNode('${c}', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">${c}</div>`).join('');
+                customChipsHtml = `
+                    <div class="menu-item has-sub" style="color:#ffca28; font-weight:bold">
+                        Spawn Custom
+                        <div class="sub-menu">
+                            ${chipsList}
+                        </div>
+                    </div>
+                `;
+            }
+
             menu.innerHTML = `
-                <div class="menu-item" style="color:var(--wire-on); font-weight:bold" onclick="Sim.addNode('IN-1', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">Spawn Input</div>
-                <div class="menu-item" style="color:var(--accent); font-weight:bold" onclick="Sim.addNode('OUT-1', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">Spawn Output</div>
+                <div class="menu-item has-sub" style="color:var(--wire-on); font-weight:bold">
+                    Spawn Input
+                    <div class="sub-menu">
+                        <div class="menu-item" onclick="Sim.addNode('IN-1', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">1-Bit</div>
+                        <div class="menu-item" onclick="Sim.addNode('IN-4', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">4-Bit</div>
+                        <div class="menu-item" onclick="Sim.addNode('IN-8', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">8-Bit</div>
+                    </div>
+                </div>
+                <div class="menu-item has-sub" style="color:var(--accent); font-weight:bold">
+                    Spawn Output
+                    <div class="sub-menu">
+                        <div class="menu-item" onclick="Sim.addNode('OUT-1', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">1-Bit</div>
+                        <div class="menu-item" onclick="Sim.addNode('OUT-4', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">4-Bit</div>
+                        <div class="menu-item" onclick="Sim.addNode('OUT-8', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">8-Bit</div>
+                    </div>
+                </div>
                 <div class="menu-item" onclick="Sim.addNode('CLOCK', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">Spawn Clock</div>
+                <div class="menu-item" style="color:#fff; font-weight:bold" onclick="Sim.addNode('NAND', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">Spawn NAND</div>
+                ${customChipsHtml}
             `;
         };
 
