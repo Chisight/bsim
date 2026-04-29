@@ -1,6 +1,6 @@
 /**
- * Simulator Core v1.23.88 (Modular Professional)
- * SECURED: Proportional hitboxes implemented for 1-bit pins to guarantee center-drag. Node interactions globally frozen.
+ * Simulator Core v1.23.90 (Modular Professional)
+ * FIXED: Eradicated pseudo-element dimension snapping and rigidly clamped pin-container bounding offsets.
  */
 const Sim = {
     nodes: [],
@@ -2068,25 +2068,23 @@ const Sim = {
                     Sim.updateWireVisuals();
                 } else if (mode === 'pins') {
                     if (isResizing || m.shiftKey) { 
-                        // [AUDIT: SEC_ARCH_LEAD] - Decoupled X/Y axis scaling to enable side-dragging and corner-dragging natively.
+                        // [AUDIT: SEC_ARCH_LEAD] - Rigid boundary clamping for independent axis scaling to prevent chip escape.
                         if (rLeft) {
-                            const newW = Math.max(16, startPinW - dx);
-                            if (newW !== startPinW) {
-                                node.pinX = Math.max(0, startPinX + (startPinW - newW));
-                                node.pinW = newW;
-                            }
+                            const nextX = Math.max(0, startPinX + dx);
+                            const diffX = nextX - startPinX;
+                            node.pinX = nextX;
+                            node.pinW = Math.max(16, startPinW - diffX);
                         } else if (rRight) {
-                            node.pinW = Math.max(16, Math.min(startNodeW - node.pinX, startPinW + dx));
+                            node.pinW = Math.max(16, Math.min(startNodeW - startPinX, startPinW + dx));
                         }
 
                         if (rTop) {
-                            const newH = Math.max(16, startPinH - dy);
-                            if (newH !== startPinH) {
-                                node.pinY = Math.max(0, startPinY + (startPinH - newH));
-                                node.pinH = newH;
-                            }
+                            const nextY = Math.max(0, startPinY + dy);
+                            const diffY = nextY - startPinY;
+                            node.pinY = nextY;
+                            node.pinH = Math.max(16, startPinH - diffY);
                         } else if (rBottom) {
-                            node.pinH = Math.max(16, Math.min(startNodeH - node.pinY, startPinH + dy));
+                            node.pinH = Math.max(16, Math.min(startNodeH - startPinY, startPinH + dy));
                         }
                         
                         target.style.width = node.pinW + 'px';
@@ -2095,8 +2093,11 @@ const Sim = {
                         target.style.top = node.pinY + 'px';
                     } else { 
                         // Move from Center
-                        const maxW = startNodeW - (node.pinW || target.offsetWidth || 16);
-                        const maxH = startNodeH - (node.pinH || target.offsetHeight || 16);
+                        // [AUDIT: SEC_ARCH_LEAD] - Dynamic width/height recalculation during translation to prevent right/bottom boundary escape.
+                        const curW = node.pinW || target.offsetWidth || 16;
+                        const curH = node.pinH || target.offsetHeight || 16;
+                        const maxW = Math.max(0, startNodeW - curW);
+                        const maxH = Math.max(0, startNodeH - curH);
                         node.pinX = Math.max(0, Math.min(maxW, startPinX + dx));
                         node.pinY = Math.max(0, Math.min(maxH, startPinY + dy));
                         target.style.left = node.pinX + 'px';
@@ -2105,15 +2106,7 @@ const Sim = {
                 }
             };
             const onUp = () => {
-                // [AUDIT: SEC_ARCH_LEAD] - Dynamic overflow resolution: snap dimensions to fit flexbox children if scaled too tightly.
-                if (mode === 'pins' && target) {
-                    if (target.scrollWidth > target.clientWidth || target.scrollHeight > target.clientHeight) {
-                        node.pinW = Math.max(node.pinW || 0, target.scrollWidth);
-                        node.pinH = Math.max(node.pinH || 0, target.scrollHeight);
-                        target.style.width = node.pinW + 'px';
-                        target.style.height = node.pinH + 'px';
-                    }
-                }
+                // [AUDIT: SEC_ARCH_LEAD] - Removed unstable scrollWidth snap-calculation overlapping with CSS pseudo-elements.
                 document.removeEventListener('mousemove', onMove);
                 document.removeEventListener('mouseup', onUp);
             };
