@@ -91,6 +91,10 @@ const DebugTerminal = {
      * @INTENT: Initialize the debug terminal subsystem, including UI construction and console interception.
      */
     init() {
+        // [AUDIT: v1.24.18 | SEC_ARCH_LEAD] - Prevent duplicate initialization from concurrent lifecycle hooks causing DOM ghosts.
+        if (this._initialized) return;
+        this._initialized = true;
+
         this.injectCSS();
         this.buildUI();
         this.attachHooks();
@@ -166,11 +170,11 @@ const DebugTerminal = {
             }
         });
 
-        // [AUDIT: v1.24.16 | SEC_ARCH_LEAD] - Repaired terminal drag constraints to prevent iframe swallowing and position jumps.
+        // [AUDIT: v1.24.18 | SEC_ARCH_LEAD] - Hardened terminal header drag logic with isolated window controls.
         let isDragging = false, startX, startY, initX, initY;
         const head = document.getElementById('dt-head');
         head.onmousedown = (e) => {
-            if (e.target.id === 'dt-min' || e.target.id === 'dt-close') return;
+            if (e.target.closest && e.target.closest('#dt-min, #dt-close')) return;
             isDragging = true;
             startX = e.clientX; startY = e.clientY;
             const rect = this.ui.getBoundingClientRect();
@@ -193,8 +197,13 @@ const DebugTerminal = {
         });
 
         // Window Controls
-        document.getElementById('dt-close').onclick = () => this.toggle(false);
-        document.getElementById('dt-min').onclick = () => {
+        const btnClose = document.getElementById('dt-close');
+        btnClose.onmousedown = (e) => e.stopPropagation();
+        btnClose.onclick = () => this.toggle(false);
+
+        const btnMin = document.getElementById('dt-min');
+        btnMin.onmousedown = (e) => e.stopPropagation();
+        btnMin.onclick = () => {
             const isMin = this.ui.style.height === '30px';
             this.ui.style.height = isMin ? '400px' : '30px';
             document.getElementById('dt-in-row').style.display = isMin ? 'flex' : 'none';
