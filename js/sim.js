@@ -9,7 +9,7 @@ const Sim = {
     workspaceStack: [],
     activeEditingChip: null,
     activeSplitChip: null,
-    tabs: [{ id: 'tab-1', name: 'Main', nodes: [], wires: [], historyStack: [], historyIndex: -1 }],
+    tabs: [{ id: 'tab-1', name: 'Main', nodes: [], wires: [], historyStack: [], historyIndex: -1, activeSplitChip: null, splitDirection: 'right' }],
     activeTabId: 'tab-1',
     wireMap: new Map(),
     _netlistDirty: true, // [wasm] flag to indicate that the netlist needs to be recompiled
@@ -306,7 +306,9 @@ const Sim = {
                     id: t.id, name: t.name,
                     nodes: (t.id === this.activeTabId && this.workspaceStack.length === 0) ? cNodes : (t.nodes || []).map(n => this._cleanNode(n)).filter(n => n !== null),
                     wires: (t.id === this.activeTabId && this.workspaceStack.length === 0) ? cWires : (t.wires || []).map(w => this._cleanWire(w)).filter(w => w !== null),
-                    historyStack: t.historyStack || [], historyIndex: t.historyIndex !== undefined ? t.historyIndex : -1
+                    historyStack: t.historyStack || [], historyIndex: t.historyIndex !== undefined ? t.historyIndex : -1,
+                    activeSplitChip: t.id === this.activeTabId ? this.activeSplitChip : t.activeSplitChip,
+                    splitDirection: t.id === this.activeTabId ? (document.getElementById('main')?.classList.contains('split-left') ? 'left' : (document.getElementById('main')?.classList.contains('split-right') ? 'right' : (this.activeSplitChip ? 'popup' : null))) : t.splitDirection
                 }));
 
                 const project = { 
@@ -362,6 +364,11 @@ const Sim = {
                         if (window.History) {
                             History.stack = t.historyStack ? [...t.historyStack] : [];
                             History.index = t.historyIndex !== undefined ? t.historyIndex : -1;
+                        }
+                        if (t.activeSplitChip) {
+                            setTimeout(() => {
+                                this.uiSplitEditor(t.splitDirection || 'right', t.activeSplitChip, true);
+                            }, 100);
                         }
                     }
                 }
@@ -2178,7 +2185,7 @@ const Sim = {
     uiNewTab() {
         if (this.activeEditingChip) return this.toast('Cannot create tabs while editing a chip.', 'warning');
         const newId = 'tab-' + Math.random().toString(36).substr(2, 5);
-        this.tabs.push({ id: newId, name: `Board ${this.tabs.length + 1}`, nodes: [], wires: [], historyStack: [], historyIndex: -1 });
+        this.tabs.push({ id: newId, name: `Board ${this.tabs.length + 1}`, nodes: [], wires: [], historyStack: [], historyIndex: -1, activeSplitChip: null, splitDirection: 'right' });
         this.uiSwitchTab(newId);
     },
 
@@ -2196,6 +2203,9 @@ const Sim = {
                 oldTab.historyStack = [...History.stack];
                 oldTab.historyIndex = History.index;
             }
+            oldTab.activeSplitChip = this.activeSplitChip;
+            const mainEl = document.getElementById('main');
+            oldTab.splitDirection = mainEl?.classList.contains('split-left') ? 'left' : (mainEl?.classList.contains('split-right') ? 'right' : (this.activeSplitChip ? 'popup' : null));
         }
 
         // Close split pane if active
@@ -2230,6 +2240,11 @@ const Sim = {
                 History.stack = newTab.historyStack ? [...newTab.historyStack] : [];
                 History.index = newTab.historyIndex !== undefined ? newTab.historyIndex : -1;
                 History.updateButtons();
+            }
+            
+            // [AUDIT: v1.24.11 | SEC_ARCH_LEAD] - Restore persisted split-pane editor context on tab switch.
+            if (newTab.activeSplitChip) {
+                this.uiSplitEditor(newTab.splitDirection || 'right', newTab.activeSplitChip, true);
             }
         }
 
@@ -2771,10 +2786,10 @@ const Sim = {
      * @STATE: LIBRARY_SYNC
      * @INTENT: Save current chip logic to the library and return to the parent workspace context.
      */
-    // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Architecture augmentation for dual-pane editing layout with workspace clearing.
-    uiSplitEditor(direction) {
-        if (!this.activeEditingChip) return;
-        const targetChip = this.activeEditingChip;
+    // [AUDIT: v1.24.11 | SEC_ARCH_LEAD] - Architecture augmentation for dual-pane editing layout with workspace clearing and state restoration.
+    uiSplitEditor(direction, overrideChip = null, isRestore = false) {
+        const targetChip = overrideChip || this.activeEditingChip;
+        if (!targetChip) return;
         const tab = document.querySelector(`.tab[onclick*="${this.activeTabId}"]`);
         
         let splitFrame = document.getElementById('split-editor-frame');
@@ -2842,11 +2857,11 @@ const Sim = {
                 main.appendChild(splitFrame);
             }
             if (tab) tab.classList.add('has-split');
-            this.toast(`Split pane activated: ${direction.toUpperCase()}`, 'info');
+            if (!isRestore) this.toast(`Split pane activated: ${direction.toUpperCase()}`, 'info');
         }
         this.activeSplitChip = targetChip;
         // Restore parent workspace in main view.
-        this.uiExitChipEdit();
+        if (!isRestore) this.uiExitChipEdit();
     },
 
     // [AUDIT: v1.24.09 | SEC_ARCH_LEAD] - Ensure context exit captures logic strictly.
