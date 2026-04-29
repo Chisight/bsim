@@ -102,21 +102,25 @@ const DebugTerminal = {
      * @ARCH: UI_STYLING
      * @INTENT: Inject terminal-specific CSS into the document head for the telemetry interface.
      */
+    // [AUDIT: v1.23.97 | SEC_ARCH_LEAD] - Upgraded terminal aesthetic and enforced text-selection capabilities.
     injectCSS() {
         const style = document.createElement('style');
         style.innerHTML = `
-            #dt-wrap { position: fixed; bottom: 20px; right: 20px; width: 500px; height: 350px; background: rgba(10, 10, 15, 0.85); backdrop-filter: blur(8px); border: 1px solid #334; border-radius: 6px; display: none; flex-direction: column; z-index: 9999; resize: both; overflow: hidden; font-family: 'JetBrains Mono', monospace; font-size: 11px; box-shadow: 0 10px 30px rgba(0,0,0,0.5); }
-            #dt-head { background: #1a1a24; padding: 6px 10px; color: #889; cursor: move; display: flex; justify-content: space-between; user-select: none; border-bottom: 1px solid #334; }
+            #dt-wrap { position: fixed; bottom: 20px; right: 20px; width: 600px; height: 400px; background: rgba(10, 10, 15, 0.95); backdrop-filter: blur(8px); border: 1px solid #334; border-radius: 6px; display: none; flex-direction: column; z-index: 9999; resize: both; overflow: hidden; font-family: 'JetBrains Mono', 'Courier New', monospace; font-size: 12px; box-shadow: 0 10px 30px rgba(0,0,0,0.8); user-select: text; }
+            #dt-head { background: #111; padding: 6px 10px; color: #888; cursor: move; display: flex; justify-content: space-between; user-select: none; border-bottom: 1px solid #222; }
             #dt-head span:hover { color: #fff; }
-            #dt-out { flex: 1; padding: 10px; overflow-y: auto; color: #ccc; word-wrap: break-word; }
-            #dt-out::-webkit-scrollbar { width: 6px; }
-            #dt-out::-webkit-scrollbar-thumb { background: #445; border-radius: 3px; }
-            #dt-in { background: #0d0d12; color: #0fa; border: none; border-top: 1px solid #334; padding: 8px 10px; outline: none; width: 100%; box-sizing: border-box; font-family: inherit; }
-            .dt-msg { margin-bottom: 4px; }
-            .dt-err { color: #f55; }
-            .dt-warn { color: #fa0; }
-            .dt-sys { color: #0af; }
-            .dt-ok { color: #0f5; }
+            #dt-out { flex: 1; padding: 10px; overflow-y: auto; color: #ddd; word-wrap: break-word; user-select: text !important; -webkit-user-select: text !important; cursor: text; }
+            #dt-out::-webkit-scrollbar { width: 8px; }
+            #dt-out::-webkit-scrollbar-thumb { background: #334; }
+            #dt-in-row { display: flex; align-items: center; background: #000; border-top: 1px solid #222; padding: 0 10px; }
+            #dt-prompt { color: #0f5; font-weight: bold; margin-right: 8px; white-space: nowrap; user-select: none; }
+            #dt-in { background: transparent; color: #fff; border: none; padding: 10px 0; outline: none; width: 100%; font-family: inherit; font-size: inherit; flex: 1; }
+            .dt-msg { margin-bottom: 4px; line-height: 1.4; user-select: text !important; -webkit-user-select: text !important; }
+            .dt-msg::selection { background: rgba(0, 255, 170, 0.3); }
+            .dt-err { color: #ff5555; }
+            .dt-warn { color: #ffaa00; }
+            .dt-sys { color: #8888aa; }
+            .dt-ok { color: #00ffaa; }
         `;
         document.head.appendChild(style);
     },
@@ -126,16 +130,20 @@ const DebugTerminal = {
      * @STATE: TERMINAL_STATE
      * @INTENT: Build the terminal DOM elements and attach dragging/resize event listeners.
      */
+    // [AUDIT: v1.23.97 | SEC_ARCH_LEAD] - Injected Linux-style DOM wrappers for terminal prompt and auto-focus logic.
     buildUI() {
         this.ui = document.createElement('div');
         this.ui.id = 'dt-wrap';
         this.ui.innerHTML = `
             <div id="dt-head">
-                <div style="font-weight:bold; color:#0af;">WASM/V8 TELEMETRY</div>
+                <div style="font-weight:bold; color:#888;">user@bsim: ~/workspace</div>
                 <div><span id="dt-min" style="cursor:pointer; margin-right:8px;">_</span><span id="dt-close" style="cursor:pointer;">X</span></div>
             </div>
             <div id="dt-out"></div>
-            <input id="dt-in" type="text" placeholder="type 'help'..." autocomplete="off" spellcheck="false" />
+            <div id="dt-in-row">
+                <span id="dt-prompt">bsim:~$</span>
+                <input id="dt-in" type="text" autocomplete="off" spellcheck="false" />
+            </div>
         `;
         document.body.appendChild(this.ui);
 
@@ -147,6 +155,12 @@ const DebugTerminal = {
         });
 
         this.inp = document.getElementById('dt-in');
+        
+        this.out.addEventListener('click', () => {
+            if (window.getSelection().toString().length === 0) {
+                this.inp.focus();
+            }
+        });
 
         // Dragging Logic
         let isDragging = false, startX, startY, initX, initY;
@@ -170,8 +184,8 @@ const DebugTerminal = {
         document.getElementById('dt-close').onclick = () => this.toggle(false);
         document.getElementById('dt-min').onclick = () => {
             const isMin = this.ui.style.height === '30px';
-            this.ui.style.height = isMin ? '350px' : '30px';
-            this.inp.style.display = isMin ? 'block' : 'none';
+            this.ui.style.height = isMin ? '400px' : '30px';
+            document.getElementById('dt-in-row').style.display = isMin ? 'flex' : 'none';
         };
 
         // Input Handle
@@ -223,10 +237,11 @@ const DebugTerminal = {
      * @IO: TERMINAL_OUTPUT
      * @INTENT: Append a formatted message line to the terminal output display.
      */
+    // [AUDIT: v1.23.97 | SEC_ARCH_LEAD] - Removed forced prompt character to align with standard stdout aesthetics.
     print(msg, type = 'sys') {
         const line = document.createElement('div');
         line.className = `dt-msg dt-${type}`;
-        line.innerText = `> ${msg}`;
+        line.innerText = msg;
         this.out.appendChild(line);
         this.out.scrollTop = this.out.scrollHeight;
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Message appended to terminal buffer.
@@ -237,21 +252,88 @@ const DebugTerminal = {
      * @IO: TERMINAL_INPUT
      * @INTENT: Parse and execute user-entered terminal commands for simulator control.
      */
+    // [AUDIT: v1.23.97 | SEC_ARCH_LEAD] - Expanded terminal CLI mapping for netlist manipulation and inspection.
     exec(cmd) {
-        this.print(cmd, 'ok');
-        const args = cmd.split(' ');
+        this.print(`bsim:~$ ${cmd}`, 'sys');
+        const args = cmd.trim().split(/\s+/);
         const c = args[0].toLowerCase();
 
         switch (c) {
             case 'help':
                 this.print("Commands: exit, clear, verbosity [0-3], synth [gate], trace [nodeId]");
-                this.print("synth <gate>: Hierarchically compiles logic from NANDs.");
-                this.print("trace [nodeId]: Output topological connections and logic states. Defaults to active selection.");
+                this.print("  ls                  - List all nodes in workspace");
+                this.print("  spawn <type> [x y]  - Add a node (e.g., spawn NAND 100 100)");
+                this.print("  rm <nodeId>         - Delete a node");
+                this.print("  set <nodeId> <val>  - Set input node value (e.g., set node-xyz 1)");
+                this.print("  wire <n1> <p1> <n2> <p2> - Connect two nodes");
+                this.print("  sim                 - Force a manual propagation tick");
+                this.print("  status              - Show engine and netlist statistics");
+                this.print("  synth <gate>        - Hierarchically compiles logic from NANDs.");
+                this.print("  trace [nodeId]      - Output topological connections and logic states.");
                 break;
             case 'exit': this.toggle(false); break;
             case 'clear': this.out.innerHTML = ''; break;
             case 'verbosity':
                 if (args[1]) { this.verbosity = parseInt(args[1]); this.print(`Verbosity -> ${this.verbosity}`); }
+                break;
+            case 'ls':
+                this.print(`--- NODE LIST (${Sim.nodes.length}) ---`, "warn");
+                Sim.nodes.forEach(n => {
+                    const out = `[${n.id}] ${n.type.padEnd(8)} @(${Math.round(n.x)},${Math.round(n.y)}) val:${n.val}`;
+                    this.print(out, "ok");
+                });
+                break;
+            case 'spawn':
+                if (!args[1]) return this.print("Usage: spawn <type> [x] [y]", "err");
+                const type = args[1].toUpperCase();
+                const x = parseFloat(args[2]) || parseInt(View.x) + 100 || 0;
+                const y = parseFloat(args[3]) || parseInt(View.y) + 100 || 0;
+                Sim.addNode(type, x, y);
+                this.print(`Spawned ${type} at ${x}, ${y}`, "ok");
+                break;
+            case 'rm':
+                if (!args[1]) return this.print("Usage: rm <nodeId>", "err");
+                const targetNode = Sim.nodes.find(n => n.id === args[1]);
+                if (!targetNode) return this.print(`Node ${args[1]} not found.`, "err");
+                Sim.selection.clear();
+                Sim.selection.add(targetNode.id);
+                Sim.deleteSelection();
+                this.print(`Deleted node ${args[1]}`, "ok");
+                break;
+            case 'set':
+                if (args.length < 3) return this.print("Usage: set <nodeId> <value>", "err");
+                const sn = Sim.nodes.find(n => n.id === args[1]);
+                if (!sn) return this.print(`Node ${args[1]} not found.`, "err");
+                const val = parseInt(args[2]);
+                if (isNaN(val)) return this.print("Value must be a number.", "err");
+                sn.val = val;
+                sn.state = val;
+                Sim.updateNodeVisual(sn);
+                Sim.seedQueue(); Sim.processQueue();
+                this.print(`Set ${args[1]} to ${val}`, "ok");
+                break;
+            case 'wire':
+                if (args.length < 5) return this.print("Usage: wire <node1> <port1> <node2> <port2>", "err");
+                Sim.wires.push({
+                    from: { nodeId: args[1], portId: args[2], isOutput: true },
+                    to: { nodeId: args[3], portId: args[4], isOutput: false }
+                });
+                WireRenderer.drawWires();
+                Sim.seedQueue(); Sim.processQueue();
+                this.print(`Wired ${args[1]}[${args[2]}] to ${args[3]}[${args[4]}]`, "ok");
+                break;
+            case 'sim':
+                Sim.seedQueue(); Sim.processQueue();
+                this.print("Propagation tick queued.", "ok");
+                break;
+            case 'status':
+                this.print(`--- SIMULATOR STATUS ---`, "warn");
+                this.print(`Nodes: ${Sim.nodes.length} | Wires: ${Sim.wires.length}`, "ok");
+                this.print(`Engine: ${Sim.useWasm ? 'WebAssembly (Fast)' : 'V8 JavaScript (Fallback)'}`, "sys");
+                if (window.WasmEngine) {
+                    this.print(`Wasm Parity: ${WasmEngine.ready ? 'ONLINE' : 'OFFLINE'}`, WasmEngine.ready ? "ok" : "err");
+                    if (WasmEngine.wasmMemory) this.print(`Cycle Map: ${(WasmEngine.wasmMemory.buffer.byteLength / 1024).toFixed(2)} KB`, "sys");
+                }
                 break;
             case 'synth':
                 if (!args[1]) return this.print("Missing target. Ex: synth XOR", "err");

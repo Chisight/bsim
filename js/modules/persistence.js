@@ -114,7 +114,7 @@ const ProjectManager = {
             if (data.library) Object.values(data.library).forEach(chip => fixNetlist(chip.wires, chip.nodes));
 
             if (!data.meta) data.meta = {};
-            data.meta.version = (window.EXPECTED_BSIM_VERSION || "1.23.96") + "-Modular";
+            data.meta.version = (window.EXPECTED_BSIM_VERSION || "1.23.97") + "-Modular";
             // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Migration complete. Target version: ${data.meta.version}.
             return data;
         },
