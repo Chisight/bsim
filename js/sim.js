@@ -2468,8 +2468,8 @@ const Sim = {
             const rRight = clickX > target.offsetWidth - thX;
             const rTop = clickY < thY;
             const rBottom = clickY > target.offsetHeight - thY;
-            // [AUDIT: v1.24.35 | SEC_ARCH_LEAD] - Authorized boundary resizing for info readouts, labels, and ports.
-            const isResizing = (mode === 'pin-labels' || mode === 'pin-both') ? true : ((mode === 'pins' || mode === 'pin-dots' || mode === 'info' || mode === 'label') && (rLeft || rRight || rTop || rBottom));
+            // [AUDIT: v1.24.38 | SEC_ARCH_LEAD] - Unified translation and scaling boolean logic to prevent dead zones on proxy.
+            const isResizing = (mode === 'pin-labels' || mode === 'pin-both') ? (rLeft || rRight || rTop || rBottom) : ((mode === 'pins' || mode === 'pin-dots' || mode === 'info' || mode === 'label') && (rLeft || rRight || rTop || rBottom));
             
             const startX = e.clientX;
             const startY = e.clientY;
@@ -2496,7 +2496,7 @@ const Sim = {
                     el.style.width = node.customWidth + 'px';
                     el.style.height = node.customHeight + 'px';
                     Sim.updateWireVisuals();
-                } else if (mode === 'pins' || mode === 'info' || mode === 'label') {
+                } else if (mode === 'pins' || mode === 'info' || mode === 'label' || mode === 'pin-labels' || mode === 'pin-both') {
                     let cX = startPinX, cY = startPinY, cW = startPinW, cH = startPinH;
                     if (isResizing || m.shiftKey) { 
                         // [AUDIT: v1.24.27 | SEC_ARCH_LEAD] - Adjusted scaling constraints for label geometries to permit overhangs and font scaling.
@@ -2510,18 +2510,18 @@ const Sim = {
                         }
 
                         if (mode === 'pin-labels' || mode === 'pin-both') {
-                            const isCenterDrag = !rTop && !rBottom;
-                            if (isCenterDrag) {
-                                // [AUDIT: v1.24.35 | SEC_ARCH_LEAD] - Expand and compress symmetrically from center layout block.
-                                cY = startPinY - dy;
-                                cH = Math.max(10, startPinH + dy * 2);
-                            } else if (rTop) {
+                            // [AUDIT: v1.24.38 | SEC_ARCH_LEAD] - Isolated 1D vertical geometric mutations for port proxies absorbing horizontal input without translation.
+                            cX = startPinX; 
+                            cW = startPinW;
+                            if (rTop) {
                                 const nextY = startPinY + dy;
-                                const diffY = nextY - startPinY;
                                 cY = nextY;
-                                cH = Math.max(10, startPinH - diffY);
+                                cH = Math.max(10, startPinH - (nextY - startPinY));
                             } else if (rBottom) {
                                 cH = Math.max(10, startPinH + dy);
+                            } else if (m.shiftKey) { // Shift-drag from center symmetrically scales
+                                cY = startPinY - dy;
+                                cH = Math.max(10, startPinH + dy * 2);
                             }
                         } else if (rTop) {
                             const nextY = mode === 'label' ? startPinY + dy : Math.max(0, startPinY + dy);

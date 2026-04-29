@@ -367,12 +367,12 @@ body.edit-mode-active .port { pointer-events: none; opacity: 0.2; }
 body.edit-mode-active .bit-dot { pointer-events: none; }
 body.edit-mode-active .visual-extra { pointer-events: none; opacity: 0.5; }
 body.edit-mode-active .gate-label { pointer-events: none; opacity: 0.5; }
-/* [AUDIT: v1.24.26 | SEC_ARCH_LEAD] - Unblocked layout mutators from global interaction freeze. */
-body.edit-mode-active .visual-extra.editing-pins, body.edit-mode-active .gate-label.editing-pins { pointer-events: auto !important; opacity: 1 !important; }
+/* [AUDIT: v1.24.38 | SEC_ARCH_LEAD] - Unblocked layout mutators and proxy layers from global interaction freeze. */
+body.edit-mode-active .visual-extra.editing-pins, body.edit-mode-active .gate-label.editing-pins, body.edit-mode-active .port-edit-proxy.editing-pins { pointer-events: auto !important; opacity: 1 !important; }
 
 /* [AUDIT: SEC_ARCH_LEAD] - Polyfill extended hitboxes for info layout mutator. */
-/* [AUDIT: v1.24.26 | SEC_ARCH_LEAD] - Polyfill extended hitboxes for label layout mutator. */
-.pin-container.editing-pins::after, .visual-extra.editing-pins::after, .gate-label.editing-pins::after {
+/* [AUDIT: v1.24.38 | SEC_ARCH_LEAD] - Polyfill extended hitboxes and port intercept shields for proxy mutators. */
+.pin-container.editing-pins::after, .visual-extra.editing-pins::after, .gate-label.editing-pins::after, .port-edit-proxy.editing-pins::after {
     content: '';
     position: absolute;
     top: -12px; left: -12px; right: -12px; bottom: -12px;
