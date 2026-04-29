@@ -341,28 +341,37 @@ const DebugTerminal = {
         });
     },
 
-    getNodesForCwd() {
+    // [AUDIT: v1.24.06 | SEC_ARCH_LEAD] - Unified contextual environment resolver for split-pane and virtual workspaces.
+    getContext() {
+        const defaultCtx = { nodes: Sim.nodes, wires: Sim.wires, simObj: Sim };
+        if (this.cwd === '/') return { nodes: [], wires: [], simObj: null };
+        
         const tMatch = this.cwd.match(/^\/home\/bsim\/(tab-\d+|[^/]+)(?:\/(editor))?$/);
-        if (!tMatch) return [];
+        if (!tMatch) return defaultCtx;
+        
         const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === tMatch[1] || t.id === tMatch[1]);
-        if (!tab) return [];
+        if (!tab) return defaultCtx;
+        
         if (tMatch[2] === 'editor') {
             if (Sim.activeTabId === tab.id) {
-                if (Sim.activeEditingChip) return Sim.nodes;
+                if (Sim.activeEditingChip) return defaultCtx;
                 if (Sim.activeSplitChip) {
                     const sf = document.querySelector('#split-editor-frame iframe') || document.querySelector('#popup-editor-wrap iframe');
-                    if (sf && sf.contentWindow && sf.contentWindow.Sim) return sf.contentWindow.Sim.nodes;
+                    if (sf && sf.contentWindow && sf.contentWindow.Sim) {
+                        return { nodes: sf.contentWindow.Sim.nodes, wires: sf.contentWindow.Sim.wires, simObj: sf.contentWindow.Sim };
+                    }
                 }
             }
         } else {
             if (Sim.activeTabId === tab.id) {
-                if (Sim.activeEditingChip && Sim.workspaceStack.length > 0) return Sim.workspaceStack[0].nodes;
-                if (!Sim.activeEditingChip && Sim.activeSplitChip) return Sim.nodes;
-                return Sim.nodes;
+                if (Sim.activeEditingChip && Sim.workspaceStack.length > 0) {
+                    return { nodes: Sim.workspaceStack[0].nodes, wires: Sim.workspaceStack[0].wires, simObj: Sim };
+                }
+                return defaultCtx;
             }
-            return tab.nodes;
+            return { nodes: tab.nodes || [], wires: tab.wires || [], simObj: null };
         }
-        return [];
+        return { nodes: [], wires: [], simObj: null };
     },
 
     // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Context-aware autocomplete via VFS integration.
@@ -402,7 +411,7 @@ const DebugTerminal = {
                     return (searchPath ? searchPath + '/' : '') + d;
                 });
             } else {
-                const cNodes = this.getNodesForCwd();
+                const cNodes = this.getContext().nodes;
                 matches = cNodes.map(n => n.id).filter(id => id.toLowerCase().startsWith(prefix));
                 const shortMatches = cNodes.map(n => n.id.replace('node-', '')).filter(id => id.toLowerCase().startsWith(prefix));
                 matches = [...new Set([...matches, ...shortMatches])];
@@ -459,14 +468,25 @@ const DebugTerminal = {
         this.print("Terminal contents saved.", "ok");
     },
 
+    // [AUDIT: v1.24.06 | SEC_ARCH_LEAD] - Polyfilled node highlighting to transcend iframe boundaries.
     highlightNode(id) {
         this.clearHighlight();
-        const el = document.getElementById(id);
+        let el = document.getElementById(id);
+        if (!el) {
+            const sf = document.querySelector('#split-editor-frame iframe') || document.querySelector('#popup-editor-wrap iframe');
+            if (sf && sf.contentWindow && sf.contentWindow.document) {
+                el = sf.contentWindow.document.getElementById(id);
+            }
+        }
         if (el) el.classList.add('dt-target-highlight');
     },
 
     clearHighlight() {
         document.querySelectorAll('.dt-target-highlight').forEach(el => el.classList.remove('dt-target-highlight'));
+        const sf = document.querySelector('#split-editor-frame iframe') || document.querySelector('#popup-editor-wrap iframe');
+        if (sf && sf.contentWindow && sf.contentWindow.document) {
+            sf.contentWindow.document.querySelectorAll('.dt-target-highlight').forEach(el => el.classList.remove('dt-target-highlight'));
+        }
     },
 
     /**
@@ -800,23 +820,28 @@ const DebugTerminal = {
                 });
                 Sim.autoSave();
                 break;
-            case 'rm':
+            case 'rm': {
                 // [AUDIT: v1.24.02 | SEC_ARCH_LEAD] - Integrated recursive file system deletion logic (rm -rf).
                 const isRf = args.includes('-rf') || args.includes('-r') || args.includes('-f');
                 const rmArgs = args.filter(a => a !== 'rm' && !a.startsWith('-'));
                 
                 if (rmArgs.length === 0) return this.print("Usage: rm [-rf] <id|path> [id2...]", "err");
                 
+                const ctx = this.getContext();
+                
                 if (rmArgs[0] === 'all' && this.cwd.startsWith('/home/bsim')) {
-                    Sim.selection.clear();
-                    Sim.nodes.forEach(n => Sim.selection.add(n.id));
-                    Sim.deleteSelection();
-                    return this.print("Cleared entire workspace.", "ok");
+                    if (ctx.simObj) {
+                        ctx.simObj.selection.clear();
+                        ctx.nodes.forEach(n => ctx.simObj.selection.add(n.id));
+                        ctx.simObj.deleteSelection();
+                        return this.print("Cleared entire active workspace.", "ok");
+                    }
+                    return this.print("Cannot clear inactive workspace.", "err");
                 }
 
                 let rmCount = 0;
                 let rmDirCount = 0;
-                Sim.selection.clear();
+                if (ctx.simObj) ctx.simObj.selection.clear();
                 
                 rmArgs.forEach(target => {
                     if (target.includes('/') || this.cwd.startsWith('/etc/lib')) {
@@ -852,32 +877,38 @@ const DebugTerminal = {
                             this.print(`rm: cannot remove '${target}': Permission denied`, "err");
                         }
                     } else {
-                        const n = Sim.nodes.find(node => node.id === target || node.id === `node-${target}`);
-                        if (n) { Sim.selection.add(n.id); rmCount++; }
+                        const n = ctx.nodes.find(node => node.id === target || node.id === `node-${target}`);
+                        if (n && ctx.simObj) { ctx.simObj.selection.add(n.id); rmCount++; }
                     }
                 });
                 
-                if (Sim.selection.size > 0) Sim.deleteSelection();
+                if (ctx.simObj && ctx.simObj.selection.size > 0) ctx.simObj.deleteSelection();
+                
                 if (rmCount > 0 || rmDirCount > 0) {
                     if (rmDirCount > 0 || this.cwd.startsWith('/etc/lib')) Sim.updateLibraryUI();
                     this.print(`Removed ${rmCount} item(s).`, "ok");
                     Sim.autoSave();
-                } else if (Sim.selection.size === 0 && rmCount === 0 && rmDirCount === 0) {
+                } else if ((!ctx.simObj || ctx.simObj.selection.size === 0) && rmCount === 0 && rmDirCount === 0) {
                     this.print("No valid items found to delete.", "err");
                 }
                 break;
-            case 'set':
+            }
+            case 'set': {
                 if (args.length < 3) return this.print("Usage: set <nodeId> <value>", "err");
-                const sn = Sim.nodes.find(n => n.id === args[1]);
+                const ctx = this.getContext();
+                const sn = ctx.nodes.find(n => n.id === args[1] || n.id === `node-${args[1]}`);
                 if (!sn) return this.print(`Node ${args[1]} not found.`, "err");
                 const val = parseInt(args[2]);
                 if (isNaN(val)) return this.print("Value must be a number.", "err");
                 sn.val = val;
                 sn.state = val;
-                Sim.updateNodeVisual(sn);
-                Sim.seedQueue(); Sim.processQueue();
-                this.print(`Set ${args[1]} to ${val}`, "ok");
+                if (ctx.simObj) {
+                    ctx.simObj.updateNodeVisual(sn);
+                    ctx.simObj.seedQueue(); ctx.simObj.processQueue();
+                }
+                this.print(`Set ${sn.id} to ${val}`, "ok");
                 break;
+            }
             case 'wire':
                 if (args.length < 5) return this.print("Usage: wire <node1> <port1> <node2> <port2>", "err");
                 Sim.wires.push({
@@ -931,13 +962,15 @@ const DebugTerminal = {
                     this.print(`Watching ${args[1]} for state changes...`, "ok");
                 }
                 break;
-            case 'dump':
+            case 'dump': {
                 if (!args[1]) return this.print("Usage: dump <nodeId|macro>", "err");
-                let dNode = Sim.nodes.find(n => n.id === args[1]);
+                const ctx = this.getContext();
+                let dNode = ctx.nodes.find(n => n.id === args[1] || n.id === `node-${args[1]}`);
                 if (!dNode) dNode = Sim.library[args[1]];
                 if (!dNode) return this.print("Node/Macro not found.", "err");
                 this.print(`<pre style="margin:0; font-size:10px; line-height:1.2;">${JSON.stringify(dNode, null, 2)}</pre>`, "sys");
                 break;
+            }
             case 'cp': {
                 // [AUDIT: v1.24.05 | SEC_ARCH_LEAD] - Enforced block scope to prevent let/const hoisting conflicts across switch cases.
                 if (args.length < 3) return this.print("Usage: cp <src> <dest>", "err");
@@ -1085,29 +1118,37 @@ const DebugTerminal = {
      * @IO: TERMINAL_OUTPUT
      * @INTENT: Map and display the connectivity and signal state of a specific node or the current selection.
      */
+    // [AUDIT: v1.24.06 | SEC_ARCH_LEAD] - Context-aware topological tracing for nested workspace resolution.
     traceNode(nodeId) {
         if (!window.Sim) return this.print("Simulator context offline.", "err");
         
+        const ctx = this.getContext();
+        
         let targetId = nodeId;
         if (!targetId) {
-            if (Sim.selection.size === 1) targetId = Array.from(Sim.selection)[0];
+            if (ctx.simObj && ctx.simObj.selection && ctx.simObj.selection.size === 1) targetId = Array.from(ctx.simObj.selection)[0];
             else return this.print("Specify a nodeId or select exactly one node. Ex: trace node-123", "err");
         }
         
-        const node = Sim.nodes.find(n => n.id === targetId);
+        const node = ctx.nodes.find(n => n.id === targetId || n.id === `node-${targetId}`);
         if (!node) return this.print(`Node not found: ${targetId}`, "err");
+        
+        targetId = node.id;
 
         this.print(`=== TRACE: ${node.id} (${node.type}) ===`, "sys");
-        this.print(`Label: ${node.label} | Val: ${JSON.stringify(node.val)} | State: ${JSON.stringify(node.state)}`, "sys");
+        this.print(`Label: ${node.label || 'None'} | Val: ${JSON.stringify(node.val)} | State: ${JSON.stringify(node.state)}`, "sys");
 
-        const upstream = Sim.wires.filter(w => w.to.nodeId === targetId);
-        const downstream = Sim.wires.filter(w => w.from.nodeId === targetId);
+        const upstream = ctx.wires.filter(w => w.to.nodeId === targetId);
+        const downstream = ctx.wires.filter(w => w.from.nodeId === targetId);
 
         this.print(`--- UPSTREAM (Inputs) ---`, "warn");
         if (upstream.length === 0) this.print("  (None)", "sys");
         upstream.forEach(w => {
-            const src = Sim.nodes.find(n => n.id === w.from.nodeId);
-            const sig = Sim.getSignal(w.from.nodeId, w.from.portId);
+            const src = ctx.nodes.find(n => n.id === w.from.nodeId);
+            let sig = 0;
+            if (ctx.simObj && typeof ctx.simObj.getSignal === 'function') {
+                sig = ctx.simObj.getSignal(w.from.nodeId, w.from.portId);
+            }
             const srcType = src ? src.type : "UNKNOWN";
             this.print(`  [${w.to.portId}] <- ${w.from.nodeId}[${w.from.portId}] (${srcType}) = ${JSON.stringify(sig)}`, "ok");
         });
@@ -1115,7 +1156,7 @@ const DebugTerminal = {
         this.print(`--- DOWNSTREAM (Outputs) ---`, "warn");
         if (downstream.length === 0) this.print("  (None)", "sys");
         downstream.forEach(w => {
-            const dst = Sim.nodes.find(n => n.id === w.to.nodeId);
+            const dst = ctx.nodes.find(n => n.id === w.to.nodeId);
             const dstType = dst ? dst.type : "UNKNOWN";
             this.print(`  [${w.from.portId}] -> ${w.to.nodeId}[${w.to.portId}] (${dstType})`, "ok");
         });

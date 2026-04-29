@@ -139,8 +139,8 @@ window.onload = () => {
      * @STATE: BSIM_METADATA
      * @INTENT: Define the application semantic versioning for runtime compatibility checks.
      */
-    // [AUDIT: v1.24.05 | SEC_ARCH_LEAD] - Semantic version increment following debug terminal hotkey collision resolution and scope isolation.
-    window.LOADED_BSIM_VERSION = "1.24.05";
+    // [AUDIT: v1.24.06 | SEC_ARCH_LEAD] - Semantic version increment following context-aware debugging for VFS terminal nodes.
+    window.LOADED_BSIM_VERSION = "1.24.06";
     console.log(`BrowserSim v${window.LOADED_BSIM_VERSION} Modular Professional Initialized.`);
     
     if (window.EXPECTED_BSIM_VERSION && window.EXPECTED_BSIM_VERSION !== window.LOADED_BSIM_VERSION) {
