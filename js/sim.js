@@ -2637,59 +2637,7 @@ const Sim = {
         input.select();
     },
 
-    uiEnterValue(id, format = 'D') {
-        const n = this.nodes.find(node => node.id === id);
-        if (!n || !n.type.startsWith('IN-')) return;
-        const bits = parseInt(n.type.split('-')[1]) || 1;
-        
-        let currentNum = 0;
-        if (bits === 1) {
-            currentNum = n.val;
-        } else {
-            for (let i = 0; i < bits; i++) currentNum |= (n.state[i] ? 1 : 0) << i;
-        }
-        
-        let prefill = currentNum.toString(10);
-        let promptType = 'Decimal';
-        
-        if (format === 'H') {
-            prefill = currentNum.toString(16).toUpperCase().padStart(Math.ceil(bits / 4), '0');
-            promptType = 'Hex';
-        } else if (format === 'B') {
-            prefill = currentNum.toString(2).padStart(bits, '0');
-            promptType = 'Binary';
-        }
-        
-        this.modal(`Set ${bits}-Bit Value`, `Enter value (${promptType} default, or override with 0x/0b):`, 'prompt', (val) => {
-            if (val === null || val === '') return;
-            const cleanVal = val.trim();
-            let num;
-            
-            if (cleanVal.toLowerCase().startsWith('0x')) {
-                num = parseInt(cleanVal, 16);
-            } else if (cleanVal.toLowerCase().startsWith('0b')) {
-                num = parseInt(cleanVal.substring(2), 2);
-            } else {
-                if (format === 'H') num = parseInt(cleanVal, 16);
-                else if (format === 'B') num = parseInt(cleanVal, 2);
-                else num = parseInt(cleanVal, 10);
-            }
-
-            if (isNaN(num)) return this.toast('Invalid number format', 'danger');
-            
-            const maxVal = (1 << bits) - 1;
-            num = Math.max(0, Math.min(maxVal, num));
-            
-            if (bits === 1) {
-                n.state = num > 0 ? 1 : 0;
-                n.val = n.state;
-            } else {
-                for (let i = 0; i < bits; i++) n.state[i] = (num & (1 << i)) ? 1 : 0;
-                n.val = [...n.state];
-            }
-            this.updateNodeVisual(n); this.seedQueue(); this.processQueue();
-        }, prefill);
-    },
+    // [AUDIT: v1.24.25 | SEC_ARCH_LEAD] - Purged legacy uiEnterValue popup logic in favor of inline editing.
 
 
     /**

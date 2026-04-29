@@ -199,8 +199,7 @@ const InteractionHandler = {
                     Sim.autoSave();
                 }
             }, node.freq);
-        } else if (node.type.startsWith('IN-') && node.type !== 'IN-1') {
-            Sim.uiEnterValue(node.id);
+        // [AUDIT: v1.24.25 | SEC_ARCH_LEAD] - Removed uiEnterValue popup intercept to allow inline renaming on multi-bit inputs.
         } else if (node.type !== 'JUNCTION') {
             // [AUDIT: v1.24.24 | SEC_ARCH_LEAD] - Replaced modal prompt with inline DOM input injection for component relabeling.
             const lbl = div.querySelector('.gate-label');

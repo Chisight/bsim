@@ -1,11 +1,11 @@
-# bSim v1.24.24 - Modular Professional Logic Simulator
+# bSim v1.24.25 - Modular Professional Logic Simulator
 
 bSim is a high-performance, modular digital logic simulator built for the web. It allows users to design, simulate, and synthesize complex digital circuits using an atomic NAND-based foundation.
 
 ## 🚀 Key Features
 
-- **Multi-Tab Workspace**: (New in v1.24.24) Manage multiple independent circuit boards within a single project context, featuring isolated undo/redo stacks.
-- **Split-Pane Editor**: (New in v1.24.24) Professional dual-pane editing environment for macro chips. Compare sub-circuits side-by-side or spawn external popup editors.
+- **Multi-Tab Workspace**: (New in v1.24.25) Manage multiple independent circuit boards within a single project context, featuring isolated undo/redo stacks.
+- **Split-Pane Editor**: (New in v1.24.25) Professional dual-pane editing environment for macro chips. Compare sub-circuits side-by-side or spawn external popup editors.
 - **Hybrid Simulation Engine**: Utilizes a high-frequency WebAssembly (WASM) kernel for O(1) signal propagation in pure-native circuits, with a robust V8 object-graph fallback.
 - **Debug Terminal CLI**: Integrated command-line interface with tab-completion and visual workspace highlighting for headless project manipulation.
 - **Auto-Hiding Navigation**: Modern shell with collapsing navbars and edge-reveal telemetry to maximize workspace real estate.
