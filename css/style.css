@@ -82,8 +82,8 @@ nav .menu-item { display: inline-flex; border-radius: 4px; color: #888; font-wei
 nav .menu-item:hover { background: #252530; color: #fff; }
 nav .menu-item.has-sub::after { content: '▾'; margin-left: 6px; }
 nav .sub-menu { position: absolute; top: 100%; left: 0; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 4px; display: none; flex-direction: column; min-width: 160px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 2000; }
-/* [AUDIT: v1.24.23 | SEC_ARCH_LEAD] - Constrained hover reveal to direct child sub-menus to prevent nested cascade auto-opening. */
-nav > .menu-item.has-sub:hover > .sub-menu { display: flex; }
+/* [AUDIT: v1.24.34 | SEC_ARCH_LEAD] - Extended hover rules to support focus locks. */
+nav > .menu-item.has-sub:hover > .sub-menu, nav > .menu-item.has-sub.keep-open > .sub-menu { display: flex; }
 nav .sub-menu .menu-item { padding: 8px 15px; width: 100%; box-sizing: border-box; display: block; border-radius: 4px; }
 nav .sub-menu .menu-item::after { display: none; }
 
@@ -292,7 +292,7 @@ footer::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px
     display: none; min-width: 120px; z-index: 10001; padding: 5px 0;
 }
 /* [AUDIT: v1.24.23 | SEC_ARCH_LEAD] - Constrained hover reveal to direct child sub-menus globally. */
-.menu-item.has-sub:hover > .sub-menu { display: block; }
+.menu-item.has-sub:hover > .sub-menu, .menu-item.has-sub.keep-open > .sub-menu { display: block; }
 /* [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Sub-menu boundary inversion logic. */
 #context-menu.open-left .sub-menu { left: auto; right: 100%; }
 #context-menu.open-up .sub-menu { top: auto; bottom: -1px; }
@@ -367,12 +367,12 @@ body.edit-mode-active .port { pointer-events: none; opacity: 0.2; }
 body.edit-mode-active .bit-dot { pointer-events: none; }
 body.edit-mode-active .visual-extra { pointer-events: none; opacity: 0.5; }
 body.edit-mode-active .gate-label { pointer-events: none; opacity: 0.5; }
-/* [AUDIT: v1.24.26 | SEC_ARCH_LEAD] - Unblocked layout mutators from global interaction freeze. */
-body.edit-mode-active .visual-extra.editing-pins, body.edit-mode-active .gate-label.editing-pins { pointer-events: auto !important; opacity: 1 !important; }
+/* [AUDIT: v1.24.38 | SEC_ARCH_LEAD] - Unblocked layout mutators and proxy layers from global interaction freeze. */
+body.edit-mode-active .visual-extra.editing-pins, body.edit-mode-active .gate-label.editing-pins, body.edit-mode-active .port-edit-proxy.editing-pins { pointer-events: auto !important; opacity: 1 !important; }
 
 /* [AUDIT: SEC_ARCH_LEAD] - Polyfill extended hitboxes for info layout mutator. */
-/* [AUDIT: v1.24.26 | SEC_ARCH_LEAD] - Polyfill extended hitboxes for label layout mutator. */
-.pin-container.editing-pins::after, .visual-extra.editing-pins::after, .gate-label.editing-pins::after {
+/* [AUDIT: v1.24.38 | SEC_ARCH_LEAD] - Polyfill extended hitboxes and port intercept shields for proxy mutators. */
+.pin-container.editing-pins::after, .visual-extra.editing-pins::after, .gate-label.editing-pins::after, .port-edit-proxy.editing-pins::after {
     content: '';
     position: absolute;
     top: -12px; left: -12px; right: -12px; bottom: -12px;

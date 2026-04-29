@@ -269,6 +269,9 @@ class MutateLayoutCommand {
         this.node.pinW = this.nw.pw; this.node.pinH = this.nw.ph;
         this.node.infoX = this.nw.ix; this.node.infoY = this.nw.iy;
         this.node.infoW = this.nw.iw; this.node.infoH = this.nw.ih;
+        this.node.labelX = this.nw.lx; this.node.labelY = this.nw.ly;
+        this.node.labelW = this.nw.lw; this.node.labelH = this.nw.lh;
+        this.node.portY = this.nw.portY; this.node.portH = this.nw.portH;
         Sim.updateNodeVisual(this.node);
         Sim.updateWireVisuals();
     }
@@ -278,6 +281,9 @@ class MutateLayoutCommand {
         this.node.pinW = this.og.pw; this.node.pinH = this.og.ph;
         this.node.infoX = this.og.ix; this.node.infoY = this.og.iy;
         this.node.infoW = this.og.iw; this.node.infoH = this.og.ih;
+        this.node.labelX = this.og.lx; this.node.labelY = this.og.ly;
+        this.node.labelW = this.og.lw; this.node.labelH = this.og.lh;
+        this.node.portY = this.og.portY; this.node.portH = this.og.portH;
         Sim.updateNodeVisual(this.node);
         Sim.updateWireVisuals();
     }

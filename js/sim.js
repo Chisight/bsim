@@ -1308,7 +1308,24 @@ const Sim = {
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Apply saved geometric properties dynamically on visual update.
         if (n.customWidth) el.style.width = n.customWidth + 'px';
         if (n.customHeight) el.style.height = n.customHeight + 'px';
-        
+
+        // [AUDIT: v1.24.34 | SEC_ARCH_LEAD] - Apply dynamically calculated port spread geometry.
+        if (n.portY !== undefined || n.portH !== undefined) {
+            const py = n.portY !== undefined ? n.portY : 24;
+            const ph = n.portH !== undefined ? n.portH : (n.customHeight || parseInt(el.style.height) || 64) - 30;
+            const alignPorts = (selector) => {
+                const ports = Array.from(el.querySelectorAll(selector));
+                const total = ports.length;
+                if (total === 0) return;
+                ports.forEach((p, i) => {
+                    const topPct = total === 1 ? 0.5 : ((i + 0.5) / total);
+                    p.style.top = (py + topPct * ph) + 'px';
+                });
+            };
+            alignPorts('.port.input');
+            alignPorts('.port.output');
+        }
+
         // [AUDIT: v1.24.27 | SEC_ARCH_LEAD] - Apply localized label geometry bounding box limits and dynamic font scaling.
         const lblCont = el.querySelector('.gate-label');
         if (lblCont && (n.labelX !== undefined || n.labelW !== undefined)) {
@@ -2351,21 +2368,42 @@ const Sim = {
         const node = this.nodes.find(n => n.id === nodeId);
         const el = document.getElementById(nodeId);
         if (!node || !el) return;
-        this.activeNodeEdit = { node, mode, og: { w: node.customWidth, h: node.customHeight, px: node.pinX, py: node.pinY, pw: node.pinW, ph: node.pinH, ix: node.infoX, iy: node.infoY, iw: node.infoW, ih: node.infoH, lx: node.labelX, ly: node.labelY, lw: node.labelW, lh: node.labelH } };
+        this.activeNodeEdit = { node, mode, og: { w: node.customWidth, h: node.customHeight, px: node.pinX, py: node.pinY, pw: node.pinW, ph: node.pinH, ix: node.infoX, iy: node.infoY, iw: node.infoW, ih: node.infoH, lx: node.labelX, ly: node.labelY, lw: node.labelW, lh: node.labelH, portY: node.portY, portH: node.portH } };
         
         // [AUDIT: SEC_ARCH_LEAD] - Lock global wiring interactions to prevent misclicks during layout mutation.
         document.body.classList.add('edit-mode-active');
         
-        el.style.outline = '2px dashed #00ffaa';
+        // [AUDIT: v1.24.36 | SEC_ARCH_LEAD] - Isolated base outline rendering to prevent multi-box rendering glitches on inner wrappers.
+        if (mode === 'icon') el.style.outline = '2px dashed #00ffaa';
         
         const pinCont = el.querySelector('.pin-container');
         const infoCont = el.querySelector('.visual-extra');
         const lblCont = el.querySelector('.gate-label');
-        const target = mode === 'pins' ? pinCont : (mode === 'info' ? infoCont : (mode === 'label' ? lblCont : el));
+        let target = (mode === 'pins' || mode === 'pin-dots') ? pinCont : (mode === 'info' ? infoCont : (mode === 'label' ? lblCont : el));
+        
+        // [AUDIT: v1.24.34 | SEC_ARCH_LEAD] - Dynamic proxy generation for port geometry mutations.
+        if (mode === 'pin-labels' || mode === 'pin-both') {
+            let proxy = el.querySelector('.port-edit-proxy');
+            if (!proxy) {
+                proxy = document.createElement('div');
+                proxy.className = 'port-edit-proxy editing-pins';
+                proxy.style.position = 'absolute';
+                // [AUDIT: v1.24.36 | SEC_ARCH_LEAD] - Switched to unified yellow dashed border styling for macro port proxies.
+                proxy.style.background = 'rgba(255, 202, 40, 0.1)';
+                proxy.style.zIndex = '500';
+                const py = node.portY !== undefined ? node.portY : 24;
+                const ph = node.portH !== undefined ? node.portH : (node.customHeight || parseInt(el.style.height) || 64) - 30;
+                proxy.style.top = py + 'px'; proxy.style.left = '-10px';
+                proxy.style.width = (parseInt(el.style.width) || 90) + 20 + 'px';
+                proxy.style.height = ph + 'px';
+                el.appendChild(proxy);
+            }
+            target = proxy;
+        }
         if (!target) return;
         
         // [AUDIT: v1.24.26 | SEC_ARCH_LEAD] - Injected edit mode dispatch handling for gate label components.
-        if (mode === 'pins' || mode === 'info' || mode === 'label') {
+        if (mode === 'pins' || mode === 'pin-dots' || mode === 'info' || mode === 'label' || mode === 'pin-labels' || mode === 'pin-both') {
             if (mode === 'info' && node.infoX === undefined) {
                 // [AUDIT: SEC_ARCH_LEAD] - Initialize default offset coordinates if previously relative
                 node.infoX = target.offsetLeft;
@@ -2384,11 +2422,11 @@ const Sim = {
                 target.style.margin = '0';
             }
             target.classList.add('editing-pins');
-            target.style.outline = '2px dashed #ff00aa';
+            target.style.outline = (mode === 'pin-labels' || mode === 'pin-both') ? '2px dotted #ffca28' : '2px dashed #ff00aa';
             target.style.cursor = 'move';
             target.style.transform = 'none'; // Release absolute centering lock for dragging
             
-            // [AUDIT: SEC_ARCH_LEAD] - Dynamic proportional cursor feedback mapping supporting extended hitboxes.
+            // [AUDIT: v1.24.35 | SEC_ARCH_LEAD] - Cursor mapping overriding for symmetric layout stretching.
             this._editHover = (ev) => {
                 const rect = target.getBoundingClientRect();
                 const scale = View.scale || 1;
@@ -2401,7 +2439,8 @@ const Sim = {
                 const hTop = hy < thY;
                 const hBottom = hy > target.offsetHeight - thY;
                 
-                if ((hTop && hLeft) || (hBottom && hRight)) target.style.cursor = 'nwse-resize';
+                if (mode === 'pin-labels' || mode === 'pin-both') target.style.cursor = 'ns-resize';
+                else if ((hTop && hLeft) || (hBottom && hRight)) target.style.cursor = 'nwse-resize';
                 else if ((hTop && hRight) || (hBottom && hLeft)) target.style.cursor = 'nesw-resize';
                 else if (hTop || hBottom) target.style.cursor = 'ns-resize';
                 else if (hLeft || hRight) target.style.cursor = 'ew-resize';
@@ -2429,19 +2468,22 @@ const Sim = {
             const rRight = clickX > target.offsetWidth - thX;
             const rTop = clickY < thY;
             const rBottom = clickY > target.offsetHeight - thY;
-            // [AUDIT: v1.24.30 | SEC_ARCH_LEAD] - Authorized boundary resizing for info readouts and labels.
-            const isResizing = (mode === 'pins' || mode === 'info' || mode === 'label') && (rLeft || rRight || rTop || rBottom);
+            // [AUDIT: v1.24.38 | SEC_ARCH_LEAD] - Unified translation and scaling boolean logic to prevent dead zones on proxy.
+            const isResizing = (mode === 'pin-labels' || mode === 'pin-both') ? (rLeft || rRight || rTop || rBottom) : ((mode === 'pins' || mode === 'pin-dots' || mode === 'info' || mode === 'label') && (rLeft || rRight || rTop || rBottom));
             
             const startX = e.clientX;
             const startY = e.clientY;
             const isInfo = mode === 'info';
             const isLabel = mode === 'label';
+            const isPort = mode === 'pin-labels' || mode === 'pin-both';
             const startPinX = isInfo ? (node.infoX || 0) : (isLabel ? (node.labelX || 0) : (node.pinX || 0));
-            const startPinY = isInfo ? (node.infoY || 0) : (isLabel ? (node.labelY || 0) : (node.pinY || 0));
+            const startPinY = isInfo ? (node.infoY || 0) : (isLabel ? (node.labelY || 0) : (isPort ? (node.portY !== undefined ? node.portY : 24) : (node.pinY || 0)));
             const startPinW = isInfo ? (node.infoW || target.offsetWidth) : (isLabel ? (node.labelW || target.offsetWidth) : (node.pinW || target.offsetWidth));
-            const startPinH = isInfo ? (node.infoH || target.offsetHeight) : (isLabel ? (node.labelH || target.offsetHeight) : (node.pinH || target.offsetHeight));
+            const startPinH = isInfo ? (node.infoH || target.offsetHeight) : (isLabel ? (node.labelH || target.offsetHeight) : (isPort ? (node.portH !== undefined ? node.portH : (node.customHeight || parseInt(el.style.height) || 64) - 30) : (node.pinH || target.offsetHeight)));
             const startNodeW = node.customWidth || parseInt(el.style.width) || 90;
             const startNodeH = node.customHeight || parseInt(el.style.height) || 80;
+            const startBasePinY = node.pinY || 0;
+            const startBasePinH = node.pinH || (pinCont ? pinCont.offsetHeight : 16);
 
             const onMove = (m) => {
                 const scale = View.scale || 1;
@@ -2454,7 +2496,7 @@ const Sim = {
                     el.style.width = node.customWidth + 'px';
                     el.style.height = node.customHeight + 'px';
                     Sim.updateWireVisuals();
-                } else if (mode === 'pins' || mode === 'info' || mode === 'label') {
+                } else if (mode === 'pins' || mode === 'info' || mode === 'label' || mode === 'pin-labels' || mode === 'pin-both') {
                     let cX = startPinX, cY = startPinY, cW = startPinW, cH = startPinH;
                     if (isResizing || m.shiftKey) { 
                         // [AUDIT: v1.24.27 | SEC_ARCH_LEAD] - Adjusted scaling constraints for label geometries to permit overhangs and font scaling.
@@ -2467,7 +2509,21 @@ const Sim = {
                             cW = Math.max(16, mode === 'label' ? Math.min(startNodeW * 3, startPinW + dx) : Math.min(startNodeW - startPinX, startPinW + dx));
                         }
 
-                        if (rTop) {
+                        if (mode === 'pin-labels' || mode === 'pin-both') {
+                            // [AUDIT: v1.24.38 | SEC_ARCH_LEAD] - Isolated 1D vertical geometric mutations for port proxies absorbing horizontal input without translation.
+                            cX = startPinX; 
+                            cW = startPinW;
+                            if (rTop) {
+                                const nextY = startPinY + dy;
+                                cY = nextY;
+                                cH = Math.max(10, startPinH - (nextY - startPinY));
+                            } else if (rBottom) {
+                                cH = Math.max(10, startPinH + dy);
+                            } else if (m.shiftKey) { // Shift-drag from center symmetrically scales
+                                cY = startPinY - dy;
+                                cH = Math.max(10, startPinH + dy * 2);
+                            }
+                        } else if (rTop) {
                             const nextY = mode === 'label' ? startPinY + dy : Math.max(0, startPinY + dy);
                             const diffY = nextY - startPinY;
                             cY = nextY;
@@ -2489,8 +2545,20 @@ const Sim = {
                         node.infoX = cX; node.infoY = cY; node.infoW = cW; node.infoH = cH;
                     } else if (mode === 'label') {
                         node.labelX = cX; node.labelY = cY; node.labelW = cW; node.labelH = cH;
+                    } else if (mode === 'pin-labels') {
+                        node.portY = cY; node.portH = cH;
+                    } else if (mode === 'pin-both') {
+                        // [AUDIT: v1.24.36 | SEC_ARCH_LEAD] - Synchronized physical pin arrays with proxy height and vertical delta.
+                        node.portY = cY; node.portH = cH;
+                        node.pinY = startBasePinY + (cY - startPinY);
+                        node.pinH = startBasePinH + (cH - startPinH);
                     } else {
                         node.pinX = cX; node.pinY = cY; node.pinW = cW; node.pinH = cH;
+                    }
+                    
+                    if (mode === 'pin-labels' || mode === 'pin-both') {
+                        Sim.updateNodeVisual(node);
+                        Sim.updateWireVisuals();
                     }
                     target.style.width = cW + 'px';
                     target.style.height = cH + 'px';
@@ -2521,7 +2589,8 @@ const Sim = {
         const pinCont = el?.querySelector('.pin-container');
         const infoCont = el?.querySelector('.visual-extra');
         const lblCont = el?.querySelector('.gate-label');
-        const target = state.mode === 'pins' ? pinCont : (state.mode === 'info' ? infoCont : (state.mode === 'label' ? lblCont : el));
+        let target = state.mode === 'pins' || state.mode === 'pin-dots' ? pinCont : (state.mode === 'info' ? infoCont : (state.mode === 'label' ? lblCont : el));
+        if (state.mode === 'pin-labels' || state.mode === 'pin-both') target = el?.querySelector('.port-edit-proxy');
         
         if (target && this._editModeDown) {
             target.removeEventListener('mousedown', this._editModeDown);
@@ -2532,8 +2601,10 @@ const Sim = {
         if (pinCont) { pinCont.classList.remove('editing-pins'); pinCont.style.outline = ''; pinCont.style.cursor = ''; }
         if (infoCont) { infoCont.classList.remove('editing-pins'); infoCont.style.outline = ''; infoCont.style.cursor = ''; }
         if (lblCont) { lblCont.classList.remove('editing-pins'); lblCont.style.outline = ''; lblCont.style.cursor = ''; }
+        const proxy = el?.querySelector('.port-edit-proxy');
+        if (proxy) proxy.remove();
 
-        const nw = { w: state.node.customWidth, h: state.node.customHeight, px: state.node.pinX, py: state.node.pinY, pw: state.node.pinW, ph: state.node.pinH, ix: state.node.infoX, iy: state.node.infoY, iw: state.node.infoW, ih: state.node.infoH, lx: state.node.labelX, ly: state.node.labelY, lw: state.node.labelW, lh: state.node.labelH };
+        const nw = { w: state.node.customWidth, h: state.node.customHeight, px: state.node.pinX, py: state.node.pinY, pw: state.node.pinW, ph: state.node.pinH, ix: state.node.infoX, iy: state.node.infoY, iw: state.node.infoW, ih: state.node.infoH, lx: state.node.labelX, ly: state.node.labelY, lw: state.node.labelW, lh: state.node.labelH, portY: state.node.portY, portH: state.node.portH };
         if (JSON.stringify(nw) !== JSON.stringify(state.og)) {
             // [AUDIT: SEC_ARCH_LEAD] - Delegated layout state modifications to structured history command.
             History.execute(new MutateLayoutCommand(state.node, state.og, nw));
@@ -2559,6 +2630,7 @@ const Sim = {
                         n.infoW = state.node.infoW; n.infoH = state.node.infoH;
                         n.labelX = state.node.labelX; n.labelY = state.node.labelY;
                         n.labelW = state.node.labelW; n.labelH = state.node.labelH;
+                        n.portY = state.node.portY; n.portH = state.node.portH;
                         Sim.updateNodeVisual(n);
                     }
                 });
