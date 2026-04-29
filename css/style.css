@@ -272,8 +272,8 @@ body.edit-mode-active .bit-dot { pointer-events: none; }
 body.edit-mode-active .visual-extra { pointer-events: none; opacity: 0.5; }
 body.edit-mode-active .gate-label { pointer-events: none; opacity: 0.5; }
 
-/* [AUDIT: SEC_ARCH_LEAD] - Proportional hitbox expansion and visual lock */
-.pin-container.editing-pins::after {
+/* [AUDIT: SEC_ARCH_LEAD] - Polyfill extended hitboxes for info layout mutator. */
+.pin-container.editing-pins::after, .visual-extra.editing-pins::after {
     content: '';
     position: absolute;
     top: -12px; left: -12px; right: -12px; bottom: -12px;

@@ -1242,6 +1242,22 @@ const Sim = {
                     if (n.pinH !== undefined) pinCont.style.height = n.pinH + 'px';
                 }
             }
+
+            // [AUDIT: SEC_ARCH_LEAD] - Apply localized readout geometry bounding box limits.
+            const infoCont = el.querySelector('.visual-extra');
+            if (infoCont && (n.infoX !== undefined || n.infoW !== undefined)) {
+                infoCont.style.position = 'absolute';
+                infoCont.style.margin = '0';
+                infoCont.style.display = 'flex';
+                infoCont.style.flexWrap = 'wrap';
+                infoCont.style.alignItems = 'center';
+                infoCont.style.justifyContent = 'center';
+                if (n.infoX !== undefined) infoCont.style.left = n.infoX + 'px';
+                if (n.infoY !== undefined) infoCont.style.top = n.infoY + 'px';
+                if (n.infoW !== undefined) infoCont.style.width = n.infoW + 'px';
+                if (n.infoH !== undefined) infoCont.style.height = n.infoH + 'px';
+            }
+            
             // Strip legacy property to prevent future save crashes
             if (n._domCache) delete n._domCache;
         }
@@ -1986,7 +2002,7 @@ const Sim = {
         const node = this.nodes.find(n => n.id === nodeId);
         const el = document.getElementById(nodeId);
         if (!node || !el) return;
-        this.activeNodeEdit = { node, mode, og: { w: node.customWidth, h: node.customHeight, px: node.pinX, py: node.pinY, pw: node.pinW, ph: node.pinH } };
+        this.activeNodeEdit = { node, mode, og: { w: node.customWidth, h: node.customHeight, px: node.pinX, py: node.pinY, pw: node.pinW, ph: node.pinH, ix: node.infoX, iy: node.infoY, iw: node.infoW, ih: node.infoH } };
         
         // [AUDIT: SEC_ARCH_LEAD] - Lock global wiring interactions to prevent misclicks during layout mutation.
         document.body.classList.add('edit-mode-active');
@@ -1994,10 +2010,20 @@ const Sim = {
         el.style.outline = '2px dashed #00ffaa';
         
         const pinCont = el.querySelector('.pin-container');
-        const target = mode === 'pins' ? pinCont : el;
+        const infoCont = el.querySelector('.visual-extra');
+        const target = mode === 'pins' ? pinCont : (mode === 'info' ? infoCont : el);
         if (!target) return;
         
-        if (mode === 'pins') {
+        if (mode === 'pins' || mode === 'info') {
+            if (mode === 'info' && node.infoX === undefined) {
+                // [AUDIT: SEC_ARCH_LEAD] - Initialize default offset coordinates if previously relative
+                node.infoX = target.offsetLeft;
+                node.infoY = target.offsetTop;
+                node.infoW = target.offsetWidth;
+                node.infoH = target.offsetHeight;
+                target.style.position = 'absolute';
+                target.style.margin = '0';
+            }
             target.classList.add('editing-pins');
             target.style.outline = '2px dashed #ff00aa';
             target.style.cursor = 'move';
@@ -2048,10 +2074,11 @@ const Sim = {
             
             const startX = e.clientX;
             const startY = e.clientY;
-            const startPinX = node.pinX || 0;
-            const startPinY = node.pinY || 0;
-            const startPinW = node.pinW || target.offsetWidth;
-            const startPinH = node.pinH || target.offsetHeight;
+            const isInfo = mode === 'info';
+            const startPinX = isInfo ? (node.infoX || 0) : (node.pinX || 0);
+            const startPinY = isInfo ? (node.infoY || 0) : (node.pinY || 0);
+            const startPinW = isInfo ? (node.infoW || target.offsetWidth) : (node.pinW || target.offsetWidth);
+            const startPinH = isInfo ? (node.infoH || target.offsetHeight) : (node.pinH || target.offsetHeight);
             const startNodeW = node.customWidth || parseInt(el.style.width) || 90;
             const startNodeH = node.customHeight || parseInt(el.style.height) || 80;
 
@@ -2066,47 +2093,49 @@ const Sim = {
                     el.style.width = node.customWidth + 'px';
                     el.style.height = node.customHeight + 'px';
                     Sim.updateWireVisuals();
-                } else if (mode === 'pins') {
+                } else if (mode === 'pins' || mode === 'info') {
+                    let cX = startPinX, cY = startPinY, cW = startPinW, cH = startPinH;
                     if (isResizing || m.shiftKey) { 
-                        // [AUDIT: SEC_ARCH_LEAD] - Rigid boundary clamping for independent axis scaling to prevent chip escape.
+                        // [AUDIT: SEC_ARCH_LEAD] - Generalized rigid boundary clamping for independent axis scaling to prevent chip escape.
                         if (rLeft) {
                             const nextX = Math.max(0, startPinX + dx);
                             const diffX = nextX - startPinX;
-                            node.pinX = nextX;
-                            node.pinW = Math.max(16, startPinW - diffX);
+                            cX = nextX;
+                            cW = Math.max(16, startPinW - diffX);
                         } else if (rRight) {
-                            node.pinW = Math.max(16, Math.min(startNodeW - startPinX, startPinW + dx));
+                            cW = Math.max(16, Math.min(startNodeW - startPinX, startPinW + dx));
                         }
 
                         if (rTop) {
                             const nextY = Math.max(0, startPinY + dy);
                             const diffY = nextY - startPinY;
-                            node.pinY = nextY;
-                            node.pinH = Math.max(16, startPinH - diffY);
+                            cY = nextY;
+                            cH = Math.max(16, startPinH - diffY);
                         } else if (rBottom) {
-                            node.pinH = Math.max(16, Math.min(startNodeH - startPinY, startPinH + dy));
+                            cH = Math.max(16, Math.min(startNodeH - startPinY, startPinH + dy));
                         }
-                        
-                        target.style.width = node.pinW + 'px';
-                        target.style.height = node.pinH + 'px';
-                        target.style.left = node.pinX + 'px';
-                        target.style.top = node.pinY + 'px';
                     } else { 
                         // Move from Center
-                        // [AUDIT: SEC_ARCH_LEAD] - Dynamic width/height recalculation during translation to prevent right/bottom boundary escape.
-                        const curW = node.pinW || target.offsetWidth || 16;
-                        const curH = node.pinH || target.offsetHeight || 16;
+                        const curW = startPinW || target.offsetWidth || 16;
+                        const curH = startPinH || target.offsetHeight || 16;
                         const maxW = Math.max(0, startNodeW - curW);
                         const maxH = Math.max(0, startNodeH - curH);
-                        node.pinX = Math.max(0, Math.min(maxW, startPinX + dx));
-                        node.pinY = Math.max(0, Math.min(maxH, startPinY + dy));
-                        target.style.left = node.pinX + 'px';
-                        target.style.top = node.pinY + 'px';
+                        cX = Math.max(0, Math.min(maxW, startPinX + dx));
+                        cY = Math.max(0, Math.min(maxH, startPinY + dy));
                     }
+                    
+                    if (mode === 'info') {
+                        node.infoX = cX; node.infoY = cY; node.infoW = cW; node.infoH = cH;
+                    } else {
+                        node.pinX = cX; node.pinY = cY; node.pinW = cW; node.pinH = cH;
+                    }
+                    target.style.width = cW + 'px';
+                    target.style.height = cH + 'px';
+                    target.style.left = cX + 'px';
+                    target.style.top = cY + 'px';
                 }
             };
             const onUp = () => {
-                // [AUDIT: SEC_ARCH_LEAD] - Removed unstable scrollWidth snap-calculation overlapping with CSS pseudo-elements.
                 document.removeEventListener('mousemove', onMove);
                 document.removeEventListener('mouseup', onUp);
             };
@@ -2127,7 +2156,8 @@ const Sim = {
         
         const el = document.getElementById(state.node.id);
         const pinCont = el?.querySelector('.pin-container');
-        const target = state.mode === 'pins' ? pinCont : el;
+        const infoCont = el?.querySelector('.visual-extra');
+        const target = state.mode === 'pins' ? pinCont : (state.mode === 'info' ? infoCont : el);
         
         if (target && this._editModeDown) {
             target.removeEventListener('mousedown', this._editModeDown);
@@ -2136,9 +2166,10 @@ const Sim = {
         
         if (el) { el.style.outline = ''; el.style.cursor = ''; }
         if (pinCont) { pinCont.classList.remove('editing-pins'); pinCont.style.outline = ''; pinCont.style.cursor = ''; }
+        if (infoCont) { infoCont.classList.remove('editing-pins'); infoCont.style.outline = ''; infoCont.style.cursor = ''; }
 
-        const nw = { w: state.node.customWidth, h: state.node.customHeight, px: state.node.pinX, py: state.node.pinY, pw: state.node.pinW, ph: state.node.pinH };
-        if (nw.w !== state.og.w || nw.h !== state.og.h || nw.px !== state.og.px || nw.py !== state.og.py || nw.pw !== state.og.pw || nw.ph !== state.og.ph) {
+        const nw = { w: state.node.customWidth, h: state.node.customHeight, px: state.node.pinX, py: state.node.pinY, pw: state.node.pinW, ph: state.node.pinH, ix: state.node.infoX, iy: state.node.infoY, iw: state.node.infoW, ih: state.node.infoH };
+        if (JSON.stringify(nw) !== JSON.stringify(state.og)) {
             // [AUDIT: SEC_ARCH_LEAD] - Delegated layout state modifications to structured history command.
             History.execute(new MutateLayoutCommand(state.node, state.og, nw));
         } else {
@@ -2201,6 +2232,75 @@ const Sim = {
      * @STATE: INPUT_MUTATION
      * @INTENT: Prompt the user for a numeric value (Hex, Dec, Bin) and apply it to a multi-bit input node.
      */
+    uiInlineEditValue(e, id, format) {
+        // [AUDIT: SEC_ARCH_LEAD] - Inline structural editor for multi-bit readouts.
+        if (document.body.classList.contains('edit-mode-active')) return;
+        const target = e.currentTarget;
+        if (target.querySelector('input')) return; // Already editing
+
+        const n = this.nodes.find(node => node.id === id);
+        if (!n || !n.type.startsWith('IN-')) return;
+        const bits = parseInt(n.type.split('-')[1]) || 1;
+        
+        let currentNum = 0;
+        if (bits === 1) {
+            currentNum = n.val;
+        } else {
+            for (let i = 0; i < bits; i++) currentNum |= (n.state[i] ? 1 : 0) << i;
+        }
+        
+        let prefill = currentNum.toString(10);
+        if (format === 'H') prefill = currentNum.toString(16).toUpperCase().padStart(Math.ceil(bits / 4), '0');
+        else if (format === 'B') prefill = currentNum.toString(2).padStart(bits, '0');
+        
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = prefill;
+        input.style.cssText = 'width: 100%; height: 100%; box-sizing: border-box; background: #222; color: #fff; border: 1px solid #00ffaa; font-family: "JetBrains Mono", monospace; font-size: inherit; text-align: center; outline: none; border-radius: 2px;';
+        
+        const ogText = target.innerText;
+        target.innerText = '';
+        target.appendChild(input);
+        
+        const commit = () => {
+            if (!target.contains(input)) return;
+            const cleanVal = input.value.trim();
+            let num;
+            if (cleanVal.toLowerCase().startsWith('0x')) num = parseInt(cleanVal, 16);
+            else if (cleanVal.toLowerCase().startsWith('0b')) num = parseInt(cleanVal.substring(2), 2);
+            else {
+                if (format === 'H') num = parseInt(cleanVal, 16);
+                else if (format === 'B') num = parseInt(cleanVal, 2);
+                else num = parseInt(cleanVal, 10);
+            }
+
+            if (isNaN(num)) {
+                this.toast('Invalid number format', 'danger');
+                target.innerHTML = ogText;
+            } else {
+                const maxVal = (1 << bits) - 1;
+                num = Math.max(0, Math.min(maxVal, num));
+                if (bits === 1) {
+                    n.state = num > 0 ? 1 : 0;
+                    n.val = n.state;
+                } else {
+                    for (let i = 0; i < bits; i++) n.state[i] = (num & (1 << i)) ? 1 : 0;
+                    n.val = [...n.state];
+                }
+                this.updateNodeVisual(n);
+                this.seedQueue(); this.processQueue();
+            }
+        };
+
+        input.onblur = commit;
+        input.onkeydown = (ev) => {
+            if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+            if (ev.key === 'Escape') { target.innerHTML = ogText; }
+        };
+        input.focus();
+        input.select();
+    },
+
     uiEnterValue(id, format = 'D') {
         const n = this.nodes.find(node => node.id === id);
         if (!n || !n.type.startsWith('IN-')) return;

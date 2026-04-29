@@ -138,11 +138,12 @@ const NodeRenderer = {
             }
         }
 
+        // [AUDIT: SEC_ARCH_LEAD] - Migrated chip info readouts to inline edit interface.
         const labelsHtml = (bits >= 4) ? `
             <div class="visual-extra">
-                <span class="dec" onmousedown="event.stopPropagation(); Sim.uiEnterValue('${node.id}', 'D')">D: 0</span>
-                <span class="hex" onmousedown="event.stopPropagation(); Sim.uiEnterValue('${node.id}', 'H')">H: 00</span>
-                <div class="bin" onmousedown="event.stopPropagation(); Sim.uiEnterValue('${node.id}', 'B')">B: ${'0'.repeat(bits)}</div>
+                <span class="dec" ondblclick="event.stopPropagation(); Sim.uiInlineEditValue(event, '${node.id}', 'D')">D: 0</span>
+                <span class="hex" ondblclick="event.stopPropagation(); Sim.uiInlineEditValue(event, '${node.id}', 'H')">H: 00</span>
+                <div class="bin" ondblclick="event.stopPropagation(); Sim.uiInlineEditValue(event, '${node.id}', 'B')">B: ${'0'.repeat(bits)}</div>
             </div>` : '';
 
         div.innerHTML = node.type === 'JUNCTION' ? portsHtml : `

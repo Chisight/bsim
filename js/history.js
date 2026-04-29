@@ -252,7 +252,7 @@ window.DeleteNodeCommand = DeleteNodeCommand;
 window.AddWireCommand = AddWireCommand;
 window.DeleteWireCommand = DeleteWireCommand;
 /**
- * [AUDIT: SEC_ARCH_LEAD] - Layout mutation structural command for deterministic undo/redo stack.
+ * [AUDIT: SEC_ARCH_LEAD] - Layout mutation structural command updated for chip info readouts.
  * @ARCH: COMMAND_PATTERN
  * @STATE: NETLIST_STATE
  * @INTENT: Encapsulate layout preference mutations to preserve geometric history.
@@ -267,6 +267,8 @@ class MutateLayoutCommand {
         this.node.customWidth = this.nw.w; this.node.customHeight = this.nw.h;
         this.node.pinX = this.nw.px; this.node.pinY = this.nw.py;
         this.node.pinW = this.nw.pw; this.node.pinH = this.nw.ph;
+        this.node.infoX = this.nw.ix; this.node.infoY = this.nw.iy;
+        this.node.infoW = this.nw.iw; this.node.infoH = this.nw.ih;
         Sim.updateNodeVisual(this.node);
         Sim.updateWireVisuals();
     }
@@ -274,6 +276,8 @@ class MutateLayoutCommand {
         this.node.customWidth = this.og.w; this.node.customHeight = this.og.h;
         this.node.pinX = this.og.px; this.node.pinY = this.og.py;
         this.node.pinW = this.og.pw; this.node.pinH = this.og.ph;
+        this.node.infoX = this.og.ix; this.node.infoY = this.og.iy;
+        this.node.infoW = this.og.iw; this.node.infoH = this.og.ih;
         Sim.updateNodeVisual(this.node);
         Sim.updateWireVisuals();
     }
