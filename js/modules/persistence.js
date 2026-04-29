@@ -35,8 +35,8 @@ const ProjectManager = {
             const fileVer = this.parseVer(data.meta?.version || "1.0.0");
 
 
-            // [AUDIT: v1.23.95 | SEC_ARCH_LEAD] - Updated fallback runtime expectation string to enforce new migration baseline.
-            const currentVer = this.parseVer(window.EXPECTED_BSIM_VERSION || "1.23.95");
+            // [AUDIT: v1.23.96 | SEC_ARCH_LEAD] - Updated fallback runtime expectation string to enforce new migration baseline.
+            const currentVer = this.parseVer(window.EXPECTED_BSIM_VERSION || "1.23.96");
 
             if (fileVer < currentVer) console.log(`[Migration] Upgrading schema from ${data.meta?.version} to ${window.EXPECTED_BSIM_VERSION}`);
 
@@ -63,8 +63,8 @@ const ProjectManager = {
                                 }
                             } else {
                                 if (['NOT','AND','OR','NOR','XOR','XNOR','NAND'].includes(t)) {
-                                    // [AUDIT: v1.23.95 | SEC_ARCH_LEAD] - Restored legacy combinational output mapping to resolve DOM binding failures.
-                                    if (ep.portId === 'out0' || ep.portId === 'q') ep.portId = 'out';
+                                    // [AUDIT: v1.23.96 | SEC_ARCH_LEAD] - Reverted native gate output mapping to strictly target DOM property 'q'.
+                                    if (ep.portId === 'out0' || ep.portId === 'out') ep.portId = 'q';
                                 } else if (['IN-1','OUT-1','PROBE-1','CLOCK'].includes(t)) {
                                     if (ep.portId === 'out') ep.portId = 'out0';
                                 }
@@ -75,11 +75,21 @@ const ProjectManager = {
                         if (cNode.isCustom && data.library && data.library[cNode.type]) {
                             const lib = data.library[cNode.type];
                             const ioNodes = lib.nodes.filter(x => x.type.startsWith(isIn ? 'IN-' : 'OUT-') || (isIn && x.type.startsWith('PROBE-')));
-                            ioNodes.sort((a, b) => a.y - b.y);
+                            // [AUDIT: v1.23.96 | SEC_ARCH_LEAD] - Apply secondary X-axis sorting to match DOM rendering parity.
+                            ioNodes.sort((a, b) => (a.y - b.y) || (a.x - b.x));
                             
                             const bPref = isIn ? 'in' : 'out';
-                            let bitIdx = 0;
+                            let totalBits = 0;
+                            ioNodes.forEach(n => totalBits += (parseInt(n.type.split('-')[1]) || 1));
                             
+                            // [AUDIT: v1.23.96 | SEC_ARCH_LEAD] - Skip migration if port is already a valid continuous bit index.
+                            const portMatch = ep.portId ? ep.portId.match(new RegExp(`^${bPref}(\\d+)$`)) : null;
+                            if (portMatch) {
+                                const pIdx = parseInt(portMatch[1]);
+                                if (pIdx >= 0 && pIdx < totalBits) return;
+                            }
+
+                            let bitIdx = 0;
                             for (let i = 0; i < ioNodes.length; i++) {
                                 const io = ioNodes[i];
                                 if (io.id === ep.portId || (io.label && io.label.toLowerCase() === (ep.portId || '').toLowerCase()) || ep.portId === `${bPref}${bitIdx}`) {
@@ -95,7 +105,7 @@ const ProjectManager = {
                                 }
                                 bitIdx += bits;
                             }
-                            if (ioNodes.length > 0) ep.portId = `${bPref}0`;
+                            if (ioNodes.length > 0 && !ep.portId.startsWith(bPref)) ep.portId = `${bPref}0`;
                         }
                     });
                 });
@@ -104,7 +114,7 @@ const ProjectManager = {
             if (data.library) Object.values(data.library).forEach(chip => fixNetlist(chip.wires, chip.nodes));
 
             if (!data.meta) data.meta = {};
-            data.meta.version = (window.EXPECTED_BSIM_VERSION || "1.23.95") + "-Modular";
+            data.meta.version = (window.EXPECTED_BSIM_VERSION || "1.23.96") + "-Modular";
             // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Migration complete. Target version: ${data.meta.version}.
             return data;
         },
