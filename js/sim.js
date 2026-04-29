@@ -1,6 +1,6 @@
 /**
- * Simulator Core v1.23.82 (Modular Professional)
- * FIXED: Localized node edit drag interaction isolated from global netlist topological drags.
+ * Simulator Core v1.23.83 (Modular Professional)
+ * POLISHED: Encapsulated node pin indicators into bounded flex containers with strict bounding logic.
  */
 const Sim = {
     nodes: [],
@@ -1232,10 +1232,10 @@ const Sim = {
                     dot.classList.toggle('on', stateBit === 1);
                     dot.classList.toggle('off', stateBit === 0 || stateBit === null || stateBit === 'Z');
                 });
-                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Apply localized pin geometry bounding box limits.
-                const pinCont = cache.dots[0]?.parentElement;
+                // [AUDIT: SEC_ARCH_LEAD] - Apply localized pin geometry bounding box limits targeting isolated wrapper.
+                const pinCont = el.querySelector('.pin-container');
                 if (pinCont && (n.pinX !== undefined || n.pinW !== undefined)) {
-                    pinCont.style.position = 'absolute';
+                    pinCont.style.transform = 'none'; // Overrides default vertically centered mapping
                     if (n.pinX !== undefined) pinCont.style.left = n.pinX + 'px';
                     if (n.pinY !== undefined) pinCont.style.top = n.pinY + 'px';
                     if (n.pinW !== undefined) pinCont.style.width = n.pinW + 'px';
@@ -1985,16 +1985,14 @@ const Sim = {
         
         el.style.outline = '2px dashed #00ffaa';
         
-        const pinCont = el.querySelector('.bit-dot')?.parentElement;
+        const pinCont = el.querySelector('.pin-container');
         const target = mode === 'pins' ? pinCont : el;
         if (!target) return;
         
         if (mode === 'pins') {
-            target.style.outline = '1px dashed #ff00aa';
-            target.style.position = 'absolute';
-            target.style.display = 'flex';
-            target.style.flexWrap = 'wrap';
+            target.style.outline = '2px dashed #ff00aa';
             target.style.cursor = 'move';
+            target.style.transform = 'none'; // Release absolute centering lock for dragging
         } else {
             el.style.cursor = 'se-resize';
         }
@@ -2026,13 +2024,19 @@ const Sim = {
                     Sim.updateWireVisuals();
                 } else if (mode === 'pins') {
                     if (m.shiftKey) { 
-                        node.pinW = Math.max(10, startPinW + dx);
-                        node.pinH = Math.max(10, startPinH + dy);
+                        // [AUDIT: SEC_ARCH_LEAD] - Enforce rigid dimensional scaling clamps for inner indicator array.
+                        const maxW = startNodeW - startPinX;
+                        const maxH = startNodeH - startPinY;
+                        node.pinW = Math.max(16, Math.min(maxW, startPinW + dx));
+                        node.pinH = Math.max(16, Math.min(maxH, startPinH + dy));
                         target.style.width = node.pinW + 'px';
                         target.style.height = node.pinH + 'px';
                     } else { 
-                        node.pinX = Math.max(0, Math.min((node.customWidth || parseInt(el.style.width) || 90) - (node.pinW || target.offsetWidth || 10), startPinX + dx));
-                        node.pinY = Math.max(0, Math.min((node.customHeight || parseInt(el.style.height) || 80) - (node.pinH || target.offsetHeight || 10), startPinY + dy));
+                        // [AUDIT: SEC_ARCH_LEAD] - Constrain inner indicator translation to strictly within host bounds.
+                        const maxW = startNodeW - (node.pinW || target.offsetWidth || 16);
+                        const maxH = startNodeH - (node.pinH || target.offsetHeight || 16);
+                        node.pinX = Math.max(0, Math.min(maxW, startPinX + dx));
+                        node.pinY = Math.max(0, Math.min(maxH, startPinY + dy));
                         target.style.left = node.pinX + 'px';
                         target.style.top = node.pinY + 'px';
                     }
@@ -2056,7 +2060,7 @@ const Sim = {
         this.activeNodeEdit = null;
         
         const el = document.getElementById(state.node.id);
-        const pinCont = el?.querySelector('.bit-dot')?.parentElement;
+        const pinCont = el?.querySelector('.pin-container');
         const target = state.mode === 'pins' ? pinCont : el;
         
         if (target && this._editModeDown) {

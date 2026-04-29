@@ -36,30 +36,33 @@ const NodeRenderer = {
         Sim.updateNodePosition(node, div);
         let portsHtml = '';
 
+        // [AUDIT: SEC_ARCH_LEAD] - Isolate bit-dot indicators into bounded containers for layout encapsulation.
         if (node.type.startsWith('IN-')) {
+            let dotsHtml = '';
             for (let i = 0; i < bits; i++) {
                 const bIdx = bits - 1 - i; // TOP is MSB, BOTTOM is LSB
                 const topPct = bits === 1 ? 50 : ((i + 0.5) / bits) * 100;
-                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - UI Scaling: Render single-digit pin indices for buses to prevent layout clipping.
+                // [AUDIT: SEC_ARCH_LEAD] - UI Scaling: Render single-digit pin indices for buses to prevent layout clipping.
                 const labelText = (bits > 1) ? bIdx : '';
                 portsHtml += `<div class="port output" data-port="out${bIdx}" style="top:${topPct}%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${bIdx}')">
                     <div class="port-meta"><span class="port-label">${labelText}</span></div>
                 </div>`;
-                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Isolated bit-dot indicators to opposite bounds to prevent port interaction overlap.
-                portsHtml += `<div class="bit-dot" data-bit="${bIdx}" style="position:absolute; left:8px; top:calc(${topPct}% - 7px); margin:0;" onclick="event.stopPropagation(); Sim.toggleBit(event, '${node.id}', ${bIdx})"></div>`;
+                dotsHtml += `<div class="bit-dot" data-bit="${bIdx}" onclick="event.stopPropagation(); Sim.toggleBit(event, '${node.id}', ${bIdx})"></div>`;
             }
+            portsHtml += `<div class="pin-container in">${dotsHtml}</div>`;
         } else if (node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
+            let dotsHtml = '';
             for (let i = 0; i < bits; i++) {
                 const bIdx = bits - 1 - i; // TOP is MSB, BOTTOM is LSB
                 const topPct = bits === 1 ? 50 : ((i + 0.5) / bits) * 100;
-                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - UI Scaling: Render single-digit pin indices for buses to prevent layout clipping.
+                // [AUDIT: SEC_ARCH_LEAD] - UI Scaling: Render single-digit pin indices for buses to prevent layout clipping.
                 const labelText = (bits > 1) ? bIdx : '';
                 portsHtml += `<div class="port input" data-port="in${bIdx}" style="top:${topPct}%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'in${bIdx}')">
                     <div class="port-meta"><span class="port-label">${labelText}</span></div>
                 </div>`;
-                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Isolated bit-dot indicators to opposite bounds to prevent port interaction overlap.
-                portsHtml += `<div class="bit-dot" data-bit="${bIdx}" style="position:absolute; right:8px; top:calc(${topPct}% - 7px); margin:0;"></div>`;
+                dotsHtml += `<div class="bit-dot" data-bit="${bIdx}"></div>`;
             }
+            portsHtml += `<div class="pin-container out">${dotsHtml}</div>`;
         }
  else {
             if (node.type === 'JUNCTION') portsHtml = `<div class="port input output" data-port="j" style="top:50%;left:50%;transform:translate(-50%,-50%)" onmousedown="if(!Sim.wiring.active) return; event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'j')"></div>`;
