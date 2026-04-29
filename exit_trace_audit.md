@@ -1,25 +1,25 @@
-# Exit Trace Audit Log (v1.23.92)
+# Exit Trace Audit Log (v1.23.93)
 
 This document maps every logical exit point and function boundary instrumented with high-density `EXIT_TRACE` markers to isolate signal anomalies.
 
 ## 1. Simulation Kernel (`js/sim.js`)
 | Function | Line | Intent |
 | :--- | :--- | :--- |
-| `calculateNextState` | 458 | State calculated for node. |
-| `processQueue` | 530 | Early exit, simulation queue empty. |
-| `processQueue` | 696 | Wasm-accelerated simulation tick complete. |
-| `processQueue` | 785 | V8-based simulation tick complete. |
-| `runWasmParityCheck` | 798 | Diagnostics aborted, Wasm Engine not linked. |
-| `runWasmParityCheck` | 817 | Diagnostics aborted, mixed-mode netlist detected. |
-| `runWasmParityCheck` | 969 | Parity diagnostics suite finalized. |
-| `addNode` | 1134 | Node added to workspace. |
-| `updateNodeVisual` | 1312 | Node visual state synchronized. |
-| `getDrivingSignal` | 1479 | Driver resolution complete (Floating). |
-| `seedQueue` | 1493 | Queue seeded for full propagation sweep. |
-| `toast` | 1876 | Toast aborted, notifications disabled. |
-| `toast` | 1880 | Toast aborted, debug mode inactive. |
-| `toast` | 1950 | Toast notification lifecycle initiated. |
-| `uiSaveLayout.btn.onclick` | 2263 | Global layout mutation finalized and persisted. |
+| `calculateNextState` | 491 | State calculated for node. |
+| `processQueue` | 563 | Early exit, simulation queue empty. |
+| `processQueue` | 729 | Wasm-accelerated simulation tick complete. |
+| `processQueue` | 818 | V8-based simulation tick complete. |
+| `runWasmParityCheck` | 831 | Diagnostics aborted, Wasm Engine not linked. |
+| `runWasmParityCheck` | 850 | Diagnostics aborted, mixed-mode netlist detected. |
+| `runWasmParityCheck` | 1002 | Parity diagnostics suite finalized. |
+| `addNode` | 1167 | Node added to workspace. |
+| `updateNodeVisual` | 1345 | Node visual state synchronized. |
+| `getDrivingSignal` | 1519 | Driver resolution complete (Floating). |
+| `seedQueue` | 1533 | Queue seeded for full propagation sweep. |
+| `toast` | 1916 | Toast aborted, notifications disabled. |
+| `toast` | 1920 | Toast aborted, debug mode inactive. |
+| `toast` | 1990 | Toast notification lifecycle initiated. |
+| `uiSaveLayout.btn.onclick` | 2303 | Global layout mutation finalized and persisted. |
 | `autoSave` | 274 | AutoSave operation finalized. |
 
 ## 2. WebAssembly Bridge (`js/modules/wasm_bridge.js`)
@@ -31,19 +31,19 @@ This document maps every logical exit point and function boundary instrumented w
 | `resolveAllDriverIndices` | 258 | Returning drivers for node:port. |
 | `buildBusTree` | 275 | Bus resolution tree built. |
 | `executeTick` | 510 | Early exit, Wasm engine not ready. |
-| `executeTick` | 514 | Wasm tick executed successfully. |
-| `writeState` | 537 | Node state written to Wasm memory. |
-| `readWireState` | 546 | Wire state read failure. |
-| `readWireState` | 549 | Wire state read success. |
-| `getSpecificIdx` | 561 | Mapping failure for node:port. |
-| `getSpecificIdx` | 577 | Linear mapping for node:port. |
-| `readState` | 590 | Read failure for node. |
-| `readState` | 598 | Scalar read success for node. |
-| `readPinState` | 611 | Pin probe failure (system offline). |
-| `readPinState` | 709 | Unconnected sterile pin detected. |
-| `readPinState` | 717 | Pin probe failed (resolution failed). |
-| `readPinState` | 721 | SYNC_BRIDGE pin probe success. |
-| `exportMemoryMap` | 749 | Memory map exported to console. |
+| `executeTick" | 514 | Wasm tick executed successfully. |
+| `writeState" | 537 | Node state written to Wasm memory. |
+| `readWireState" | 546 | Wire state read failure. |
+| `readWireState" | 549 | Wire state read success. |
+| `getSpecificIdx" | 561 | Mapping failure for node:port. |
+| `getSpecificIdx" | 577 | Linear mapping for node:port. |
+| `readState" | 590 | Read failure for node. |
+| `readState" | 598 | Scalar read success for node. |
+| `readPinState" | 611 | Pin probe failure (system offline). |
+| `readPinState" | 709 | Unconnected sterile pin detected. |
+| `readPinState" | 717 | Pin probe failed (resolution failed). |
+| `readPinState" | 721 | SYNC_BRIDGE pin probe success. |
+| `exportMemoryMap" | 749 | Memory map exported to console. |
 
 ## 3. Analysis Engine (`js/modules/analyzer.js`)
 | Function | Line | Intent |

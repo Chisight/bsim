@@ -1,4 +1,4 @@
-# MRAP Architectural Audit Log (v1.23.92)
+# MRAP Architectural Audit Log (v1.23.93)
 
 This document details the Modular Runtime Architectural Protocol (MRAP) taxonomy injection across the BrowserSim codebase. Every functional block has been tagged to enforce Zero Trust boundaries, traceability, and deterministic operation.
 
@@ -16,9 +16,11 @@ This document details the Modular Runtime Architectural Protocol (MRAP) taxonomy
 | :--- | :--- | :--- |
 | L37 | `@ARCH: KERNEL_ORCHESTRATOR`, `@IO: WORKSPACE_INITIALIZATION` | Entry trace for simulation kernel bootstrap and global event listeners. |
 | L220 | `@ARCH: PERSISTENCE_MANAGER`, `@STATE: WORKSPACE_SERIAL` | Periodically synchronize current workspace state to local storage. |
-| L382 | `@ARCH: SIGNAL_RESOLVER`, `@STATE: NODE_UPDATE` | Evaluate logical transfer functions and propagate signals through the netlist. |
-| L472 | `@ARCH: SCHEDULER`, `@CONSTRAINT: TIME_STEP_QUANTIZATION` | Orchestrate main simulation loop, delegating to Wasm for native logic blocks. |
-| L1874 | `@ARCH: UI_TOAST_SYSTEM`, `@STATE: TOAST_PERSISTENCE`, `@IO: USER_NOTIFICATION` | Display interactive, draggable toast notifications with persistent positioning. |
+| L322 | `@ARCH: LEGACY_MIGRATOR`, `@STATE: NETLIST_RECLAMATION` | Auto-resolve legacy port mappings and sanitize corrupted geometric midpoints. |
+| L415 | `@ARCH: SIGNAL_RESOLVER`, `@STATE: NODE_UPDATE` | Evaluate logical transfer functions and propagate signals through the netlist. |
+| L501 | `@ARCH: SCHEDULER`, `@CONSTRAINT: TIME_STEP_QUANTIZATION` | Orchestrate main simulation loop, delegating to Wasm for native logic blocks. |
+| L1355 | `@ARCH: JIT_VALIDATOR`, `@CONSTRAINT: GEOMETRIC_INTEGRITY` | Purge corrupted routing coordinates during wire visual synchronization. |
+| L1909 | `@ARCH: UI_TOAST_SYSTEM`, `@STATE: TOAST_PERSISTENCE`, `@IO: USER_NOTIFICATION` | Display interactive, draggable toast notifications with persistent positioning. |
 
 ## 2. WebAssembly Bridge (`js/modules/wasm_bridge.js`)
 | Location | Tags | Intent |
@@ -49,5 +51,5 @@ This document details the Modular Runtime Architectural Protocol (MRAP) taxonomy
 
 ---
 **Audit Status**: COMPLETED
-**Parity Verification**: v1.23.92 Standard Met.
+**Parity Verification**: v1.23.93 Standard Met.
 **Security Authorization**: SEC_ARCH_LEAD Approved.
