@@ -211,19 +211,46 @@ const DebugTerminal = {
      * @IO: AUTO_COMPLETE
      * @INTENT: Handle tab-completion for commands and node IDs, with visual workspace highlighting.
      */
+    getNodesForCwd() {
+        if (this.cwd === '/') return [];
+        const parts = this.cwd.split('/').filter(p => p);
+        if (parts[0] === 'library') return [];
+        const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === parts[0] || t.id === parts[0]);
+        if (!tab) return [];
+        if (parts.length === 1) {
+            if (Sim.activeTabId === tab.id && Sim.activeEditingChip && Sim.workspaceStack.length > 0) return Sim.workspaceStack[0].nodes;
+            if (Sim.activeTabId === tab.id) return Sim.nodes;
+            return tab.nodes;
+        } else if (parts[1] === 'editor') {
+            if (Sim.activeTabId === tab.id && Sim.activeEditingChip) return Sim.nodes;
+        }
+        return [];
+    },
+
+    // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Context-aware autocomplete via VFS integration.
     handleTab() {
         const val = this.inp.value;
         if (!this._acState) {
             const parts = val.split(' ');
-            const isCmd = parts.length === 1;
+            const cmd = parts[0].toLowerCase();
             const prefix = parts[parts.length - 1].toLowerCase();
             let matches = [];
             
-            if (isCmd) {
-                const cmds = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace'];
+            if (parts.length === 1) {
+                const cmds = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv'];
                 matches = cmds.filter(c => c.startsWith(prefix));
+            } else if (cmd === 'cd') {
+                const pathParts = this.cwd.split('/').filter(p => p);
+                if (this.cwd === '/') {
+                    matches = Sim.tabs.map((t,i) => `tab-${i+1}/`).concat(['library/']).filter(d => d.startsWith(prefix));
+                } else if (pathParts.length === 1 && Sim.activeTabId === Sim.tabs.find((t,i) => `tab-${i+1}`===pathParts[0])?.id && Sim.activeEditingChip) {
+                    matches = ['editor/'].filter(d => d.startsWith(prefix));
+                }
             } else {
-                matches = Sim.nodes.map(n => n.id).filter(id => id.toLowerCase().startsWith(prefix));
+                const cNodes = this.getNodesForCwd();
+                matches = cNodes.map(n => n.id).filter(id => id.toLowerCase().startsWith(prefix));
+                const shortMatches = cNodes.map(n => n.id.replace('node-', '')).filter(id => id.toLowerCase().startsWith(prefix));
+                matches = [...new Set([...matches, ...shortMatches])];
             }
             
             if (matches.length === 0) return;
@@ -237,8 +264,9 @@ const DebugTerminal = {
         parts[parts.length - 1] = match;
         this.inp.value = parts.join(' ') + (this._acState.parts.length === 1 && this._acState.matches.length === 1 ? ' ' : '');
         
-        if (this._acState.parts.length > 1) {
-            this.highlightNode(match);
+        if (this._acState.parts.length > 1 && parts[0].toLowerCase() !== 'cd') {
+            const fullId = match.startsWith('node-') ? match : 'node-' + match;
+            this.highlightNode(fullId);
         }
     },
 
@@ -332,19 +360,33 @@ const DebugTerminal = {
                 this.print(`/home/bsim${this.cwd}`, 'sys');
                 break;
             case 'cd':
+                // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Safe boundary traversal for virtual file system.
                 if (!args[1] || args[1] === '~' || args[1] === '/') {
                     this.cwd = '/';
                 } else if (args[1] === '..') {
                     const parts = this.cwd.split('/').filter(p => p);
                     parts.pop();
                     this.cwd = '/' + parts.join('/');
-                    if (this.cwd === '//') this.cwd = '/';
+                    if (!this.cwd.startsWith('/')) this.cwd = '/' + this.cwd;
                 } else {
-                    let next = this.cwd.endsWith('/') ? this.cwd + args[1] : this.cwd + '/' + args[1];
-                    this.cwd = next;
+                    let target = args[1].replace(/\/$/, '');
+                    let next = this.cwd.endsWith('/') ? this.cwd + target : this.cwd + '/' + target;
+                    const parts = next.split('/').filter(p => p);
+                    let valid = false;
+                    if (parts[0] === 'library') valid = true;
+                    else {
+                        const t = Sim.tabs.find((tab, idx) => `tab-${idx+1}` === parts[0] || tab.id === parts[0]);
+                        if (t) {
+                            if (parts.length === 1) valid = true;
+                            else if (parts.length === 2 && parts[1] === 'editor' && Sim.activeTabId === t.id && Sim.activeEditingChip) valid = true;
+                        }
+                    }
+                    if (valid) this.cwd = '/' + parts.join('/');
+                    else return this.print(`cd: no such file or directory: ${args[1]}`, "err");
                 }
                 document.getElementById('dt-header-cwd').innerText = `/home/bsim${this.cwd}`;
-                document.getElementById('dt-prompt-cwd').innerText = this.cwd;
+                const promptDir = this.cwd === '/' ? '/' : this.cwd.split('/').filter(x=>x).pop();
+                document.getElementById('dt-prompt-cwd').innerText = promptDir;
                 break;
             case 'mv':
                 if (args.length < 3) return this.print("Usage: mv <chip> <folder>", "err");
@@ -367,45 +409,85 @@ const DebugTerminal = {
                 break;
             case 'ls':
                 const verbose = args.includes('-l') || args.includes('-v');
-                if (this.cwd !== '/') {
-                    // Virtual File System View
-                    const searchDir = this.cwd.startsWith('/') ? this.cwd.substring(1) : this.cwd;
-                    this.print(`--- DIRECTORY: /home/bsim${this.cwd} ---`, "warn");
+                if (this.cwd === '/') {
+                    this.print(`--- WORKSPACES ---`, "warn");
+                    Sim.tabs.forEach((t, i) => {
+                        const alias = `tab-${i+1}`;
+                        const tag = t.id === Sim.activeTabId ? '<span style="color:#ffca28">*</span>' : ' ';
+                        this.print(`${tag} <span style="color:#0af; font-weight:bold;">${alias}/</span> <span style="color:#667">(id: ${t.id}, name: ${t.name})</span>`, "ok");
+                    });
+                    this.print(`  <span style="color:#0af; font-weight:bold;">library/</span>`, "ok");
+                    return;
+                }
+
+                const dirParts = this.cwd.split('/').filter(p => p);
+                if (dirParts[0] === 'library') {
+                    const searchDir = dirParts.slice(1).join('/');
+                    this.print(`--- MACRO LIBRARY: ${searchDir || '/'} ---`, "warn");
                     let found = 0;
+                    const subdirs = new Set();
                     Object.keys(Sim.library).forEach(name => {
                         const folder = Sim.library[name].folder || '';
-                        if (folder === searchDir || folder.startsWith(searchDir + '/')) {
-                            this.print(`[Macro] <span style="color:#0af">${name}</span>`, "ok");
+                        if (folder === searchDir) {
+                            this.print(`[Macro] <span style="color:#0f5">${name}</span>`, "ok");
                             found++;
+                        } else if (folder.startsWith(searchDir ? searchDir + '/' : '')) {
+                            const sub = folder.substring(searchDir ? searchDir.length + 1 : 0).split('/')[0];
+                            if (sub) subdirs.add(sub);
                         }
+                    });
+                    subdirs.forEach(d => {
+                        this.print(`[Dir] <span style="color:#0af; font-weight:bold;">${d}/</span>`, "ok");
+                        found++;
                     });
                     if (found === 0) this.print("Directory empty.", "sys");
                     return;
                 }
 
-                // Workspace/Root View
-                this.print(`--- WORKSPACE TABS (${Sim.tabs.length}) ---`, "warn");
-                Sim.tabs.forEach(t => {
-                    const tag = t.id === Sim.activeTabId ? '<span style="color:#ffca28">*</span>' : ' ';
-                    this.print(`${tag} [<span style="color:#0af">${t.id}</span>] ${t.name}`, "ok");
-                });
+                // Inside a tab
+                const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === dirParts[0] || t.id === dirParts[0]);
+                if (!tab) return this.print("Invalid workspace.", "err");
 
-                this.print(`--- ACTIVE BOARD (${Sim.nodes.length} nodes) ---`, "warn");
+                let nodesToList = [];
+                let showEditorDir = false;
+
+                if (dirParts.length === 1) {
+                    if (Sim.activeTabId === tab.id) {
+                        if (Sim.activeEditingChip && Sim.workspaceStack.length > 0) {
+                            nodesToList = Sim.workspaceStack[0].nodes;
+                            showEditorDir = true;
+                        } else {
+                            nodesToList = Sim.nodes;
+                        }
+                    } else {
+                        nodesToList = tab.nodes;
+                    }
+                } else if (dirParts.length === 2 && dirParts[1] === 'editor') {
+                    if (Sim.activeTabId === tab.id && Sim.activeEditingChip) {
+                        nodesToList = Sim.nodes;
+                    }
+                }
+
+                this.print(`--- DIRECTORY: /home/bsim${this.cwd} ---`, "warn");
+                if (showEditorDir) {
+                    this.print(`[Dir] <span style="color:#ffca28; font-weight:bold;">editor/</span> <span style="color:#667">(${Sim.activeEditingChip})</span>`, "ok");
+                }
+
                 if (verbose) {
-                    Sim.nodes.forEach(n => {
-                        const out = `[<span style="color:#0af">${n.id}</span>] ${n.type.padEnd(8)} @(${Math.round(n.x)},${Math.round(n.y)}) val:${JSON.stringify(n.val)}`;
+                    nodesToList.forEach(n => {
+                        const out = `[<span style="color:#0f5">${n.id}</span>] ${n.type.padEnd(8)} @(${Math.round(n.x)},${Math.round(n.y)}) val:${JSON.stringify(n.val)}`;
                         this.print(out, "sys");
                     });
                 } else {
                     const groups = {};
-                    Sim.nodes.forEach(n => {
+                    nodesToList.forEach(n => {
                         if (!groups[n.type]) groups[n.type] = [];
                         groups[n.type].push(n.id);
                     });
                     for (const [type, ids] of Object.entries(groups)) {
                         const shortIds = ids.map(id => {
                             const short = id.replace('node-', '');
-                            return `<span style="color:#0af" title="${id}">${short}</span>`;
+                            return `<span style="color:#0f5" title="${id}">${short}</span>`;
                         }).join(', ');
                         this.print(`<b>${type.padEnd(8)}</b> (${ids.length}): ${shortIds}`, "sys");
                     }
