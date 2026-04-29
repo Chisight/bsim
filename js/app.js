@@ -149,8 +149,8 @@ window.onload = () => {
      * @STATE: BSIM_METADATA
      * @INTENT: Define the application semantic versioning for runtime compatibility checks.
      */
-    // [AUDIT: v1.24.31 | SEC_ARCH_LEAD] - Version increment for renaming macro save label.
-    window.LOADED_BSIM_VERSION = "1.24.31";
+    // [AUDIT: v1.24.32 | SEC_ARCH_LEAD] - Version increment for Tools menu color swap.
+    window.LOADED_BSIM_VERSION = "1.24.32";
 
     // [AUDIT: SEC_ARCH_LEAD] - Injected passive workspace boundary validation to catch upgrade mismatches.
     window.addEventListener('load', () => {
