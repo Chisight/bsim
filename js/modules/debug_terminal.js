@@ -375,7 +375,8 @@ const DebugTerminal = {
             let matches = [];
             
             if (parts.length === 1) {
-                const cmds = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv'];
+                // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Expand autocomplete index for new kernel CLI toolkit.
+                const cmds = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv', 'mkdir', 'tick', 'clock', 'force', 'unforce', 'watch', 'dump', 'cp', 'touch', 'find', 'bom', 'path'];
                 matches = cmds.filter(c => c.startsWith(prefix));
             } else if (cmd === 'cd' || cmd === 'ls' || cmd === 'tree' || cmd === 'rm' || cmd === 'mkdir') {
                 // [AUDIT: v1.24.03 | SEC_ARCH_LEAD] - Dynamic VFS path autocomplete with trailing slash parsing.
@@ -530,14 +531,28 @@ const DebugTerminal = {
 
         switch (c) {
             case 'help':
+                // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Expanded help index for kernel telemetry commands.
                 this.print("Commands: exit, clear, verbosity [0-3], synth [gate], trace [nodeId]");
                 this.print("  pwd                 - Print Working Directory (VFS)");
                 this.print("  cd <path>           - Change Directory (VFS)");
                 this.print("  mkdir [-p] <dir>    - Create VFS directory");
                 this.print("  mv <chip> <folder>  - Move chip to a library folder");
+                this.print("  cp <src> <dest>     - Clone a macro in the library");
+                this.print("  touch <macro>       - Instantiate an empty macro");
                 this.print("  ls [-l] [path]      - List workspace nodes or VFS contents");
                 this.print("  tree [path]         - Display directory structure recursively");
+                this.print("  find <pattern>      - Regex search across VFS and nodes");
                 this.print("  spawn <type> [x y]  - Add a node (e.g., spawn NAND 100 100)");
+                this.print("  rm [-rf] <id>       - Delete nodes or directories");
+                this.print("  set <nodeId> <val>  - Set input node value (e.g., set node-xyz 1)");
+                this.print("  force <n> <p> <v>   - Override a pin signal (e.g., force n1 in0 1)");
+                this.print("  unforce <n> <p>     - Release an overridden pin");
+                this.print("  tick [N]            - Advance simulation clock N cycles");
+                this.print("  clock <id> <freq>   - Set oscillator frequency (Hz)");
+                this.print("  watch <nodeId>      - Subscribe to state transitions");
+                this.print("  dump <nodeId>       - Dump raw JSON state array");
+                this.print("  bom [macro]         - Generate Bill of Materials");
+                this.print("  path <n1> <n2>      - Trace topological electrical path");
                 this.print("  rm <id> [id2...]    - Delete nodes (or 'rm all')");
                 this.print("  set <nodeId> <val>  - Set input node value (e.g., set node-xyz 1)");
                 this.print("  wire <n1> <p1> <n2> <p2> - Connect two nodes");
@@ -874,6 +889,129 @@ const DebugTerminal = {
             case 'sim':
                 Sim.seedQueue(); Sim.processQueue();
                 this.print("Propagation tick queued.", "ok");
+                break;
+            case 'tick':
+                // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Programmatic cycle advancement.
+                let ticks = parseInt(args[1]) || 1;
+                for(let i=0; i<ticks; i++) { Sim.seedQueue(); Sim.processQueue(); }
+                this.print(`Advanced ${ticks} clock cycle(s).`, "ok");
+                break;
+            case 'clock':
+                if (args.length < 3) return this.print("Usage: clock <nodeId> <freq>", "err");
+                let cNode = Sim.nodes.find(n => n.id === args[1] && n.type === 'CLOCK');
+                if (!cNode) return this.print("Clock node not found in active workspace.", "err");
+                cNode.freq = parseFloat(args[2]);
+                cNode.interval = cNode.freq > 0 ? 1000 / cNode.freq : 0;
+                this.print(`Clock ${cNode.id} set to ${cNode.freq}Hz`, "ok");
+                break;
+            case 'force':
+                if (args.length < 4) return this.print("Usage: force <nodeId> <portId> <0|1|Z>", "err");
+                if (!Sim._forcedNets) Sim._forcedNets = {};
+                let forceVal = args[3] === 'Z' ? 'Z' : parseInt(args[3]);
+                Sim._forcedNets[`${args[1]}:${args[2]}`] = forceVal;
+                this.print(`Forced ${args[1]}:${args[2]} to ${forceVal}`, "ok");
+                Sim.seedQueue(); Sim.processQueue();
+                break;
+            case 'unforce':
+                if (args.length < 3) return this.print("Usage: unforce <nodeId> <portId>", "err");
+                if (Sim._forcedNets) delete Sim._forcedNets[`${args[1]}:${args[2]}`];
+                this.print(`Unforced ${args[1]}:${args[2]}`, "ok");
+                Sim.seedQueue(); Sim.processQueue();
+                break;
+            case 'watch':
+                if (!args[1]) return this.print("Usage: watch <nodeId>", "err");
+                if (!this._watchers) this._watchers = new Set();
+                if (this._watchers.has(args[1])) {
+                    this._watchers.delete(args[1]);
+                    this.print(`Unwatched ${args[1]}`, "ok");
+                } else {
+                    this._watchers.add(args[1]);
+                    this.print(`Watching ${args[1]} for state changes...`, "ok");
+                }
+                break;
+            case 'dump':
+                if (!args[1]) return this.print("Usage: dump <nodeId|macro>", "err");
+                let dNode = Sim.nodes.find(n => n.id === args[1]);
+                if (!dNode) dNode = Sim.library[args[1]];
+                if (!dNode) return this.print("Node/Macro not found.", "err");
+                this.print(`<pre style="margin:0; font-size:10px; line-height:1.2;">${JSON.stringify(dNode, null, 2)}</pre>`, "sys");
+                break;
+            case 'cp':
+                if (args.length < 3) return this.print("Usage: cp <src> <dest>", "err");
+                if (!Sim.library[args[1]]) return this.print(`Source ${args[1]} not found in library.`, "err");
+                if (Sim.library[args[2]]) return this.print(`Dest ${args[2]} already exists.`, "err");
+                Sim.library[args[2]] = JSON.parse(JSON.stringify(Sim.library[args[1]]));
+                let destFolder = this.cwd.startsWith('/etc/lib/custom') ? this.cwd.replace(/^\/etc\/lib\/custom\/?/, '') : '';
+                Sim.library[args[2]].folder = destFolder;
+                Sim.updateLibraryUI();
+                Sim.autoSave();
+                this.print(`Copied ${args[1]} to ${args[2]}`, "ok");
+                break;
+            case 'touch':
+                if (!args[1]) return this.print("Usage: touch <macroName>", "err");
+                if (Sim.library[args[1]]) return this.print(`Macro ${args[1]} already exists.`, "err");
+                let tFolder = this.cwd.startsWith('/etc/lib/custom') ? this.cwd.replace(/^\/etc\/lib\/custom\/?/, '') : '';
+                Sim.library[args[1]] = { nodes: [], wires: [], folder: tFolder };
+                Sim.updateLibraryUI();
+                Sim.autoSave();
+                this.print(`Created empty macro ${args[1]}`, "ok");
+                break;
+            case 'find':
+                if (!args[1]) return this.print("Usage: find <regex>", "err");
+                try {
+                    let regex = new RegExp(args[1], 'i');
+                    let foundAny = false;
+                    Sim.nodes.forEach(n => {
+                        if (regex.test(n.id) || regex.test(n.type) || regex.test(n.label)) {
+                            this.print(`[Workspace] <span style="color:#0f5">${n.id}</span> (${n.type})`, "ok");
+                            foundAny = true;
+                        }
+                    });
+                    Object.keys(Sim.library).forEach(k => {
+                        if (regex.test(k)) {
+                            this.print(`[Library] <span style="color:#0af">${k}</span>`, "ok");
+                            foundAny = true;
+                        }
+                    });
+                    if (!foundAny) this.print("No matches found.", "sys");
+                } catch(e) { this.print("Invalid Regex.", "err"); }
+                break;
+            case 'bom':
+                let targetBOM = args[1] ? Sim.library[args[1]] : { nodes: Sim.nodes };
+                if (!targetBOM) return this.print("Macro not found.", "err");
+                let counts = {};
+                const traverseBOM = (nodes) => {
+                    nodes.forEach(n => {
+                        if (n.isCustom && Sim.library[n.type]) traverseBOM(Sim.library[n.type].nodes);
+                        else counts[n.type] = (counts[n.type] || 0) + 1;
+                    });
+                };
+                traverseBOM(targetBOM.nodes);
+                this.print(`--- BILL OF MATERIALS ---`, "warn");
+                Object.entries(counts).sort((a,b) => b[1]-a[1]).forEach(([k, v]) => {
+                    this.print(`${k.padEnd(12)}: ${v}`, "sys");
+                });
+                break;
+            case 'path':
+                if (args.length < 3) return this.print("Usage: path <nodeA> <nodeB>", "err");
+                const visitedPath = new Set();
+                const queue = [{ id: args[1], path: [args[1]] }];
+                let foundPath = false;
+                while(queue.length > 0) {
+                    const curr = queue.shift();
+                    if (curr.id === args[2]) {
+                        this.print(`Path found: ${curr.path.map(id => `<span style="color:#0f5">${id}</span>`).join(' -> ')}`, "ok");
+                        foundPath = true;
+                        break;
+                    }
+                    if (visitedPath.has(curr.id)) continue;
+                    visitedPath.add(curr.id);
+                    Sim.wires.forEach(w => {
+                        if (w.from.nodeId === curr.id && !visitedPath.has(w.to.nodeId)) queue.push({ id: w.to.nodeId, path: [...curr.path, w.to.nodeId] });
+                        if (w.to.nodeId === curr.id && !visitedPath.has(w.from.nodeId)) queue.push({ id: w.from.nodeId, path: [...curr.path, w.from.nodeId] });
+                    });
+                }
+                if (!foundPath) this.print("No electrical path exists.", "err");
                 break;
             case 'status':
                 this.print(`--- SIMULATOR STATUS ---`, "warn");

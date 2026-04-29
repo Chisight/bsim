@@ -94,6 +94,18 @@ const Sim = {
         this.wakeQueue();
 
         window.addEventListener('mousemove', (e) => {
+            // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Capture viewport-relative board coordinates for HUD telemetry.
+            const hc = document.getElementById('hud-coords');
+            if (hc && window.View) {
+                const scene = document.getElementById('scene');
+                if (scene) {
+                    const sr = scene.getBoundingClientRect();
+                    const bx = Math.round((e.clientX - sr.left) / View.scale);
+                    const by = Math.round((e.clientY - sr.top) / View.scale);
+                    hc.innerText = `${bx}, ${by}`;
+                }
+            }
+
             if (!this.wiring.active) return;
             const SNAP_R = 60;
             let nearest = null, nearestDist = SNAP_R;
@@ -1386,6 +1398,16 @@ const Sim = {
         });
 
         if (n._oscillating) el.classList.add('oscillating');
+        
+        // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Emit state transitions to terminal watchers.
+        if (window.DebugTerminal && DebugTerminal._watchers && DebugTerminal._watchers.has(n.id)) {
+            const currentStr = JSON.stringify(n.val);
+            if (n._lastWatchVal !== currentStr) {
+                DebugTerminal.print(`[WATCH] <span style="color:#0af">${n.id}</span> transitioned to <span style="color:#0f5">${currentStr}</span>`, 'sys');
+                n._lastWatchVal = currentStr;
+            }
+        }
+        
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node visual state synchronized for ${n.id}.
     },
 
@@ -1526,6 +1548,12 @@ const Sim = {
      */
     getDrivingSignal(nodeId, portId, visited = new Set()) {
         const netKey = `${nodeId}:${portId}`;
+        
+        // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Intercept net evaluation for CLI forced signal overriding.
+        if (this._forcedNets && this._forcedNets[netKey] !== undefined) {
+            return this._forcedNets[netKey];
+        }
+
         if (visited.has(netKey)) return null;
         visited.add(netKey);
 
@@ -1668,7 +1696,7 @@ const Sim = {
             engineStatus = '<span style="color:#ffaa00">V8 JAVASCRIPT</span>';
         }
         
-        hud.innerHTML = `GATES: ${this.nodes.length} | WIRES: ${this.wires.length}<br>CHIP : ${this.activeEditingChip || 'MAIN'}<br>ENGINE: ${engineStatus}`;
+        hud.innerHTML = `GATES: ${this.nodes.length} | WIRES: ${this.wires.length}<br>CHIP : ${this.activeEditingChip || 'MAIN'}<br>ENGINE: ${engineStatus}<br>POS  : <span id="hud-coords" style="color:#0f5">0, 0</span>`;
     },
 
     /**
