@@ -2815,6 +2815,7 @@ const Sim = {
             `;
             document.body.appendChild(popupWrap);
             
+            // [AUDIT: v1.24.16 | SEC_ARCH_LEAD] - Hardened popup editor drag state against iframe input swallowing.
             let isDragging = false, startX, startY, initX, initY;
             const head = popupWrap.querySelector('#popup-editor-head');
             head.onmousedown = (e) => {
@@ -2823,13 +2824,22 @@ const Sim = {
                 startX = e.clientX; startY = e.clientY;
                 const rect = popupWrap.getBoundingClientRect();
                 initX = rect.left; initY = rect.top;
+                popupWrap.style.left = initX + 'px';
+                popupWrap.style.top = initY + 'px';
+                popupWrap.style.right = 'auto'; popupWrap.style.bottom = 'auto';
+                document.querySelectorAll('iframe').forEach(ifr => ifr.style.pointerEvents = 'none');
             };
             document.addEventListener('mousemove', (e) => {
                 if (!isDragging) return;
                 popupWrap.style.left = (initX + (e.clientX - startX)) + 'px';
                 popupWrap.style.top = (initY + (e.clientY - startY)) + 'px';
             });
-            document.addEventListener('mouseup', () => isDragging = false);
+            document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    document.querySelectorAll('iframe').forEach(ifr => ifr.style.pointerEvents = 'auto');
+                }
+            });
 
             if (tab) tab.classList.add('has-split');
             this.toast(`Popup editor spawned for ${targetChip}`, 'success');

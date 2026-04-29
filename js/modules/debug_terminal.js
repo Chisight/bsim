@@ -166,24 +166,31 @@ const DebugTerminal = {
             }
         });
 
-        // Dragging Logic
+        // [AUDIT: v1.24.16 | SEC_ARCH_LEAD] - Repaired terminal drag constraints to prevent iframe swallowing and position jumps.
         let isDragging = false, startX, startY, initX, initY;
         const head = document.getElementById('dt-head');
         head.onmousedown = (e) => {
-            // [AUDIT: v1.24.14 | SEC_ARCH_LEAD] - Specific ID targeting to prevent VFS header span from blocking drag events.
             if (e.target.id === 'dt-min' || e.target.id === 'dt-close') return;
             isDragging = true;
             startX = e.clientX; startY = e.clientY;
             const rect = this.ui.getBoundingClientRect();
             initX = rect.left; initY = rect.top;
+            this.ui.style.left = initX + 'px';
+            this.ui.style.top = initY + 'px';
             this.ui.style.right = 'auto'; this.ui.style.bottom = 'auto';
+            document.querySelectorAll('iframe').forEach(ifr => ifr.style.pointerEvents = 'none');
         };
         document.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
             this.ui.style.left = (initX + (e.clientX - startX)) + 'px';
             this.ui.style.top = (initY + (e.clientY - startY)) + 'px';
         });
-        document.addEventListener('mouseup', () => isDragging = false);
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                document.querySelectorAll('iframe').forEach(ifr => ifr.style.pointerEvents = 'auto');
+            }
+        });
 
         // Window Controls
         document.getElementById('dt-close').onclick = () => this.toggle(false);
