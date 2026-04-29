@@ -149,8 +149,8 @@ window.onload = () => {
      * @STATE: BSIM_METADATA
      * @INTENT: Define the application semantic versioning for runtime compatibility checks.
      */
-    // [AUDIT: v1.24.38 | SEC_ARCH_LEAD] - Version increment for proxy hitbox shielding and interaction deadzone patching.
-    window.LOADED_BSIM_VERSION = "1.24.38";
+    // [AUDIT: v1.24.39 | SEC_ARCH_LEAD] - Version increment for favicon asset replacement.
+    window.LOADED_BSIM_VERSION = "1.24.39";
 
     // [AUDIT: SEC_ARCH_LEAD] - Injected passive workspace boundary validation to catch upgrade mismatches.
     window.addEventListener('load', () => {
