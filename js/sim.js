@@ -288,7 +288,7 @@ const Sim = {
                 const project = { 
                     nodes: wsStack.length > 0 ? wsStack[0].nodes : cNodes, 
                     wires: wsStack.length > 0 ? wsStack[0].wires : cWires, 
-                    library: safeLib, workspaceStack: wsStack, activeEditingChip: this.activeEditingChip,
+                    library: safeLib, directories: this.directories || [], workspaceStack: wsStack, activeEditingChip: this.activeEditingChip,
                     tabs: safeTabs, activeTabId: this.activeTabId,
                     // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - Append toast positioning to auto-save preferences payload.
                     prefs: { snapNodes: this.snapNodes, snapWires: this.snapWires, confirmDelete: this.confirmDelete, showStats: this.showStats, showTooltips: this.showTooltips, tutorialMode: this.tutorialMode, hudPos: this.hudPos, toastPos: this.toastPos } 
@@ -317,6 +317,7 @@ const Sim = {
                 
                 this.workspaceStack = parsed.workspaceStack || [];
                 this.activeEditingChip = parsed.activeEditingChip || null;
+                this.directories = parsed.directories || [];
                 
                 // [AUDIT: v1.23.99 | SEC_ARCH_LEAD] - Hydrate multi-tab states from persistence blob.
                 if (parsed.tabs && parsed.tabs.length > 0) {

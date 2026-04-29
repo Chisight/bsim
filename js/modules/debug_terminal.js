@@ -262,6 +262,17 @@ const DebugTerminal = {
         else if (path.startsWith('/etc/lib/custom')) {
             const searchDir = path.replace('/etc/lib/custom', '').replace(/^\//, '');
             const subdirs = new Set();
+            
+            if (Sim.directories) {
+                Sim.directories.forEach(d => {
+                    if (d === searchDir) return;
+                    if (searchDir === '' || d.startsWith(searchDir + '/')) {
+                        const sub = d.substring(searchDir ? searchDir.length + 1 : 0).split('/')[0];
+                        if (sub) subdirs.add(sub);
+                    }
+                });
+            }
+
             Object.keys(Sim.library).forEach(name => {
                 const folder = Sim.library[name].folder || '';
                 if (folder === searchDir) files.push(`[Macro] ${name}`);
@@ -366,8 +377,8 @@ const DebugTerminal = {
             if (parts.length === 1) {
                 const cmds = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv'];
                 matches = cmds.filter(c => c.startsWith(prefix));
-            } else if (cmd === 'cd' || cmd === 'ls' || cmd === 'tree' || cmd === 'rm') {
-                // [AUDIT: v1.24.02 | SEC_ARCH_LEAD] - Dynamic VFS path autocomplete with trailing slash parsing.
+            } else if (cmd === 'cd' || cmd === 'ls' || cmd === 'tree' || cmd === 'rm' || cmd === 'mkdir') {
+                // [AUDIT: v1.24.03 | SEC_ARCH_LEAD] - Dynamic VFS path autocomplete with trailing slash parsing.
                 let searchPath = prefix.includes('/') ? prefix.substring(0, prefix.lastIndexOf('/')) : '';
                 let searchPrefix = prefix.includes('/') ? prefix.substring(prefix.lastIndexOf('/') + 1) : prefix;
                 if (prefix.endsWith('/')) {
@@ -522,6 +533,7 @@ const DebugTerminal = {
                 this.print("Commands: exit, clear, verbosity [0-3], synth [gate], trace [nodeId]");
                 this.print("  pwd                 - Print Working Directory (VFS)");
                 this.print("  cd <path>           - Change Directory (VFS)");
+                this.print("  mkdir [-p] <dir>    - Create VFS directory");
                 this.print("  mv <chip> <folder>  - Move chip to a library folder");
                 this.print("  ls [-l] [path]      - List workspace nodes or VFS contents");
                 this.print("  tree [path]         - Display directory structure recursively");
@@ -623,6 +635,17 @@ const DebugTerminal = {
                     this.print(`--- MACRO LIBRARY: Custom/${searchDir} ---`, "warn");
                     let found = 0;
                     const subdirs = new Set();
+                    
+                    if (Sim.directories) {
+                        Sim.directories.forEach(d => {
+                            if (d === searchDir) return;
+                            if (searchDir === '' || d.startsWith(searchDir + '/')) {
+                                const sub = d.substring(searchDir ? searchDir.length + 1 : 0).split('/')[0];
+                                if (sub) subdirs.add(sub);
+                            }
+                        });
+                    }
+
                     Object.keys(Sim.library).forEach(name => {
                         const folder = Sim.library[name].folder || '';
                         if (folder === searchDir) {
@@ -718,6 +741,48 @@ const DebugTerminal = {
                 Sim.addNode(type, x, y);
                 this.print(`Spawned ${type} at ${x}, ${y}`, "ok");
                 break;
+            case 'mkdir':
+                // [AUDIT: v1.24.03 | SEC_ARCH_LEAD] - VFS directory allocation.
+                let pFlag = args.includes('-p');
+                let dirArgs = args.filter(a => a !== 'mkdir' && !a.startsWith('-'));
+                if (dirArgs.length === 0) return this.print("Usage: mkdir [-p] <dir>", "err");
+
+                if (!Sim.directories) Sim.directories = [];
+
+                dirArgs.forEach(d => {
+                    let targetPath = this.resolvePath(d).replace(/\/$/, '');
+                    if (!targetPath.startsWith('/etc/lib/custom')) {
+                        return this.print(`mkdir: cannot create directory '${d}': Permission denied`, "err");
+                    }
+                    const customPath = targetPath.replace('/etc/lib/custom', '').replace(/^\//, '');
+                    if (customPath === '') return this.print(`mkdir: cannot create directory '${d}': File exists`, "err");
+
+                    if (!pFlag) {
+                        const parts = customPath.split('/');
+                        if (parts.length > 1) {
+                            const parent = parts.slice(0, -1).join('/');
+                            let parentExists = Sim.directories.includes(parent);
+                            if (!parentExists) {
+                                Object.keys(Sim.library).forEach(k => {
+                                    if ((Sim.library[k].folder||'') === parent || (Sim.library[k].folder||'').startsWith(parent + '/')) parentExists = true;
+                                });
+                            }
+                            if (!parentExists) return this.print(`mkdir: cannot create directory '${d}': No such file or directory`, "err");
+                        }
+                    }
+
+                    const pathParts = customPath.split('/');
+                    let currentPath = '';
+                    pathParts.forEach(part => {
+                        currentPath = currentPath ? currentPath + '/' + part : part;
+                        if (!Sim.directories.includes(currentPath)) {
+                            Sim.directories.push(currentPath);
+                        }
+                    });
+                    this.print(`Created directory: ${targetPath}`, "ok");
+                });
+                Sim.autoSave();
+                break;
             case 'rm':
                 // [AUDIT: v1.24.02 | SEC_ARCH_LEAD] - Integrated recursive file system deletion logic (rm -rf).
                 const isRf = args.includes('-rf') || args.includes('-r') || args.includes('-f');
@@ -756,6 +821,11 @@ const DebugTerminal = {
                                         deleted = true;
                                     }
                                 });
+                                if (Sim.directories) {
+                                    const initLen = Sim.directories.length;
+                                    Sim.directories = Sim.directories.filter(d => d !== searchDir && !d.startsWith(searchDir + '/'));
+                                    if (Sim.directories.length < initLen) deleted = true;
+                                }
                                 if (deleted) rmDirCount++;
                                 else this.print(`rm: cannot remove '${target}': No such file or directory`, "err");
                             } else {
