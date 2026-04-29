@@ -2429,7 +2429,8 @@ const Sim = {
             const rRight = clickX > target.offsetWidth - thX;
             const rTop = clickY < thY;
             const rBottom = clickY > target.offsetHeight - thY;
-            const isResizing = mode === 'pins' && (rLeft || rRight || rTop || rBottom);
+            // [AUDIT: v1.24.30 | SEC_ARCH_LEAD] - Authorized boundary resizing for info readouts and labels.
+            const isResizing = (mode === 'pins' || mode === 'info' || mode === 'label') && (rLeft || rRight || rTop || rBottom);
             
             const startX = e.clientX;
             const startY = e.clientY;
