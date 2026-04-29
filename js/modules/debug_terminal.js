@@ -170,7 +170,8 @@ const DebugTerminal = {
         let isDragging = false, startX, startY, initX, initY;
         const head = document.getElementById('dt-head');
         head.onmousedown = (e) => {
-            if (e.target.tagName === 'SPAN') return;
+            // [AUDIT: v1.24.14 | SEC_ARCH_LEAD] - Specific ID targeting to prevent VFS header span from blocking drag events.
+            if (e.target.id === 'dt-min' || e.target.id === 'dt-close') return;
             isDragging = true;
             startX = e.clientX; startY = e.clientY;
             const rect = this.ui.getBoundingClientRect();
@@ -1175,7 +1176,7 @@ const DebugTerminal = {
     }
 };
 
-// [AUDIT: v1.24.08 | SEC_ARCH_LEAD] - Resolved cross-module initialization race condition for Sim context binding.
+// [AUDIT: v1.24.14 | SEC_ARCH_LEAD] - Resolved cross-module initialization race condition for Sim context binding.
 window.DebugTerminal = DebugTerminal;
 window.addEventListener('DOMContentLoaded', () => {
     if (typeof window.Sim !== 'undefined') window.Sim.dt = DebugTerminal;
