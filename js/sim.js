@@ -2373,7 +2373,8 @@ const Sim = {
         // [AUDIT: SEC_ARCH_LEAD] - Lock global wiring interactions to prevent misclicks during layout mutation.
         document.body.classList.add('edit-mode-active');
         
-        el.style.outline = '2px dashed #00ffaa';
+        // [AUDIT: v1.24.36 | SEC_ARCH_LEAD] - Isolated base outline rendering to prevent multi-box rendering glitches on inner wrappers.
+        if (mode === 'icon') el.style.outline = '2px dashed #00ffaa';
         
         const pinCont = el.querySelector('.pin-container');
         const infoCont = el.querySelector('.visual-extra');
@@ -2387,8 +2388,8 @@ const Sim = {
                 proxy = document.createElement('div');
                 proxy.className = 'port-edit-proxy editing-pins';
                 proxy.style.position = 'absolute';
-                proxy.style.border = '2px dashed #00ffff';
-                proxy.style.background = 'rgba(0, 255, 255, 0.1)';
+                // [AUDIT: v1.24.36 | SEC_ARCH_LEAD] - Switched to unified yellow dashed border styling for macro port proxies.
+                proxy.style.background = 'rgba(255, 202, 40, 0.1)';
                 proxy.style.zIndex = '500';
                 const py = node.portY !== undefined ? node.portY : 24;
                 const ph = node.portH !== undefined ? node.portH : (node.customHeight || parseInt(el.style.height) || 64) - 30;
@@ -2421,7 +2422,7 @@ const Sim = {
                 target.style.margin = '0';
             }
             target.classList.add('editing-pins');
-            target.style.outline = '2px dashed #ff00aa';
+            target.style.outline = (mode === 'pin-labels' || mode === 'pin-both') ? '2px dotted #ffca28' : '2px dashed #ff00aa';
             target.style.cursor = 'move';
             target.style.transform = 'none'; // Release absolute centering lock for dragging
             
@@ -2547,8 +2548,9 @@ const Sim = {
                     } else if (mode === 'pin-labels') {
                         node.portY = cY; node.portH = cH;
                     } else if (mode === 'pin-both') {
+                        // [AUDIT: v1.24.36 | SEC_ARCH_LEAD] - Synchronized physical pin arrays with proxy height and vertical delta.
                         node.portY = cY; node.portH = cH;
-                        node.pinY = startBasePinY + dy;
+                        node.pinY = startBasePinY + (cY - startPinY);
                         node.pinH = startBasePinH + (cH - startPinH);
                     } else {
                         node.pinX = cX; node.pinY = cY; node.pinW = cW; node.pinH = cH;
