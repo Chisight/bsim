@@ -13,6 +13,33 @@ const Sim = {
     activeTabId: 'tab-1',
     wireMap: new Map(),
     _netlistDirty: true, // [wasm] flag to indicate that the netlist needs to be recompiled
+
+    // [AUDIT: v1.24.09 | SEC_ARCH_LEAD] - Centralized state sanitization methods to prevent reference crashes.
+    _cleanNode(n) {
+        if (!n || !n.id) return null;
+        try {
+            return JSON.parse(JSON.stringify({
+                id: n.id, type: n.type, x: n.x, y: n.y, label: n.label,
+                val: n.val, state: n.state, outputs: n.outputs, isCustom: n.isCustom,
+                freq: n.freq, interval: n.interval, lastTick: n.lastTick, meta: n.meta,
+                customWidth: n.customWidth, customHeight: n.customHeight,
+                pinX: n.pinX, pinY: n.pinY, pinW: n.pinW, pinH: n.pinH,
+                infoX: n.infoX, infoY: n.infoY, infoW: n.infoW, infoH: n.infoH,
+                _lastX: n._lastX, _lastY: n._lastY
+            }));
+        } catch (e) { console.error("Data sanitization fault on node:", e); return null; }
+    },
+
+    _cleanWire(w) {
+        if (!w || !w.from || !w.to) return null;
+        try {
+            return JSON.parse(JSON.stringify({
+                from: { nodeId: w.from.nodeId, portId: w.from.portId },
+                to: { nodeId: w.to.nodeId, portId: w.to.portId },
+                midX: w.midX, midY: w.midY, orthoDir: w.orthoDir
+            }));
+        } catch (e) { console.error("Data sanitization fault on wire:", e); return null; }
+    },
     showToasts: true,
     debugToasts: false,
     useWasm: true,
@@ -241,32 +268,12 @@ const Sim = {
         if (this._autoSaveTimer) clearTimeout(this._autoSaveTimer);
         this._autoSaveTimer = setTimeout(() => {
             try {
-                const cleanNode = (n) => {
-                    if (!n) return null;
-                    return {
-                        id: n.id, type: n.type, x: n.x, y: n.y, label: n.label,
-                        val: n.val, state: n.state, outputs: n.outputs, isCustom: n.isCustom,
-                        freq: n.freq, interval: n.interval, lastTick: n.lastTick, meta: n.meta,
-                        customWidth: n.customWidth, customHeight: n.customHeight,
-                        pinX: n.pinX, pinY: n.pinY, pinW: n.pinW, pinH: n.pinH,
-                        infoX: n.infoX, infoY: n.infoY, infoW: n.infoW, infoH: n.infoH,
-                        _lastX: n._lastX, _lastY: n._lastY
-                    };
-                };
-                const cleanWire = (w) => {
-                    if (!w || !w.from || !w.to) return null;
-                    return {
-                        from: { nodeId: w.from.nodeId, portId: w.from.portId },
-                        to: { nodeId: w.to.nodeId, portId: w.to.portId },
-                        midX: w.midX, midY: w.midY, orthoDir: w.orthoDir
-                    };
-                };
+                const cNodes = this.nodes.map(n => this._cleanNode(n)).filter(n => n !== null);
+                const cWires = this.wires.map(w => this._cleanWire(w)).filter(w => w !== null);
                 
-                const cNodes = this.nodes.map(cleanNode).filter(n => n !== null);
-                const cWires = this.wires.map(cleanWire).filter(w => w !== null);
                 const wsStack = (this.workspaceStack || []).map(ws => ({ 
-                    nodes: (ws.nodes || []).map(cleanNode).filter(n => n !== null), 
-                    wires: (ws.wires || []).map(cleanWire).filter(w => w !== null) 
+                    nodes: (ws.nodes || []).map(n => this._cleanNode(n)).filter(n => n !== null), 
+                    wires: (ws.wires || []).map(w => this._cleanWire(w)).filter(w => w !== null) 
                 }));
                 
                 if (this.activeEditingChip && wsStack.length > 0) {
@@ -277,8 +284,9 @@ const Sim = {
                 Object.keys(this.library).forEach(k => {
                     if (this.library[k]) {
                         safeLib[k] = {
-                            nodes: (this.library[k].nodes || []).map(cleanNode).filter(n => n !== null),
-                            wires: (this.library[k].wires || []).map(cleanWire).filter(w => w !== null)
+                            nodes: (this.library[k].nodes || []).map(n => this._cleanNode(n)).filter(n => n !== null),
+                            wires: (this.library[k].wires || []).map(w => this._cleanWire(w)).filter(w => w !== null),
+                            folder: this.library[k].folder || ''
                         };
                     }
                 });
@@ -296,8 +304,8 @@ const Sim = {
 
                 const safeTabs = this.tabs.map(t => ({
                     id: t.id, name: t.name,
-                    nodes: (t.id === this.activeTabId && this.workspaceStack.length === 0) ? cNodes : (t.nodes || []).map(cleanNode).filter(n => n !== null),
-                    wires: (t.id === this.activeTabId && this.workspaceStack.length === 0) ? cWires : (t.wires || []).map(cleanWire).filter(w => w !== null),
+                    nodes: (t.id === this.activeTabId && this.workspaceStack.length === 0) ? cNodes : (t.nodes || []).map(n => this._cleanNode(n)).filter(n => n !== null),
+                    wires: (t.id === this.activeTabId && this.workspaceStack.length === 0) ? cWires : (t.wires || []).map(w => this._cleanWire(w)).filter(w => w !== null),
                     historyStack: t.historyStack || [], historyIndex: t.historyIndex !== undefined ? t.historyIndex : -1
                 }));
 
@@ -370,13 +378,13 @@ const Sim = {
                     this.workspaceStack = [];
                 }
 
-                // [AUDIT: v1.24.07 | SEC_ARCH_LEAD] - Hydrate nodes securely to sever memory linkage with the VFS layout array.
+                // [AUDIT: v1.24.09 | SEC_ARCH_LEAD] - Hydrate nodes using unified centralized sanitization.
                 if (Array.isArray(activeNodes)) {
                     activeNodes.forEach(n => { 
-                        if (n && n.id) {
-                            const cloned = JSON.parse(JSON.stringify(n));
-                            this.nodes.push(cloned); 
-                            if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(cloned); 
+                        const c = this._cleanNode(n);
+                        if (c) {
+                            this.nodes.push(c); 
+                            if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(c); 
                         }
                     });
                 }
@@ -1879,25 +1887,10 @@ const Sim = {
             return;
         }
         console.warn('[DEBUG] uiEditChip triggered for library chip:', name);
-        const cleanNode = (n) => JSON.parse(JSON.stringify({
-            id: n.id, type: n.type, x: n.x, y: n.y, label: n.label,
-            val: n.val, state: n.state, outputs: n.outputs, isCustom: n.isCustom,
-            freq: n.freq, interval: n.interval, lastTick: n.lastTick, meta: n.meta,
-            customWidth: n.customWidth, customHeight: n.customHeight,
-            pinX: n.pinX, pinY: n.pinY, pinW: n.pinW, pinH: n.pinH,
-            infoX: n.infoX, infoY: n.infoY, infoW: n.infoW, infoH: n.infoH,
-            _lastX: n._lastX, _lastY: n._lastY
-        }));
-        
-        const cleanWire = (w) => JSON.parse(JSON.stringify({
-            from: { nodeId: w.from.nodeId, portId: w.from.portId },
-            to: { nodeId: w.to.nodeId, portId: w.to.portId },
-            midX: w.midX, midY: w.midY, orthoDir: w.orthoDir
-        }));
-
+        // [AUDIT: v1.24.09 | SEC_ARCH_LEAD] - Apply central sanitization to chip editor context generation.
         this.workspaceStack.push({
-            nodes: this.nodes.map(cleanNode),
-            wires: this.wires.map(cleanWire),
+            nodes: this.nodes.map(n => this._cleanNode(n)).filter(n => n !== null),
+            wires: this.wires.map(w => this._cleanWire(w)).filter(w => w !== null),
             wireMap: new Map(this.wireMap),
             historyStack: window.History ? [...History.stack] : [],
             historyIndex: window.History ? History.index : -1
@@ -2189,40 +2182,32 @@ const Sim = {
         this.uiSwitchTab(newId);
     },
 
-    // [AUDIT: v1.24.07 | SEC_ARCH_LEAD] - Isolated workspace state contexts to resolve tab bleeding and JSON circular reference crashes.
+    // [AUDIT: v1.24.09 | SEC_ARCH_LEAD] - Refactored tab switching to use centralized fault-tolerant clean methods.
     uiSwitchTab(id) {
         if (this.activeEditingChip) return this.toast('Exit chip editor before switching tabs.', 'warning');
         if (this.activeTabId === id) return;
 
-        const cleanNode = (n) => JSON.parse(JSON.stringify({
-            id: n.id, type: n.type, x: n.x, y: n.y, label: n.label,
-            val: n.val, state: n.state, outputs: n.outputs, isCustom: n.isCustom,
-            freq: n.freq, interval: n.interval, lastTick: n.lastTick, meta: n.meta,
-            customWidth: n.customWidth, customHeight: n.customHeight,
-            pinX: n.pinX, pinY: n.pinY, pinW: n.pinW, pinH: n.pinH,
-            infoX: n.infoX, infoY: n.infoY, infoW: n.infoW, infoH: n.infoH,
-            _lastX: n._lastX, _lastY: n._lastY
-        }));
-        
-        const cleanWire = (w) => JSON.parse(JSON.stringify({
-            from: { nodeId: w.from.nodeId, portId: w.from.portId },
-            to: { nodeId: w.to.nodeId, portId: w.to.portId },
-            midX: w.midX, midY: w.midY, orthoDir: w.orthoDir
-        }));
-
         // 1. Save current state to old tab
         const oldTab = this.tabs.find(t => t.id === this.activeTabId);
         if (oldTab) {
-            oldTab.nodes = this.nodes.map(cleanNode);
-            oldTab.wires = this.wires.map(cleanWire);
+            oldTab.nodes = this.nodes.map(n => this._cleanNode(n)).filter(n => n !== null);
+            oldTab.wires = this.wires.map(w => this._cleanWire(w)).filter(w => w !== null);
             if (window.History) {
                 oldTab.historyStack = [...History.stack];
                 oldTab.historyIndex = History.index;
             }
         }
 
+        // Close split pane if active
+        const splitFrame = document.getElementById('split-editor-frame');
+        if (splitFrame) splitFrame.remove();
+        const popupWrap = document.getElementById('popup-editor-wrap');
+        if (popupWrap) popupWrap.remove();
+        const main = document.getElementById('main');
+        if (main) main.classList.remove('workspace-split', 'split-left', 'split-right');
+        this.activeSplitChip = null;
+
         // 2. Clear current workspace
-        // [AUDIT: v1.24.08 | SEC_ARCH_LEAD] - Deep DOM purge to prevent element orphaning during tab switch.
         this.nodes.forEach(n => { const el = document.getElementById(n.id); if (el) el.remove(); });
         document.querySelectorAll('.gate').forEach(el => el.remove());
         this.nodes = []; this.wires = []; this.wireMap.clear();
@@ -2234,11 +2219,13 @@ const Sim = {
         const newTab = this.tabs.find(t => t.id === id);
         if (newTab) {
             (newTab.nodes || []).forEach(n => {
-                const c = cleanNode(n);
-                this.nodes.push(c);
-                if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(c);
+                const c = this._cleanNode(n);
+                if (c) {
+                    this.nodes.push(c);
+                    if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(c);
+                }
             });
-            this.wires = (newTab.wires || []).map(cleanWire);
+            this.wires = (newTab.wires || []).map(w => this._cleanWire(w)).filter(w => w !== null);
             if (window.History) {
                 History.stack = newTab.historyStack ? [...newTab.historyStack] : [];
                 History.index = newTab.historyIndex !== undefined ? newTab.historyIndex : -1;
@@ -2313,25 +2300,10 @@ const Sim = {
                     this.toast('A chip with this name already exists!', 'warning');
                     return;
                 }
-                const cleanNode = (nd) => JSON.parse(JSON.stringify({
-                    id: nd.id, type: nd.type, x: nd.x, y: nd.y, label: nd.label,
-                    val: nd.val, state: nd.state, outputs: nd.outputs, isCustom: nd.isCustom,
-                    freq: nd.freq, interval: nd.interval, lastTick: nd.lastTick, meta: nd.meta,
-                    customWidth: nd.customWidth, customHeight: nd.customHeight,
-                    pinX: nd.pinX, pinY: nd.pinY, pinW: nd.pinW, pinH: nd.pinH,
-                    infoX: nd.infoX, infoY: nd.infoY, infoW: nd.infoW, infoH: nd.infoH,
-                    _lastX: nd._lastX, _lastY: nd._lastY
-                }));
-                const cleanWire = (w) => JSON.parse(JSON.stringify({
-                    from: { nodeId: w.from.nodeId, portId: w.from.portId },
-                    to: { nodeId: w.to.nodeId, portId: w.to.portId },
-                    midX: w.midX, midY: w.midY, orthoDir: w.orthoDir
-                }));
-
                 this.library[n] = {
                     folder: folder,
-                    nodes: this.nodes.map(cleanNode),
-                    wires: this.wires.map(cleanWire)
+                    nodes: this.nodes.map(n => this._cleanNode(n)).filter(n => n !== null),
+                    wires: this.wires.map(w => this._cleanWire(w)).filter(w => w !== null)
                 };
                 this.updateLibraryUI();
                 this.toast(`Chip "${n}" saved to ${folder ? 'folder ' + folder : 'library'}`, 'success');
@@ -2877,28 +2849,13 @@ const Sim = {
         this.uiExitChipEdit();
     },
 
+    // [AUDIT: v1.24.09 | SEC_ARCH_LEAD] - Ensure context exit captures logic strictly.
     uiExitChipEdit() {
         if (this.workspaceStack.length === 0 || !this.activeEditingChip) return;
 
-        const cleanNode = (n) => JSON.parse(JSON.stringify({
-            id: n.id, type: n.type, x: n.x, y: n.y, label: n.label,
-            val: n.val, state: n.state, outputs: n.outputs, isCustom: n.isCustom,
-            freq: n.freq, interval: n.interval, lastTick: n.lastTick, meta: n.meta,
-            customWidth: n.customWidth, customHeight: n.customHeight,
-            pinX: n.pinX, pinY: n.pinY, pinW: n.pinW, pinH: n.pinH,
-            infoX: n.infoX, infoY: n.infoY, infoW: n.infoW, infoH: n.infoH,
-            _lastX: n._lastX, _lastY: n._lastY
-        }));
-        
-        const cleanWire = (w) => JSON.parse(JSON.stringify({
-            from: { nodeId: w.from.nodeId, portId: w.from.portId },
-            to: { nodeId: w.to.nodeId, portId: w.to.portId },
-            midX: w.midX, midY: w.midY, orthoDir: w.orthoDir
-        }));
-
         this.library[this.activeEditingChip] = {
-            nodes: this.nodes.map(cleanNode),
-            wires: this.wires.map(cleanWire)
+            nodes: this.nodes.map(n => this._cleanNode(n)).filter(n => n !== null),
+            wires: this.wires.map(w => this._cleanWire(w)).filter(w => w !== null)
         };
 
         const parent = this.workspaceStack.pop();
