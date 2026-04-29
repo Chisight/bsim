@@ -84,7 +84,7 @@ const DebugTerminal = {
     },
 
     /**
-     * [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - Entry trace for debug terminal bootstrap.
+     * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for debug terminal bootstrap.
      * @ARCH: APP_INITIALIZER
      * @IO: TERMINAL_BOOT
      * @INTENT: Initialize the debug terminal subsystem, including UI construction and console interception.
@@ -95,7 +95,7 @@ const DebugTerminal = {
         this.attachHooks();
         this.overrideConsole();
         console.log("[TERM] V8/WASM Debugger Initialized. Press Ctrl+P.");
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Debug terminal subsystem operational.
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Debug terminal subsystem operational.
     },
 
     /**
@@ -229,7 +229,7 @@ const DebugTerminal = {
         line.innerText = `> ${msg}`;
         this.out.appendChild(line);
         this.out.scrollTop = this.out.scrollHeight;
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Message appended to terminal buffer.
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Message appended to terminal buffer.
     },
 
     /**
@@ -244,8 +244,9 @@ const DebugTerminal = {
 
         switch (c) {
             case 'help':
-                this.print("Commands: exit, clear, verbosity [0-3], synth [gate]");
+                this.print("Commands: exit, clear, verbosity [0-3], synth [gate], trace [nodeId]");
                 this.print("synth <gate>: Hierarchically compiles logic from NANDs.");
+                this.print("trace [nodeId]: Output topological connections and logic states. Defaults to active selection.");
                 break;
             case 'exit': this.toggle(false); break;
             case 'clear': this.out.innerHTML = ''; break;
@@ -256,10 +257,14 @@ const DebugTerminal = {
                 if (!args[1]) return this.print("Missing target. Ex: synth XOR", "err");
                 this.synthesize(args[1].toUpperCase());
                 break;
+            case 'trace':
+                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Route trace command to diagnostic topological mapper.
+                this.traceNode(args[1]);
+                break;
             default:
                 this.print(`Command not found: ${c}`, 'err');
         }
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Command execution finalized: ${cmd}.
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Command execution finalized: ${cmd}.
     },
 
     /**
@@ -273,7 +278,7 @@ const DebugTerminal = {
         
         const recipe = this.RECIPES[target];
         if (!recipe) {
-            // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Synthesis aborted, no recipe for ${target}.
+            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Synthesis aborted, no recipe for ${target}.
             return this.print(`No NAND synthesis recipe for: ${target}`, "err");
         }
 
@@ -298,7 +303,56 @@ const DebugTerminal = {
         } catch (e) {
             this.print(`Synthesis failed: ${e.message}`, 'err');
         }
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Synthesis process finalized for ${target}.
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Synthesis process finalized for ${target}.
+    },
+
+    /**
+     * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Injected topological tracing telemetry for active logic diagnostics.
+     * @ARCH: DIAGNOSTIC_TOOL
+     * @IO: TERMINAL_OUTPUT
+     * @INTENT: Map and display the connectivity and signal state of a specific node or the current selection.
+     */
+    traceNode(nodeId) {
+        if (!window.Sim) return this.print("Simulator context offline.", "err");
+        
+        let targetId = nodeId;
+        if (!targetId) {
+            if (Sim.selection.size === 1) targetId = Array.from(Sim.selection)[0];
+            else return this.print("Specify a nodeId or select exactly one node. Ex: trace node-123", "err");
+        }
+        
+        const node = Sim.nodes.find(n => n.id === targetId);
+        if (!node) return this.print(`Node not found: ${targetId}`, "err");
+
+        this.print(`=== TRACE: ${node.id} (${node.type}) ===`, "sys");
+        this.print(`Label: ${node.label} | Val: ${JSON.stringify(node.val)} | State: ${JSON.stringify(node.state)}`, "sys");
+
+        const upstream = Sim.wires.filter(w => w.to.nodeId === targetId);
+        const downstream = Sim.wires.filter(w => w.from.nodeId === targetId);
+
+        this.print(`--- UPSTREAM (Inputs) ---`, "warn");
+        if (upstream.length === 0) this.print("  (None)", "sys");
+        upstream.forEach(w => {
+            const src = Sim.nodes.find(n => n.id === w.from.nodeId);
+            const sig = Sim.getSignal(w.from.nodeId, w.from.portId);
+            const srcType = src ? src.type : "UNKNOWN";
+            this.print(`  [${w.to.portId}] <- ${w.from.nodeId}[${w.from.portId}] (${srcType}) = ${JSON.stringify(sig)}`, "ok");
+        });
+
+        this.print(`--- DOWNSTREAM (Outputs) ---`, "warn");
+        if (downstream.length === 0) this.print("  (None)", "sys");
+        downstream.forEach(w => {
+            const dst = Sim.nodes.find(n => n.id === w.to.nodeId);
+            const dstType = dst ? dst.type : "UNKNOWN";
+            this.print(`  [${w.from.portId}] -> ${w.to.nodeId}[${w.to.portId}] (${dstType})`, "ok");
+        });
+
+        if (node.isCustom) {
+            this.print(`--- MACRO INFO ---`, "warn");
+            this.print(`  Definition: Sim.library['${node.type}']`, "sys");
+            if (node.outputs) this.print(`  Latched Outputs: ${JSON.stringify(node.outputs)}`, "sys");
+        }
+        this.print(`===================================`, "sys");
     }
 };
 

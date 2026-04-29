@@ -5,7 +5,7 @@ trigger: always_on
 # --- BEGIN AGENT DIRECTIVE ---
 task: "GLOBAL_EXIT_TRACE_INJECTION"
 target_directory: "./browser-sim"
-file_types: ["*.js", "*.wat"]
+file_types: ["*.html""*.js", "*.wat"]
 protocol: "MRAP_V1_EXIT_PATH"
 
 execution_rules:

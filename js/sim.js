@@ -1,6 +1,6 @@
 /**
- * Simulator Core v1.23.75 (Modular Professional)
- * FIXED: Restored topological MSB/LSB parity and 2D coordinate array sorting.
+ * Simulator Core v1.23.90 (Modular Professional)
+ * FIXED: Eradicated pseudo-element dimension snapping and rigidly clamped pin-container bounding offsets.
  */
 const Sim = {
     nodes: [],
@@ -33,7 +33,7 @@ const Sim = {
     MAX_TRANSITIONS: 100,
 
     /**
-     * [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - Entry trace for simulation kernel bootstrap.
+     * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for simulation kernel bootstrap.
      * @ARCH: KERNEL_ORCHESTRATOR
      * @IO: WORKSPACE_INITIALIZATION
      * @INTENT: Initialize simulation kernel, viewport, and global event listeners for the workspace.
@@ -122,7 +122,7 @@ const Sim = {
 
             this.updateWireVisuals();
         });
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Simulation kernel initialization complete.
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Simulation kernel initialization complete.
     },
 
     /**
@@ -216,7 +216,7 @@ const Sim = {
     },
 
     /**
-     * [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - Align persistence telemetry with MRAP taxonomy.
+     * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Align persistence telemetry with MRAP taxonomy.
      * @ARCH: PERSISTENCE_MANAGER
      * @STATE: WORKSPACE_SERIAL
      * @INTENT: Periodically synchronize the current workspace state to local storage for crash recovery.
@@ -267,10 +267,11 @@ const Sim = {
                     nodes: wsStack.length > 0 ? wsStack[0].nodes : cNodes, 
                     wires: wsStack.length > 0 ? wsStack[0].wires : cWires, 
                     library: safeLib, workspaceStack: wsStack, activeEditingChip: this.activeEditingChip,
-                    prefs: { snapNodes: this.snapNodes, snapWires: this.snapWires, confirmDelete: this.confirmDelete, showStats: this.showStats, showTooltips: this.showTooltips, tutorialMode: this.tutorialMode, hudPos: this.hudPos } 
+                    // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - Append toast positioning to auto-save preferences payload.
+                    prefs: { snapNodes: this.snapNodes, snapWires: this.snapWires, confirmDelete: this.confirmDelete, showStats: this.showStats, showTooltips: this.showTooltips, tutorialMode: this.tutorialMode, hudPos: this.hudPos, toastPos: this.toastPos } 
                 };
                 localStorage.setItem('bsim_autosave', JSON.stringify(project));
-                // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: AutoSave operation finalized.
+                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: AutoSave operation finalized.
             } catch (e) {
                 console.error("[AutoSave] Serialization Failure:", e);
             }
@@ -343,7 +344,7 @@ const Sim = {
             } else {
                 const arr = new Array(bits).fill(0);
                 for (let i = 0; i < bits; i++) {
-                    // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - Map from top (MSB) to bottom (LSB) to fix upside-down bus assignment.
+                    // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Map from top (MSB) to bottom (LSB) to fix upside-down bus assignment.
                     arr[bits - 1 - i] = getDriveFn(`in${cIn++}`); 
                 }
                 ext[p.id] = arr;
@@ -368,7 +369,7 @@ const Sim = {
                 mapped[`out${cOut++}`] = val;
             } else {
                 for (let i = 0; i < bits; i++) {
-                    // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - Restored reversed indexing to correct top-to-bottom MSB mapping flaw.
+                    // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Restored reversed indexing to correct top-to-bottom MSB mapping flaw.
                     mapped[`out${cOut++}`] = Array.isArray(val) ? val[bits - 1 - i] : val;
                 }
             }
@@ -377,7 +378,7 @@ const Sim = {
     },
 
     /**
-     * [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - Entry trace for logical signal evaluation.
+     * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for logical signal evaluation.
      * @ARCH: SIGNAL_RESOLVER
      * @STATE: NODE_UPDATE
      * @INTENT: Evaluate the logical transfer function for a single node based on its driving signals.
@@ -452,9 +453,9 @@ const Sim = {
             for (let i = 0; i < bits; i++) state[i] = this.getDrivingSignal(node.id, `in${i}`);
             return JSON.stringify(state);
         }
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - Prevent ReferenceError on untrapped generic nodes.
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Prevent ReferenceError on untrapped generic nodes.
         const finalVal = node.val !== undefined ? node.val : null;
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: State calculated for node.
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: State calculated for node.
         return finalVal;
     },
     // =========================================================================
@@ -463,13 +464,13 @@ const Sim = {
     // =========================================================================
 
     /**
-     * [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - Entry trace for simulation tick.
+     * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for simulation tick.
      * @ARCH: SCHEDULER
      * @CONSTRAINT: TIME_STEP_QUANTIZATION
      * @INTENT: Orchestrate the main simulation loop, delegating to Wasm for native logic blocks when possible.
      */
     processQueue() {
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - JIT Interceptor for Dual-Engine Parity. Wasm macro expansion requires sequential proxy indices ('in0'), while V8 requires strict strings ('a').
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - JIT Interceptor for Dual-Engine Parity. Wasm macro expansion requires sequential proxy indices ('in0'), while V8 requires strict strings ('a').
         if (!this._wasmPortPatched && this.wasmBridge && this.wasmBridge.syncLayout) {
             this._wasmPortPatched = true;
             
@@ -523,10 +524,10 @@ const Sim = {
             this._stateSanitized = true;
         }
 
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - Purged destructive '7-num' legacy migration hack. Architectural topological parity natively restored.
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Purged destructive '7-num' legacy migration hack. Architectural topological parity natively restored.
 
         if (!this.eventQueue || this.eventQueue.size === 0) {
-            // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Early exit, simulation queue empty.
+            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Early exit, simulation queue empty.
             return;
         }
 
@@ -692,7 +693,7 @@ const Sim = {
                 WireRenderer.drawWires();
                 // clear the queue
                 this.eventQueue.clear();
-                // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Wasm-accelerated simulation tick complete.
+                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Wasm-accelerated simulation tick complete.
                 return;
             }
         }
@@ -781,12 +782,12 @@ const Sim = {
         }
         // update HUD
         this.updateHUD();
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: V8-based simulation tick complete. Iterations: ${iterations}.
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: V8-based simulation tick complete. Iterations: ${iterations}.
     },
 
     // [wasm] parity check
     /**
-     * [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - Telemetry taxonomy taxonomy correction for parity diagnostic module.
+     * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Telemetry taxonomy taxonomy correction for parity diagnostic module.
      * @ARCH: DIAGNOSTIC_ORCHESTRATOR
      * @CONSTRAINT: ENGINE_PARITY
      * @INTENT: Perform a stress-test comparison between the V8 JS engine and the Wasm kernel to ensure state parity.
@@ -794,7 +795,7 @@ const Sim = {
     async runWasmParityCheck(iterations = 1000) {
         // check if WasmEngine is loaded
         if (!window.WasmEngine || !WasmEngine.ready) {
-            // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Diagnostics aborted, Wasm Engine not linked.
+            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Diagnostics aborted, Wasm Engine not linked.
             return this.toast('Wasm Engine not linked.', 'danger');
         }
         // show toast notification
@@ -813,7 +814,7 @@ const Sim = {
         const isPureNative = checkPure(this.nodes);
         // if not pure native, return toast
         if (!isPureNative) {
-            // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Diagnostics aborted, mixed-mode netlist detected.
+            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Diagnostics aborted, mixed-mode netlist detected.
             return this.toast('Parity check requires native logic components only.', 'warning');
         }
         // start console group
@@ -836,7 +837,7 @@ const Sim = {
         const snapshot = JSON.stringify(this.nodes.map(n => ({ id: n.id, val: n.val, state: n.state })));
         // for each iteration
         for (let i = 0; i < iterations; i++) {
-            // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - Inject async yield to prevent main-thread starvation and browser watchdog thermal trips.
+            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Inject async yield to prevent main-thread starvation and browser watchdog thermal trips.
             if (i % 25 === 0) await new Promise(resolve => setTimeout(resolve, 0));
 
             // 1. Inject Randomized Entropy
@@ -965,7 +966,7 @@ const Sim = {
         this.toast(passed ? 'Parity Suite: PASSED' : 'Parity Suite: FAILED (Check Console)', passed ? 'success' : 'danger');
         // update wire visuals
         this.updateWireVisuals();
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Parity diagnostics suite finalized. Result: ${passed ? 'PASSED' : 'FAILED'}.
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Parity diagnostics suite finalized. Result: ${passed ? 'PASSED' : 'FAILED'}.
     },
 
     // simulate internal circuit (sub-circuit simulation)
@@ -980,7 +981,7 @@ const Sim = {
         let meta = typeof chipTypeOrMeta === 'string' ? this.library[chipTypeOrMeta] : chipTypeOrMeta.meta;
         // if meta not found, return
         if (!meta) {
-            // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Sub-circuit simulation aborted, metadata missing for ${chipTypeOrMeta}.
+            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Sub-circuit simulation aborted, metadata missing for ${chipTypeOrMeta}.
             return {};
         }
 
@@ -1002,7 +1003,7 @@ const Sim = {
             // add to visited
             visited.add(netKey);
 
-            // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - Apply bidirectional topological net traversal for internal chip simulation.
+            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Apply bidirectional topological net traversal for internal chip simulation.
             let wires = meta.wires.filter(w => 
                 (w.to.nodeId === nid && w.to.portId === pid) || 
                 (w.from.nodeId === nid && w.from.portId === pid)
@@ -1109,7 +1110,7 @@ const Sim = {
         const res = {};
         meta.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-')).forEach(out => res[out.id] = out.val === undefined ? 0 : out.val);
         if (this.debugToasts) console.debug(`[SimTrace] Sub-Circuit Result: ${typeof chipTypeOrMeta === 'string' ? chipTypeOrMeta : 'Custom'} | Outputs:`, res);
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Sub-simulation complete for ${typeof chipTypeOrMeta === 'string' ? chipTypeOrMeta : 'Custom'}.
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Sub-simulation complete for ${typeof chipTypeOrMeta === 'string' ? chipTypeOrMeta : 'Custom'}.
         return res;
     },
 
@@ -1130,7 +1131,7 @@ const Sim = {
         if (this.snapNodes) { x = Math.round(x / 20) * 20; y = Math.round(y / 20) * 20; }
         if (this.debugToasts) this.toast(`Added ${type} node`);
         const newNode = this._finalizeAddNode(type, x, y, label || type);
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Node added to workspace: ${newNode.id} (${type}).
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node added to workspace: ${newNode.id} (${type}).
         return newNode;
     },
 
@@ -1150,7 +1151,7 @@ const Sim = {
         const NATIVE_TYPES = new Set(['NAND', 'CLOCK', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'JUNCTION', 'TRISTATE', 'DFF', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR']);
         if (this.library[type] && !NATIVE_TYPES.has(type)) { node.isCustom = true; }
         History.execute(new AddNodeCommand(node));
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Node command dispatched for ${node.id}.
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node command dispatched for ${node.id}.
         return node;
     },
 
@@ -1159,13 +1160,30 @@ const Sim = {
      * @INTENT: Synchronize the DOM element's CSS position with the internal node coordinates.
      */
     updateNodePosition(node, el = null) {
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Enforce topological wire relativity: custom segments follow source node movement.
+        if (node._lastX !== undefined && node._lastY !== undefined) {
+            const dx = node.x - node._lastX;
+            const dy = node.y - node._lastY;
+            if (dx !== 0 || dy !== 0) {
+                this.wires.forEach(w => {
+                    if (w.from.nodeId === node.id) {
+                        if (typeof w.midX === 'number') w.midX += dx;
+                        if (typeof w.midY === 'number') w.midY += dy;
+                    }
+                });
+                if ((dx !== 0 || dy !== 0) && typeof WireRenderer !== 'undefined') WireRenderer.drawWires();
+            }
+        }
+        node._lastX = node.x;
+        node._lastY = node.y;
+
         const div = el || document.getElementById(node.id);
         if (div) {
             div.style.left = node.x + 'px';
             div.style.top = node.y + 'px';
             div.style.transform = 'none';
         }
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: DOM position updated for node ${node.id}.
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: DOM position updated for node ${node.id}.
     },
 
     /**
@@ -1175,6 +1193,11 @@ const Sim = {
      */
     updateNodeVisual(n) {
         const el = document.getElementById(n.id); if (!el) return;
+        
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Apply saved geometric properties dynamically on visual update.
+        if (n.customWidth) el.style.width = n.customWidth + 'px';
+        if (n.customHeight) el.style.height = n.customHeight + 'px';
+
         const bits = parseInt(n.type.split('-')[1]) || 1;
         if (bits >= 4) {
             const valArr = Array.isArray(n.val) ? n.val : (Array.isArray(n.state) ? n.state : [n.val]);
@@ -1210,7 +1233,32 @@ const Sim = {
                     dot.classList.toggle('on', stateBit === 1);
                     dot.classList.toggle('off', stateBit === 0 || stateBit === null || stateBit === 'Z');
                 });
+                // [AUDIT: SEC_ARCH_LEAD] - Apply localized pin geometry bounding box limits targeting isolated wrapper.
+                const pinCont = el.querySelector('.pin-container');
+                if (pinCont && (n.pinX !== undefined || n.pinW !== undefined)) {
+                    pinCont.style.transform = 'none'; // Overrides default vertically centered mapping
+                    if (n.pinX !== undefined) pinCont.style.left = n.pinX + 'px';
+                    if (n.pinY !== undefined) pinCont.style.top = n.pinY + 'px';
+                    if (n.pinW !== undefined) pinCont.style.width = n.pinW + 'px';
+                    if (n.pinH !== undefined) pinCont.style.height = n.pinH + 'px';
+                }
             }
+
+            // [AUDIT: SEC_ARCH_LEAD] - Apply localized readout geometry bounding box limits.
+            const infoCont = el.querySelector('.visual-extra');
+            if (infoCont && (n.infoX !== undefined || n.infoW !== undefined)) {
+                infoCont.style.position = 'absolute';
+                infoCont.style.margin = '0';
+                infoCont.style.display = 'flex';
+                infoCont.style.flexWrap = 'wrap';
+                infoCont.style.alignItems = 'center';
+                infoCont.style.justifyContent = 'center';
+                if (n.infoX !== undefined) infoCont.style.left = n.infoX + 'px';
+                if (n.infoY !== undefined) infoCont.style.top = n.infoY + 'px';
+                if (n.infoW !== undefined) infoCont.style.width = n.infoW + 'px';
+                if (n.infoH !== undefined) infoCont.style.height = n.infoH + 'px';
+            }
+            
             // Strip legacy property to prevent future save crashes
             if (n._domCache) delete n._domCache;
         }
@@ -1243,33 +1291,25 @@ const Sim = {
         el.classList.toggle('inactive', isZero && !isActive && !isFloat);
         el.classList.toggle('floating', isFloat);
 
-        // Recursive pin refresh for nested custom chips
-        if (n.isCustom) {
-            const ports = el.querySelectorAll('.port');
-            ports.forEach(p => {
-                const pid = p.dataset.port;
-                let drive = null;
-                
-                if (pid.startsWith('out')) {
-                    drive = this.getSignal(n.id, pid);
-                } else {
-                    const isPure = this.nodes.every(no => new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']).has(no.type) || no.isCustom);
-                    if (this.useWasm && isPure && window.WasmEngine && WasmEngine.ready) {
-                        drive = WasmEngine.readPinState(n.id, pid);
-                        if (drive === 2) drive = 'Z';
-                    } else {
-                        drive = this.getDrivingSignal(n.id, pid);
-                    }
-                }
-                
-                p.classList.toggle('on', drive === 1);
-                p.classList.toggle('off', drive === 0);
-                p.classList.toggle('float', drive === null || drive === 'Z');
-            });
-        }
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Universal pin color mapping for real-time electrical state tracking.
+        const ports = el.querySelectorAll('.port');
+        ports.forEach(p => {
+            const pid = p.dataset.port;
+            let drive = null;
+            
+            if (p.classList.contains('output') && !p.classList.contains('input')) {
+                drive = this.getSignal(n.id, pid);
+            } else {
+                drive = this.getDrivingSignal(n.id, pid);
+            }
+            
+            p.classList.toggle('on', drive === 1);
+            p.classList.toggle('off', drive === 0);
+            p.classList.toggle('float', drive === null || drive === 'Z');
+        });
 
         if (n._oscillating) el.classList.add('oscillating');
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Node visual state synchronized for ${n.id}.
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node visual state synchronized for ${n.id}.
     },
 
     /**
@@ -1296,7 +1336,7 @@ const Sim = {
             x: (r.left - sr.left + r.width / 2) / View.scale,
             y: (r.top - sr.top + r.height / 2) / View.scale
         };
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Port coordinates resolved for ${nodeId}:${portId}.
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Port coordinates resolved for ${nodeId}:${portId}.
         return coords;
     },
 
@@ -1306,6 +1346,8 @@ const Sim = {
      * @INTENT: Manage the state machine for manual wire creation between ports.
      */
     handlePortInteraction(e, nodeId, portId) {
+        // [AUDIT: SEC_ARCH_LEAD] - Global freeze on wiring interactions during layout configurations.
+        if (document.body.classList.contains('edit-mode-active')) return;
         const pEl = document.getElementById(nodeId)?.querySelector(`[data-port="${portId}"]`);
         if (e.shiftKey && !this.wiring.active) {
             const wire = this.wires.findLast(w => (w.to.nodeId === nodeId && w.to.portId === portId) || (w.from.nodeId === nodeId && w.from.portId === portId));
@@ -1344,7 +1386,7 @@ const Sim = {
             this.clearSnapState();
             WireRenderer.drawWires();
         }
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Port interaction state machine cycle complete.
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Port interaction state machine cycle complete.
     },
 
     /**
@@ -1393,7 +1435,7 @@ const Sim = {
     },
 
     /**
-     * [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - Entry trace for driving signal resolution.
+     * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for driving signal resolution.
      * @ARCH: SIGNAL_RESOLVER
      * @STATE: NETLIST_TRAVERSAL
      * @INTENT: Trace a net backwards to find the driving signal for a given input port.
@@ -1434,12 +1476,12 @@ const Sim = {
                 if (sig !== null) return sig;
             }
         }
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Driver resolution complete for ${nodeId}:${portId}. No driver found (Floating).
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Driver resolution complete for ${nodeId}:${portId}. No driver found (Floating).
         return null;
     },
 
     /**
-     * [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - Entry trace for full simulation reset.
+     * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for full simulation reset.
      * @ARCH: SIMULATION_KERNEL
      * @STATE: SIMULATION_RESET
      * @INTENT: Reset transition histories and force a full-netlist propagation sweep.
@@ -1448,7 +1490,7 @@ const Sim = {
         this._transitions.clear(); 
         this.nodes.forEach(n => { n._oscillating = false; n._forcePropagate = true; }); 
         this.eventQueue = new Set(this.nodes); 
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Queue seeded for full propagation sweep.
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Queue seeded for full propagation sweep.
     },
     /**
      * @IO: UI_INTERACTION
@@ -1456,6 +1498,9 @@ const Sim = {
      * @INTENT: Toggle a specific bit of an input node and trigger a simulation tick.
      */
     toggleBit(e, nodeId, bitIndex) {
+        // [AUDIT: SEC_ARCH_LEAD] - Prevent input toggling while in layout mutation mode.
+        if (document.body.classList.contains('edit-mode-active')) return;
+
         if (typeof e === 'string') {
             bitIndex = nodeId;
             nodeId = e;
@@ -1485,7 +1530,7 @@ const Sim = {
             this.updateNodeVisual(n);
         });
         this.seedQueue(); this.processQueue();
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Input bit(s) toggled and propagation triggered.
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Input bit(s) toggled and propagation triggered.
     },
 
     /**
@@ -1820,26 +1865,89 @@ const Sim = {
     },
 
     /**
-     * @IO: UI_TOAST
-     * @INTENT: Display a transient notification message in the UI with optional type-specific styling.
+     * [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - Overhauled toast engine with global positioning persistence and interaction capture.
+     * @ARCH: UI_TOAST_SYSTEM
+     * @STATE: TOAST_PERSISTENCE
+     * @IO: USER_NOTIFICATION
+     * @INTENT: Display interactive, draggable toast notifications with persistent positioning.
      */
     toast(msg, type = 'info', duration = 3000) {
-        if (!this.showToasts) return;
-        if (type === 'debug' && !this.debugToasts) return;
+        if (!this.showToasts) {
+            // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - EXIT_TRACE: Toast aborted, notifications disabled.
+            return;
+        }
+        if (type === 'debug' && !this.debugToasts) {
+            // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - EXIT_TRACE: Toast aborted, debug mode inactive.
+            return;
+        }
 
         let el = document.getElementById('ui-toast-el');
         if (!el) {
             el = document.createElement('div');
             el.id = 'ui-toast-el'; el.className = 'ui-toast';
             document.body.appendChild(el);
+
+            let holdTimer;
+            let isDragging = false;
+            let offsetX, offsetY;
+
+            el.addEventListener('mousedown', (e) => {
+                if (e.target.tagName === 'SPAN') return; // Bypass button clicks
+                holdTimer = setTimeout(() => {
+                    isDragging = true;
+                    el.classList.add('draggable');
+                    el.classList.add('dragging');
+                    const rect = el.getBoundingClientRect();
+                    offsetX = e.clientX - rect.left;
+                    offsetY = e.clientY - rect.top;
+                }, 1000);
+            });
+
+            window.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                el.style.left = (e.clientX - offsetX) + 'px';
+                el.style.top = (e.clientY - offsetY) + 'px';
+                el.style.bottom = 'auto';
+                el.style.transform = 'none';
+            });
+
+            window.addEventListener('mouseup', (e) => {
+                clearTimeout(holdTimer);
+                if (isDragging) {
+                    isDragging = false;
+                    el.classList.remove('draggable');
+                    el.classList.remove('dragging');
+                    const rect = el.getBoundingClientRect();
+                    Sim.toastPos = { left: rect.left, top: rect.top };
+                    Sim.autoSave(); 
+                }
+            });
+            
+            el.addEventListener('mouseleave', () => {
+                if (!isDragging) clearTimeout(holdTimer);
+            });
         }
-        el.innerText = msg;
+        
+        el.innerHTML = msg; // innerHTML allows nested action buttons
         el.className = `ui-toast show toast-${type}`;
+        
+        if (this.toastPos) {
+            el.style.left = this.toastPos.left + 'px';
+            el.style.top = this.toastPos.top + 'px';
+            el.style.bottom = 'auto';
+            el.style.transform = 'none';
+        } else {
+            el.style.left = '50%';
+            el.style.bottom = '80px';
+            el.style.top = 'auto';
+            el.style.transform = 'translateX(-50%)';
+        }
 
         clearTimeout(this._toastTimer);
         if (duration > 0) {
             this._toastTimer = setTimeout(() => el.classList.remove('show'), duration);
         }
+        // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - EXIT_TRACE: Toast notification lifecycle initiated.
     },
 
     /**
@@ -1880,6 +1988,13 @@ const Sim = {
                         <option value="large" ${this.portSize === 'large' ? 'selected' : ''}>Large</option>
                     </select>
                 </div>
+                <div style="margin-top:5px; font-size:11px; color:#aaa;">Indicator Dot Size:
+                    <select onchange="Sim.dotSize=this.value; Sim.applyStyles();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px;">
+                        <option value="small" ${this.dotSize === 'small' ? 'selected' : ''}>Small (8px)</option>
+                        <option value="medium" ${this.dotSize === 'medium' || !this.dotSize ? 'selected' : ''}>Medium (12px)</option>
+                        <option value="large" ${this.dotSize === 'large' ? 'selected' : ''}>Large (16px)</option>
+                    </select>
+                </div>
                 <div style="height:1px; background:#333; margin: 8px 0 4px 0;"></div>
                 <label style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
                     <span style="font-weight:bold; color:var(--wire-on);">Execution Engine:</span>
@@ -1910,9 +2025,12 @@ const Sim = {
      * @INTENT: Synchronize dynamic CSS variables (e.g., port size) with current application preferences.
      */
     applyStyles() {
-        // UNDERLYING LOGIC: Map portSize preference to CSS variable
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Added dynamic scaling mapping for logic state indicators.
         const sizeMap = { 'small': '15%', 'medium': '25%', 'large': '35%' };
         document.documentElement.style.setProperty('--port-size', sizeMap[this.portSize || 'medium']);
+        
+        const dotMap = { 'small': '8px', 'medium': '12px', 'large': '16px' };
+        document.documentElement.style.setProperty('--dot-size', dotMap[this.dotSize || 'medium']);
     },
     /**
      * @ARCH: NETLIST_FACTORY
@@ -1938,12 +2056,318 @@ const Sim = {
         });
     },
 
+    /**
+     * [AUDIT: SEC_ARCH_LEAD] - Entry trace for parametric node edit mode.
+     * @ARCH: UI_CONTROLLER
+     * @STATE: LAYOUT_MUTATION
+     * @INTENT: Enable bounded spatial editing for internal pin indicators and node geometry via click-drag isolation.
+     */
+    enterNodeEditMode(nodeId, mode) {
+        const node = this.nodes.find(n => n.id === nodeId);
+        const el = document.getElementById(nodeId);
+        if (!node || !el) return;
+        this.activeNodeEdit = { node, mode, og: { w: node.customWidth, h: node.customHeight, px: node.pinX, py: node.pinY, pw: node.pinW, ph: node.pinH, ix: node.infoX, iy: node.infoY, iw: node.infoW, ih: node.infoH } };
+        
+        // [AUDIT: SEC_ARCH_LEAD] - Lock global wiring interactions to prevent misclicks during layout mutation.
+        document.body.classList.add('edit-mode-active');
+        
+        el.style.outline = '2px dashed #00ffaa';
+        
+        const pinCont = el.querySelector('.pin-container');
+        const infoCont = el.querySelector('.visual-extra');
+        const target = mode === 'pins' ? pinCont : (mode === 'info' ? infoCont : el);
+        if (!target) return;
+        
+        if (mode === 'pins' || mode === 'info') {
+            if (mode === 'info' && node.infoX === undefined) {
+                // [AUDIT: SEC_ARCH_LEAD] - Initialize default offset coordinates if previously relative
+                node.infoX = target.offsetLeft;
+                node.infoY = target.offsetTop;
+                node.infoW = target.offsetWidth;
+                node.infoH = target.offsetHeight;
+                target.style.position = 'absolute';
+                target.style.margin = '0';
+            }
+            target.classList.add('editing-pins');
+            target.style.outline = '2px dashed #ff00aa';
+            target.style.cursor = 'move';
+            target.style.transform = 'none'; // Release absolute centering lock for dragging
+            
+            // [AUDIT: SEC_ARCH_LEAD] - Dynamic proportional cursor feedback mapping supporting extended hitboxes.
+            this._editHover = (ev) => {
+                const rect = target.getBoundingClientRect();
+                const scale = View.scale || 1;
+                const hx = (ev.clientX - rect.left) / scale;
+                const hy = (ev.clientY - rect.top) / scale;
+                const thX = Math.min(12, target.offsetWidth / 3);
+                const thY = Math.min(12, target.offsetHeight / 3);
+                const hLeft = hx < thX;
+                const hRight = hx > target.offsetWidth - thX;
+                const hTop = hy < thY;
+                const hBottom = hy > target.offsetHeight - thY;
+                
+                if ((hTop && hLeft) || (hBottom && hRight)) target.style.cursor = 'nwse-resize';
+                else if ((hTop && hRight) || (hBottom && hLeft)) target.style.cursor = 'nesw-resize';
+                else if (hTop || hBottom) target.style.cursor = 'ns-resize';
+                else if (hLeft || hRight) target.style.cursor = 'ew-resize';
+                else target.style.cursor = 'move';
+            };
+            target.addEventListener('mousemove', this._editHover);
+        } else {
+            el.style.cursor = 'se-resize';
+        }
+
+        this._editModeDown = (e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+            
+            // [AUDIT: SEC_ARCH_LEAD] - Proportional grab-zone calculation to guarantee a central translation zone.
+            const rect = target.getBoundingClientRect();
+            const scale = View.scale || 1;
+            const clickX = (e.clientX - rect.left) / scale;
+            const clickY = (e.clientY - rect.top) / scale;
+            
+            const thX = Math.min(12, target.offsetWidth / 3);
+            const thY = Math.min(12, target.offsetHeight / 3);
+            const rLeft = clickX < thX;
+            const rRight = clickX > target.offsetWidth - thX;
+            const rTop = clickY < thY;
+            const rBottom = clickY > target.offsetHeight - thY;
+            const isResizing = mode === 'pins' && (rLeft || rRight || rTop || rBottom);
+            
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const isInfo = mode === 'info';
+            const startPinX = isInfo ? (node.infoX || 0) : (node.pinX || 0);
+            const startPinY = isInfo ? (node.infoY || 0) : (node.pinY || 0);
+            const startPinW = isInfo ? (node.infoW || target.offsetWidth) : (node.pinW || target.offsetWidth);
+            const startPinH = isInfo ? (node.infoH || target.offsetHeight) : (node.pinH || target.offsetHeight);
+            const startNodeW = node.customWidth || parseInt(el.style.width) || 90;
+            const startNodeH = node.customHeight || parseInt(el.style.height) || 80;
+
+            const onMove = (m) => {
+                const scale = View.scale || 1;
+                const dx = (m.clientX - startX) / scale;
+                const dy = (m.clientY - startY) / scale;
+                
+                if (mode === 'icon') {
+                    node.customWidth = Math.max(40, startNodeW + dx);
+                    node.customHeight = Math.max(40, startNodeH + dy);
+                    el.style.width = node.customWidth + 'px';
+                    el.style.height = node.customHeight + 'px';
+                    Sim.updateWireVisuals();
+                } else if (mode === 'pins' || mode === 'info') {
+                    let cX = startPinX, cY = startPinY, cW = startPinW, cH = startPinH;
+                    if (isResizing || m.shiftKey) { 
+                        // [AUDIT: SEC_ARCH_LEAD] - Generalized rigid boundary clamping for independent axis scaling to prevent chip escape.
+                        if (rLeft) {
+                            const nextX = Math.max(0, startPinX + dx);
+                            const diffX = nextX - startPinX;
+                            cX = nextX;
+                            cW = Math.max(16, startPinW - diffX);
+                        } else if (rRight) {
+                            cW = Math.max(16, Math.min(startNodeW - startPinX, startPinW + dx));
+                        }
+
+                        if (rTop) {
+                            const nextY = Math.max(0, startPinY + dy);
+                            const diffY = nextY - startPinY;
+                            cY = nextY;
+                            cH = Math.max(16, startPinH - diffY);
+                        } else if (rBottom) {
+                            cH = Math.max(16, Math.min(startNodeH - startPinY, startPinH + dy));
+                        }
+                    } else { 
+                        // Move from Center
+                        const curW = startPinW || target.offsetWidth || 16;
+                        const curH = startPinH || target.offsetHeight || 16;
+                        const maxW = Math.max(0, startNodeW - curW);
+                        const maxH = Math.max(0, startNodeH - curH);
+                        cX = Math.max(0, Math.min(maxW, startPinX + dx));
+                        cY = Math.max(0, Math.min(maxH, startPinY + dy));
+                    }
+                    
+                    if (mode === 'info') {
+                        node.infoX = cX; node.infoY = cY; node.infoW = cW; node.infoH = cH;
+                    } else {
+                        node.pinX = cX; node.pinY = cY; node.pinW = cW; node.pinH = cH;
+                    }
+                    target.style.width = cW + 'px';
+                    target.style.height = cH + 'px';
+                    target.style.left = cX + 'px';
+                    target.style.top = cY + 'px';
+                }
+            };
+            const onUp = () => {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            };
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
+        };
+        
+        target.addEventListener('mousedown', this._editModeDown);
+        this.toast(`Edit Mode: ${mode === 'pins' ? 'Drag to move, Shift+Drag to resize' : 'Drag bottom-right to scale'}. Double-click board to save.`, 'info', 0);
+    },
+
+    exitNodeEditMode() {
+        if (!this.activeNodeEdit) return;
+        // [AUDIT: SEC_ARCH_LEAD] - Release global wiring interaction lock.
+        document.body.classList.remove('edit-mode-active');
+        const state = this.activeNodeEdit;
+        this.activeNodeEdit = null;
+        
+        const el = document.getElementById(state.node.id);
+        const pinCont = el?.querySelector('.pin-container');
+        const infoCont = el?.querySelector('.visual-extra');
+        const target = state.mode === 'pins' ? pinCont : (state.mode === 'info' ? infoCont : el);
+        
+        if (target && this._editModeDown) {
+            target.removeEventListener('mousedown', this._editModeDown);
+            if (this._editHover) target.removeEventListener('mousemove', this._editHover);
+        }
+        
+        if (el) { el.style.outline = ''; el.style.cursor = ''; }
+        if (pinCont) { pinCont.classList.remove('editing-pins'); pinCont.style.outline = ''; pinCont.style.cursor = ''; }
+        if (infoCont) { infoCont.classList.remove('editing-pins'); infoCont.style.outline = ''; infoCont.style.cursor = ''; }
+
+        const nw = { w: state.node.customWidth, h: state.node.customHeight, px: state.node.pinX, py: state.node.pinY, pw: state.node.pinW, ph: state.node.pinH, ix: state.node.infoX, iy: state.node.infoY, iw: state.node.infoW, ih: state.node.infoH };
+        if (JSON.stringify(nw) !== JSON.stringify(state.og)) {
+            // [AUDIT: SEC_ARCH_LEAD] - Delegated layout state modifications to structured history command.
+            History.execute(new MutateLayoutCommand(state.node, state.og, nw));
+        } else {
+            Sim.updateNodeVisual(state.node);
+            Sim.updateWireVisuals();
+        }
+        
+        this.toast('Layout saved. ', 'success', 5000);
+        const tEl = document.getElementById('ui-toast-el');
+        if (tEl) {
+            const btn = document.createElement('span');
+            btn.innerText = '[Apply Global]';
+            btn.style.cssText = 'cursor:pointer; text-decoration:underline; margin-left:10px; font-weight:bold; color:#fff;';
+            // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - Apply persistence write and rigid bounds to global node mutator dispatch.
+            btn.onclick = () => {
+                this.nodes.forEach(n => {
+                    if (n.type === state.node.type) {
+                        n.customWidth = state.node.customWidth; n.customHeight = state.node.customHeight;
+                        n.pinX = state.node.pinX; n.pinY = state.node.pinY;
+                        n.pinW = state.node.pinW; n.pinH = state.node.pinH;
+                        Sim.updateNodeVisual(n);
+                    }
+                });
+                this.updateWireVisuals();
+                this.autoSave();
+                this.toast(`Global layout applied to all ${state.node.type} components.`, 'success');
+                // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - EXIT_TRACE: Global layout mutation finalized and persisted.
+            };
+            tEl.appendChild(btn);
+        }
+        this.autoSave();
+    },
+
+    /**
+     * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Parametric macro geometry bounds override.
+     * @ARCH: NETLIST_FACTORY
+     * @INTENT: Modify the custom bounding box of a chip globally, mathematical offsets automatically realign.
+     */
+    uiScaleChip(name) {
+        this.modal('Set Custom Geometry', 'Enter width and height (e.g., 100,200):', 'prompt', (input) => {
+            if (!input) return;
+            const dims = input.split(',').map(n => parseInt(n.trim()));
+            if (dims.length !== 2 || isNaN(dims[0]) || isNaN(dims[1])) return this.toast('Invalid format. Use W,H', 'danger');
+            
+            // Apply to active nodes on the board
+            this.nodes.forEach(n => {
+                if (n.type === name) {
+                    n.customWidth = dims[0];
+                    n.customHeight = dims[1];
+                    const el = document.getElementById(n.id);
+                    if (el) { el.remove(); NodeRenderer.renderNode(n); }
+                }
+            });
+            this.updateWireVisuals();
+            this.toast(`Geometry for ${name} updated.`, 'success');
+            this.autoSave();
+        });
+    },
+
 
     /**
      * @IO: UI_PROMPT
      * @STATE: INPUT_MUTATION
      * @INTENT: Prompt the user for a numeric value (Hex, Dec, Bin) and apply it to a multi-bit input node.
      */
+    uiInlineEditValue(e, id, format) {
+        // [AUDIT: SEC_ARCH_LEAD] - Inline structural editor for multi-bit readouts.
+        if (document.body.classList.contains('edit-mode-active')) return;
+        const target = e.currentTarget;
+        if (target.querySelector('input')) return; // Already editing
+
+        const n = this.nodes.find(node => node.id === id);
+        if (!n || !n.type.startsWith('IN-')) return;
+        const bits = parseInt(n.type.split('-')[1]) || 1;
+        
+        let currentNum = 0;
+        if (bits === 1) {
+            currentNum = n.val;
+        } else {
+            for (let i = 0; i < bits; i++) currentNum |= (n.state[i] ? 1 : 0) << i;
+        }
+        
+        let prefill = currentNum.toString(10);
+        if (format === 'H') prefill = currentNum.toString(16).toUpperCase().padStart(Math.ceil(bits / 4), '0');
+        else if (format === 'B') prefill = currentNum.toString(2).padStart(bits, '0');
+        
+        const input = document.createElement('input');
+        input.type = 'text';
+        input.value = prefill;
+        input.style.cssText = 'width: 100%; height: 100%; box-sizing: border-box; background: #222; color: #fff; border: 1px solid #00ffaa; font-family: "JetBrains Mono", monospace; font-size: inherit; text-align: center; outline: none; border-radius: 2px;';
+        
+        const ogText = target.innerText;
+        target.innerText = '';
+        target.appendChild(input);
+        
+        const commit = () => {
+            if (!target.contains(input)) return;
+            const cleanVal = input.value.trim();
+            let num;
+            if (cleanVal.toLowerCase().startsWith('0x')) num = parseInt(cleanVal, 16);
+            else if (cleanVal.toLowerCase().startsWith('0b')) num = parseInt(cleanVal.substring(2), 2);
+            else {
+                if (format === 'H') num = parseInt(cleanVal, 16);
+                else if (format === 'B') num = parseInt(cleanVal, 2);
+                else num = parseInt(cleanVal, 10);
+            }
+
+            if (isNaN(num)) {
+                this.toast('Invalid number format', 'danger');
+                target.innerHTML = ogText;
+            } else {
+                const maxVal = (1 << bits) - 1;
+                num = Math.max(0, Math.min(maxVal, num));
+                if (bits === 1) {
+                    n.state = num > 0 ? 1 : 0;
+                    n.val = n.state;
+                } else {
+                    for (let i = 0; i < bits; i++) n.state[i] = (num & (1 << i)) ? 1 : 0;
+                    n.val = [...n.state];
+                }
+                this.updateNodeVisual(n);
+                this.seedQueue(); this.processQueue();
+            }
+        };
+
+        input.onblur = commit;
+        input.onkeydown = (ev) => {
+            if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+            if (ev.key === 'Escape') { target.innerHTML = ogText; }
+        };
+        input.focus();
+        input.select();
+    },
+
     uiEnterValue(id, format = 'D') {
         const n = this.nodes.find(node => node.id === id);
         if (!n || !n.type.startsWith('IN-')) return;

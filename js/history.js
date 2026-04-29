@@ -21,7 +21,7 @@ const History = {
         if (this.stack.length > this.max) this.stack.shift(); else this.index++;
         this.updateButtons();
         Sim.autoSave();
-        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Command execution history updated: ${cmd.constructor.name}.
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Command execution history updated: ${cmd.constructor.name}.
     },
 
     /**
@@ -36,9 +36,9 @@ const History = {
             this.index--;
             this.updateButtons();
             Sim.autoSave();
-            // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Undo operation finalized for ${cmd.constructor.name}.
+            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Undo operation finalized for ${cmd.constructor.name}.
         } else {
-            // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Undo ignored, history stack empty.
+            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Undo ignored, history stack empty.
         }
     },
 
@@ -54,9 +54,9 @@ const History = {
             cmd.do();
             this.updateButtons();
             Sim.autoSave();
-            // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Redo operation finalized for ${cmd.constructor.name}.
+            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Redo operation finalized for ${cmd.constructor.name}.
         } else {
-            // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Redo ignored, end of stack reached.
+            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Redo ignored, end of stack reached.
         }
     },
 
@@ -251,6 +251,39 @@ window.AddNodeCommand = AddNodeCommand;
 window.DeleteNodeCommand = DeleteNodeCommand;
 window.AddWireCommand = AddWireCommand;
 window.DeleteWireCommand = DeleteWireCommand;
+/**
+ * [AUDIT: SEC_ARCH_LEAD] - Layout mutation structural command updated for chip info readouts.
+ * @ARCH: COMMAND_PATTERN
+ * @STATE: NETLIST_STATE
+ * @INTENT: Encapsulate layout preference mutations to preserve geometric history.
+ */
+class MutateLayoutCommand {
+    constructor(node, og, nw) {
+        this.node = node;
+        this.og = og;
+        this.nw = nw;
+    }
+    do() {
+        this.node.customWidth = this.nw.w; this.node.customHeight = this.nw.h;
+        this.node.pinX = this.nw.px; this.node.pinY = this.nw.py;
+        this.node.pinW = this.nw.pw; this.node.pinH = this.nw.ph;
+        this.node.infoX = this.nw.ix; this.node.infoY = this.nw.iy;
+        this.node.infoW = this.nw.iw; this.node.infoH = this.nw.ih;
+        Sim.updateNodeVisual(this.node);
+        Sim.updateWireVisuals();
+    }
+    undo() {
+        this.node.customWidth = this.og.w; this.node.customHeight = this.og.h;
+        this.node.pinX = this.og.px; this.node.pinY = this.og.py;
+        this.node.pinW = this.og.pw; this.node.pinH = this.og.ph;
+        this.node.infoX = this.og.ix; this.node.infoY = this.og.iy;
+        this.node.infoW = this.og.iw; this.node.infoH = this.og.ih;
+        Sim.updateNodeVisual(this.node);
+        Sim.updateWireVisuals();
+    }
+}
+
 window.MoveNodeCommand = MoveNodeCommand;
 window.PasteCommand = PasteCommand;
+window.MutateLayoutCommand = MutateLayoutCommand;
 window.History = History;
