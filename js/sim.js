@@ -1,6 +1,6 @@
 /**
- * Simulator Core v1.23.83 (Modular Professional)
- * POLISHED: Encapsulated node pin indicators into bounded flex containers with strict bounding logic.
+ * Simulator Core v1.23.84 (Modular Professional)
+ * REFINED: Relaxed pin indicator scaling constraints with dynamic snap-to-fit flexbox overflow resolution.
  */
 const Sim = {
     nodes: [],
@@ -1983,6 +1983,9 @@ const Sim = {
         if (!node || !el) return;
         this.activeNodeEdit = { node, mode, og: { w: node.customWidth, h: node.customHeight, px: node.pinX, py: node.pinY, pw: node.pinW, ph: node.pinH } };
         
+        // [AUDIT: SEC_ARCH_LEAD] - Lock global wiring interactions to prevent misclicks during layout mutation.
+        document.body.classList.add('edit-mode-active');
+        
         el.style.outline = '2px dashed #00ffaa';
         
         const pinCont = el.querySelector('.pin-container');
@@ -2025,10 +2028,11 @@ const Sim = {
                 } else if (mode === 'pins') {
                     if (m.shiftKey) { 
                         // [AUDIT: SEC_ARCH_LEAD] - Enforce rigid dimensional scaling clamps for inner indicator array.
+                        // [AUDIT: SEC_ARCH_LEAD] - Unlocked lower bound clamps for free-form user scaling.
                         const maxW = startNodeW - startPinX;
                         const maxH = startNodeH - startPinY;
-                        node.pinW = Math.max(16, Math.min(maxW, startPinW + dx));
-                        node.pinH = Math.max(16, Math.min(maxH, startPinH + dy));
+                        node.pinW = Math.max(4, Math.min(maxW, startPinW + dx));
+                        node.pinH = Math.max(4, Math.min(maxH, startPinH + dy));
                         target.style.width = node.pinW + 'px';
                         target.style.height = node.pinH + 'px';
                     } else { 
@@ -2043,6 +2047,15 @@ const Sim = {
                 }
             };
             const onUp = () => {
+                // [AUDIT: SEC_ARCH_LEAD] - Dynamic overflow resolution: snap dimensions to fit flexbox children if scaled too tightly.
+                if (mode === 'pins' && target) {
+                    if (target.scrollWidth > target.clientWidth || target.scrollHeight > target.clientHeight) {
+                        node.pinW = Math.max(node.pinW || 0, target.scrollWidth);
+                        node.pinH = Math.max(node.pinH || 0, target.scrollHeight);
+                        target.style.width = node.pinW + 'px';
+                        target.style.height = node.pinH + 'px';
+                    }
+                }
                 document.removeEventListener('mousemove', onMove);
                 document.removeEventListener('mouseup', onUp);
             };
@@ -2056,6 +2069,8 @@ const Sim = {
 
     exitNodeEditMode() {
         if (!this.activeNodeEdit) return;
+        // [AUDIT: SEC_ARCH_LEAD] - Release global wiring interaction lock.
+        document.body.classList.remove('edit-mode-active');
         const state = this.activeNodeEdit;
         this.activeNodeEdit = null;
         
