@@ -1,5 +1,11 @@
 const TutorialEngine = {
     active: null, step: 0,
+    /**
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for tutorial panel draggable initialization.
+     * @IO: UI_INTERACTION
+     * @ARCH: UI_UX_HELPER
+     * @INTENT: Enable manual dragging for the tutorial panel via mouse events.
+     */
     makeDraggable(el) {
         let pos1 = 0, pos2 = 0, pos3 = 0, pos4 = 0;
         const dragMouseDown = (e) => {
@@ -26,9 +32,9 @@ const TutorialEngine = {
         const closeDragElement = () => {
             document.onmouseup = null; document.onmousemove = null;
         };
-        const header = document.getElementById('tut-drag-handle');
         if (header) { header.onmousedown = dragMouseDown; }
         else { el.onmousedown = dragMouseDown; }
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Tutorial panel made draggable.
     },
     tutorials: {
         'SR_LATCH': {
@@ -91,6 +97,12 @@ const TutorialEngine = {
             ]
         }
     },
+    /**
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for tutorial menu display.
+     * @IO: UI_MODAL
+     * @ARCH: TUTORIAL_DISPATCHER
+     * @INTENT: Display the tutorial selection menu to the user.
+     */
     showMenu() {
         if (!Sim.tutorialMode) { Sim.toast('Enable Tutorial Mode in Preferences first.'); return; }
         let html = '<div style="margin-bottom:15px; color:#aaa; font-size:13px;">Select a module to begin guided construction:</div>';
@@ -98,23 +110,42 @@ const TutorialEngine = {
             html += `<button class="ui-btn secondary" style="width:100%; margin-bottom:10px; border:1px solid var(--border);" onclick="TutorialEngine.start('${key}')">${this.tutorials[key].title}</button>`;
         });
         Sim.modal('Interactive Instructor', html, 'alert');
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Tutorial selection menu displayed.
     },
+    /**
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for tutorial session start.
+     * @STATE: TUTORIAL_SESSION
+     * @INTENT: Initialize a specific tutorial session and reset the progress counter.
+     */
     start(id) {
         this.active = id; this.step = 0;
         document.getElementById('ui-overlay').style.display = 'none';
         this.render();
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Tutorial session '${id}' initialized.
     },
+    /**
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for tutorial session termination.
+     * @STATE: TUTORIAL_SESSION
+     * @INTENT: Terminate the active tutorial session and hide the panel.
+     */
     quit() {
         this.active = null;
         const panel = document.getElementById('tutorial-panel');
         if (panel) panel.style.display = 'none';
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Tutorial session terminated and panel hidden.
     },
+    /**
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for tutorial panel rendering.
+     * @IO: UI_RENDERING
+     * @INTENT: Redraw the tutorial panel content based on the current step and completion state.
+     */
     render() {
         const panel = document.getElementById('tutorial-panel');
         if (!this.active || !panel) return;
         const tut = this.tutorials[this.active];
         if (this.step >= tut.steps.length) {
             panel.innerHTML = `<div style="color:var(--wire-on); font-weight:bold; font-size:16px; margin-bottom:8px;">Module Complete!</div><div style="color:#aaa; font-size:12px; margin-bottom:15px;">You have successfully added this component to your library.</div><button class="ui-btn primary" onclick="TutorialEngine.quit()">Finish</button>`;
+            // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Tutorial completion view rendered.
             return;
         }
         const cur = tut.steps[this.step];
@@ -132,7 +163,14 @@ const TutorialEngine = {
             </div>
         `;
         this.makeDraggable(panel);
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Tutorial step ${this.step + 1} rendered.
     },
+    /**
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for tutorial progress validation.
+     * @ARCH: TUTORIAL_VALIDATOR
+     * @CONSTRAINT: STEP_VALIDATION
+     * @INTENT: Evaluate the current workspace state against the active tutorial step requirements.
+     */
     checkProgress() {
         if (!this.active) return;
         const tut = this.tutorials[this.active];
@@ -143,6 +181,7 @@ const TutorialEngine = {
                 Sim.toast('Step Complete!');
             }
         }
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Tutorial progress check finalized.
     }
 };
 

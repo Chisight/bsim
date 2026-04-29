@@ -1,15 +1,22 @@
 /**
- * Logic Analyzer Module v1.22.0 (Modular Professional)
+ * Logic Analyzer Module v1.23.73 (Modular Professional)
  * Handles truth table generation, BOM estimation, and signal tracing.
  */
 const Analyzer = {
     _lastTruthTable: null,
 
+    /**
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for truth table generation.
+     * @ARCH: LOGIC_ANALYZER
+     * @IO: TRUTH_TABLE_GEN
+     * @INTENT: Exhaustively iterate through all input permutations to generate a deterministic truth table of the current netlist.
+     */
     generateTruthTable() {
         const rawInNodes = Sim.nodes.filter(n => n.type.startsWith('IN-'));
         const rawOutNodes = Sim.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-'));
 
         if (rawInNodes.length === 0 || rawOutNodes.length === 0) {
+            // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Truth table generation aborted (missing IO).
             return Sim.modal('Error', 'Requires at least 1 IN and 1 OUT/PROBE.', 'alert');
         }
 
@@ -23,7 +30,10 @@ const Analyzer = {
             }
         });
 
-        if (totalBits > 8) return Sim.modal('Error', 'Limit 8 input bits total to prevent stack overflow.', 'alert');
+        if (totalBits > 8) {
+            // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Truth table generation aborted (bit limit exceeded).
+            return Sim.modal('Error', 'Limit 8 input bits total to prevent stack overflow.', 'alert');
+        }
 
         const snapshot = JSON.stringify(Sim.nodes.map(n => ({ id: n.id, val: n.val, state: n.state })));
         const resultsMinterms = rawOutNodes.map(() => []);
@@ -101,8 +111,15 @@ const Analyzer = {
 
         // Display diagnostic table
         Sim.modal('Truth Table Analysis', html, 'alert');
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Truth table generation complete. Input bits: ${totalBits}.
     },
 
+    /**
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for hardware bill-of-materials estimation.
+     * @ARCH: HARDWARE_BOM_ANALYZER
+     * @IO: HARDWARE_ESTIMATOR
+     * @INTENT: Calculate the bill of materials (BOM) based on standard 74-series logic IC capacities.
+     */
     generateBOM() {
         const counts = { NAND: 0, NOR: 0, AND: 0, OR: 0, NOT: 0, TRISTATE: 0, DFF: 0, TFF: 0 };
         Sim.nodes.forEach(n => { if (counts[n.type] !== undefined) counts[n.type]++; });
@@ -143,9 +160,11 @@ const Analyzer = {
         html += `</div>`;
 
         Sim.modal('Hardware BOM Estimation', html, 'alert');
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: BOM estimation complete. Total ICs: ${totalICs}.
     },
     
     /**
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for recursive hierarchy flattening.
      * @ARCH: HIERARCHY_COMPILER
      * @CONSTRAINT: MAX_DEPTH=256
      * @INTENT: Flatten nested macro hierarchies into primitive signal nodes with recursion depth safety.
@@ -156,13 +175,42 @@ const Analyzer = {
             console.error(`[FATAL_RECURSION_ERROR] Macro depth exceeded safety limit (MAX_DEPTH=256).`);
             throw new Error(`[FATAL_RECURSION_ERROR] Halting execution to prevent V8 stack smash.`);
         }
-        if (!node.isMacro) return [node];
+        if (!node.isMacro) {
+            // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Leaf node reached during flattening: ${node.id}.
+            return [node];
+        }
         
         let subNodes = [];
         node.internalNodes.forEach(sub => {
             subNodes.push(...this.flattenHierarchy(sub, depth + 1));
         });
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Macro flattening complete for ${node.id} at depth ${depth}.
         return subNodes;
+    },
+    /**
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for deterministic port mapping.
+     * @ARCH: PORT_MAPPER
+     * @INTENT: Ensure deterministic LSB-to-MSB (0-to-n) port mapping for macro inputs/outputs.
+     */
+    // [AUDIT: v1.23.63 | SEC_ARCH_LEAD] - Ensure deterministic LSB-to-MSB (0-to-n) port mapping for macro inputs/outputs.
+    getMacroPortMapping(macroNode) {
+        const mapping = {};
+        macroNode.internalNodes.forEach(node => {
+            const type = node.type;
+            if (type.startsWith('IN-')) {
+                const width = parseInt(type.split('-')[1]) || 1;
+                for (let i = 0; i < width; i++) {
+                    mapping[`in${i}`] = { nodeId: node.id, portId: width === 1 ? 'out' : `out${i}` };
+                }
+            } else if (type.startsWith('OUT-') || type.startsWith('PROBE-')) {
+                const width = parseInt(type.split('-')[1]) || 1;
+                for (let i = 0; i < width; i++) {
+                    mapping[`out${i}`] = { nodeId: node.id, portId: width === 1 ? 'in' : `in${i}` };
+                }
+            }
+        });
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Port mapping complete for macro ${macroNode.id}.
+        return mapping;
     }
 };
 

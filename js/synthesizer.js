@@ -1,9 +1,15 @@
 /**
- * Logic Synthesizer v1.22.0 (Modular Professional)
+ * Logic Synthesizer v1.23.73 (Modular Professional)
  * Implements Quine-McCluskey SOP minimization and Parity Extraction.
  * FIXED: Uses only defined library chips and loops for equivalents.
  */
 const LogicSynthesizer = {
+    /**
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for signature map generation.
+     * @ARCH: SYNTHESIS_ANALYZER
+     * @STATE: LIBRARY_SIGNATURES
+     * @INTENT: Scan the library and native gates to generate unique truth-table signatures for logical matching.
+     */
     generateSignatureMap() {
         console.log("[DEBUG] Generating library signature map for synthesis...");
         const signatures = new Map();
@@ -38,14 +44,25 @@ const LogicSynthesizer = {
         });
 
         console.log(`[DEBUG] Signature map generation complete. Found ${signatures.size} distinct patterns.`);
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Signature map generated with ${signatures.size} entries.
         return signatures;
     },
 
+    /**
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for chip synthesis orchestration.
+     * @ARCH: SYNTHESIS_ORCHESTRATOR
+     * @IO: UI_MODAL
+     * @INTENT: High-level orchestration for converting a truth table into a named library chip.
+     */
     synthesizeToChip(outputsData, inputLabels, defaultName) {
         console.log(`[DEBUG] synthesizeToChip triggered | Inputs: ${inputLabels.length} | Outputs: ${outputsData.length}`);
         Sim.toast('Analyzing truth table...', 'info');
         Sim.modal('Package Synthesized Logic', 'Enter name for custom chip:', 'prompt', (chipName) => {
-            if (!chipName) { console.warn("[DEBUG] Synthesis aborted: No chip name provided."); return; }
+            if (!chipName) { 
+                console.warn("[DEBUG] Synthesis aborted: No chip name provided.");
+                // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Synthesis aborted, missing chip name.
+                return;
+            }
             chipName = chipName.toUpperCase().trim().replace(/\s+/g, '_');
             console.log(`[DEBUG] Starting synthesis for chip: ${chipName}`);
             Sim.toast(`Generating logic for ${chipName}...`, 'success');
@@ -66,6 +83,12 @@ const LogicSynthesizer = {
         }, defaultName);
     },
 
+    /**
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for QM logic minimization.
+     * @ARCH: LOGIC_SYNTHESIZER
+     * @CONSTRAINT: QUINE_MCCLUSKEY
+     * @INTENT: Primary logic synthesis engine using Quine-McCluskey minimization to generate an optimized netlist.
+     */
     synthesize(outputsData, inputLabels, targetChipName = "") {
         console.log(`[DEBUG] LogicSynthesizer.synthesize started for target: ${targetChipName}`);
         const numVars = inputLabels.length;
@@ -398,6 +421,7 @@ const LogicSynthesizer = {
 
         Sim.seedQueue();
         Sim.wakeQueue();
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Logic synthesis finalized and simulation queue re-seeded.
     }
 };
 

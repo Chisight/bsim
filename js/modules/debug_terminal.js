@@ -83,14 +83,25 @@ const DebugTerminal = {
         }
     },
 
+    /**
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for debug terminal bootstrap.
+     * @ARCH: APP_INITIALIZER
+     * @IO: TERMINAL_BOOT
+     * @INTENT: Initialize the debug terminal subsystem, including UI construction and console interception.
+     */
     init() {
         this.injectCSS();
         this.buildUI();
         this.attachHooks();
         this.overrideConsole();
         console.log("[TERM] V8/WASM Debugger Initialized. Press Ctrl+P.");
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Debug terminal subsystem operational.
     },
 
+    /**
+     * @ARCH: UI_STYLING
+     * @INTENT: Inject terminal-specific CSS into the document head for the telemetry interface.
+     */
     injectCSS() {
         const style = document.createElement('style');
         style.innerHTML = `
@@ -110,6 +121,11 @@ const DebugTerminal = {
         document.head.appendChild(style);
     },
 
+    /**
+     * @IO: UI_INTERACTION
+     * @STATE: TERMINAL_STATE
+     * @INTENT: Build the terminal DOM elements and attach dragging/resize event listeners.
+     */
     buildUI() {
         this.ui = document.createElement('div');
         this.ui.id = 'dt-wrap';
@@ -168,6 +184,10 @@ const DebugTerminal = {
         };
     },
 
+    /**
+     * @IO: KEYBOARD_INTERACTION
+     * @INTENT: Attach global keyboard shortcuts (e.g., Ctrl+P) to toggle terminal visibility.
+     */
     attachHooks() {
         window.addEventListener('keydown', (e) => {
             if (e.ctrlKey && e.key.toLowerCase() === 'p') {
@@ -177,6 +197,11 @@ const DebugTerminal = {
         });
     },
 
+    /**
+     * @ARCH: LOGGING_INTERCEPTOR
+     * @IO: TELEMETRY
+     * @INTENT: Redirect standard console methods to the terminal output buffer for in-app debugging.
+     */
     overrideConsole() {
         const ogLog = console.log, ogWarn = console.warn, ogErr = console.error;
         console.log = (...args) => { ogLog(...args); if (this.verbosity >= 2) this.print(args.join(' '), 'sys'); };
@@ -184,20 +209,34 @@ const DebugTerminal = {
         console.error = (...args) => { ogErr(...args); if (this.verbosity >= 0) this.print(args.join(' '), 'err'); };
     },
 
+    /**
+     * @STATE: TERMINAL_VISIBILITY
+     * @INTENT: Toggle the display state of the debug terminal and manage focus transitions.
+     */
     toggle(state) {
         this.visible = state;
         this.ui.style.display = state ? 'flex' : 'none';
         if (state) this.inp.focus();
     },
 
+    /**
+     * @IO: TERMINAL_OUTPUT
+     * @INTENT: Append a formatted message line to the terminal output display.
+     */
     print(msg, type = 'sys') {
         const line = document.createElement('div');
         line.className = `dt-msg dt-${type}`;
         line.innerText = `> ${msg}`;
         this.out.appendChild(line);
         this.out.scrollTop = this.out.scrollHeight;
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Message appended to terminal buffer.
     },
 
+    /**
+     * @ARCH: COMMAND_PROCESSOR
+     * @IO: TERMINAL_INPUT
+     * @INTENT: Parse and execute user-entered terminal commands for simulator control.
+     */
     exec(cmd) {
         this.print(cmd, 'ok');
         const args = cmd.split(' ');
@@ -220,14 +259,23 @@ const DebugTerminal = {
             default:
                 this.print(`Command not found: ${c}`, 'err');
         }
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Command execution finalized: ${cmd}.
     },
 
+    /**
+     * @ARCH: HARDWARE_SYNTHESIZER
+     * @CONSTRAINT: RECURSIVE_BUILD
+     * @INTENT: Compile high-level gates from primitive NAND representations and inject into the simulator library.
+     */
     synthesize(target) {
         if (!window.Sim) return this.print("Simulator context not linked.", "err");
         if (Sim.library[target]) return this.print(`${target} already exists in library.`, "warn");
         
         const recipe = this.RECIPES[target];
-        if (!recipe) return this.print(`No NAND synthesis recipe for: ${target}`, "err");
+        if (!recipe) {
+            // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Synthesis aborted, no recipe for ${target}.
+            return this.print(`No NAND synthesis recipe for: ${target}`, "err");
+        }
 
         // Validate dependencies and recursively construct
         recipe.deps.forEach(dep => {
@@ -250,6 +298,7 @@ const DebugTerminal = {
         } catch (e) {
             this.print(`Synthesis failed: ${e.message}`, 'err');
         }
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Synthesis process finalized for ${target}.
     }
 };
 

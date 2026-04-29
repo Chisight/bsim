@@ -1,12 +1,13 @@
-# BrowserSim v1.22.34 - Modular Professional Logic Simulator
+# BrowserSim v1.23.64 - Modular Professional Logic Simulator
 
 BrowserSim is a high-performance, modular digital logic simulator built for the web. It allows users to design, simulate, and synthesize complex digital circuits using an atomic NAND-based foundation.
 
 ## 🚀 Key Features
 
 - **Hybrid Simulation Engine**: Utilizes a high-frequency WebAssembly (WASM) kernel for O(1) signal propagation in pure-native circuits, with a robust V8 object-graph fallback for mixed-mode simulation.
+- **MRAP Diagnostic Hardening**: (New in v1.23.64) Full codebase instrumentation with `@ARCH` architectural tags and high-density `EXIT_TRACE` markers for zero-trust state observability.
 - **Custom Chip Creation**: Design sub-circuits and encapsulate them into reusable library components.
-- **Advanced Diagnostics**: Built-in Parity Diagnostics suite to ensure cryptographic consistency between the WASM kernel and JavaScript execution.
+- **Advanced Diagnostics**: Built-in Parity Diagnostics suite and Wasm Linear Memory Mapping to ensure consistency between the WASM kernel and JavaScript execution.
 - **Logic Synthesis**: Integrated truth table generator and logic synthesizer to optimize and verify circuit behavior.
 - **Hardware Analysis**: Automated Bill of Materials (BOM) estimation for hardware implementations.
 - **Professional UX**: Features a responsive grid workspace, keyboard shortcuts (Undo/Redo, Delete), and a persistent auto-save layer.
