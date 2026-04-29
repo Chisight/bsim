@@ -272,6 +272,14 @@ body.edit-mode-active .bit-dot { pointer-events: none; }
 body.edit-mode-active .visual-extra { pointer-events: none; opacity: 0.5; }
 body.edit-mode-active .gate-label { pointer-events: none; opacity: 0.5; }
 
+/* [AUDIT: SEC_ARCH_LEAD] - Proportional hitbox expansion and visual lock */
+.pin-container.editing-pins::after {
+    content: '';
+    position: absolute;
+    top: -12px; left: -12px; right: -12px; bottom: -12px;
+    z-index: 50; /* Shields inner bits and safely expands mouse capture radius */
+}
+
 .pin-container { position: absolute; display: flex; flex-wrap: wrap; align-content: center; justify-content: center; min-width: 16px; min-height: 16px; gap: 2px; z-index: 10; }
 .pin-container.in { left: 8px; top: 50%; transform: translateY(-50%); }
 .pin-container.out { right: 8px; top: 50%; transform: translateY(-50%); }

@@ -1,6 +1,6 @@
 /**
- * Simulator Core v1.23.87 (Modular Professional)
- * FIXED: Decoupled axis-scaling logic for true edge and corner dragging. Input toggles locked during edits.
+ * Simulator Core v1.23.88 (Modular Professional)
+ * SECURED: Proportional hitboxes implemented for 1-bit pins to guarantee center-drag. Node interactions globally frozen.
  */
 const Sim = {
     nodes: [],
@@ -1329,6 +1329,8 @@ const Sim = {
      * @INTENT: Manage the state machine for manual wire creation between ports.
      */
     handlePortInteraction(e, nodeId, portId) {
+        // [AUDIT: SEC_ARCH_LEAD] - Global freeze on wiring interactions during layout configurations.
+        if (document.body.classList.contains('edit-mode-active')) return;
         const pEl = document.getElementById(nodeId)?.querySelector(`[data-port="${portId}"]`);
         if (e.shiftKey && !this.wiring.active) {
             const wire = this.wires.findLast(w => (w.to.nodeId === nodeId && w.to.portId === portId) || (w.from.nodeId === nodeId && w.from.portId === portId));
@@ -1996,21 +1998,23 @@ const Sim = {
         if (!target) return;
         
         if (mode === 'pins') {
+            target.classList.add('editing-pins');
             target.style.outline = '2px dashed #ff00aa';
             target.style.cursor = 'move';
             target.style.transform = 'none'; // Release absolute centering lock for dragging
             
-            // [AUDIT: SEC_ARCH_LEAD] - Dynamic 8-way cursor feedback mapping for edges and corners.
+            // [AUDIT: SEC_ARCH_LEAD] - Dynamic proportional cursor feedback mapping supporting extended hitboxes.
             this._editHover = (ev) => {
                 const rect = target.getBoundingClientRect();
                 const scale = View.scale || 1;
                 const hx = (ev.clientX - rect.left) / scale;
                 const hy = (ev.clientY - rect.top) / scale;
-                const th = 12;
-                const hLeft = hx < th;
-                const hRight = hx > target.offsetWidth - th;
-                const hTop = hy < th;
-                const hBottom = hy > target.offsetHeight - th;
+                const thX = Math.min(12, target.offsetWidth / 3);
+                const thY = Math.min(12, target.offsetHeight / 3);
+                const hLeft = hx < thX;
+                const hRight = hx > target.offsetWidth - thX;
+                const hTop = hy < thY;
+                const hBottom = hy > target.offsetHeight - thY;
                 
                 if ((hTop && hLeft) || (hBottom && hRight)) target.style.cursor = 'nwse-resize';
                 else if ((hTop && hRight) || (hBottom && hLeft)) target.style.cursor = 'nesw-resize';
@@ -2028,17 +2032,18 @@ const Sim = {
             e.preventDefault();
             e.stopPropagation();
             
-            // [AUDIT: SEC_ARCH_LEAD] - Isolated edge and corner detection for independent axis scaling.
+            // [AUDIT: SEC_ARCH_LEAD] - Proportional grab-zone calculation to guarantee a central translation zone.
             const rect = target.getBoundingClientRect();
             const scale = View.scale || 1;
             const clickX = (e.clientX - rect.left) / scale;
             const clickY = (e.clientY - rect.top) / scale;
             
-            const threshold = 12;
-            const rLeft = clickX < threshold;
-            const rRight = clickX > target.offsetWidth - threshold;
-            const rTop = clickY < threshold;
-            const rBottom = clickY > target.offsetHeight - threshold;
+            const thX = Math.min(12, target.offsetWidth / 3);
+            const thY = Math.min(12, target.offsetHeight / 3);
+            const rLeft = clickX < thX;
+            const rRight = clickX > target.offsetWidth - thX;
+            const rTop = clickY < thY;
+            const rBottom = clickY > target.offsetHeight - thY;
             const isResizing = mode === 'pins' && (rLeft || rRight || rTop || rBottom);
             
             const startX = e.clientX;
@@ -2137,7 +2142,7 @@ const Sim = {
         }
         
         if (el) { el.style.outline = ''; el.style.cursor = ''; }
-        if (pinCont) { pinCont.style.outline = ''; pinCont.style.cursor = ''; }
+        if (pinCont) { pinCont.classList.remove('editing-pins'); pinCont.style.outline = ''; pinCont.style.cursor = ''; }
 
         History.execute({
             do: () => { Sim.updateWireVisuals(); },

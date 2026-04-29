@@ -11,8 +11,8 @@ const InteractionHandler = {
      */
     handleNodeDrag(e, node, div) {
         console.debug('[DEBUG] Node onmousedown triggered. Node ID:', node.id, '| Button pressed:', e.button);
-        // [AUDIT: SEC_ARCH_LEAD] - Prevent displacement of node topology when localized edit mode is active.
-        if (Sim.activeNodeEdit && Sim.activeNodeEdit.node.id === node.id) return;
+        // [AUDIT: SEC_ARCH_LEAD] - Global freeze on node topological drags during layout configurations.
+        if (document.body.classList.contains('edit-mode-active')) return;
 
         if (e.target.classList.contains('port')) {
             // [AUDIT: SEC_ARCH_LEAD] - EXIT_TRACE: Drag aborted, port interaction detected.
@@ -142,6 +142,8 @@ const InteractionHandler = {
      * @INTENT: Toggle logical state of input nodes and frequency of clock nodes on click.
      */
     handleNodeClick(e, node, div, bits) {
+        // [AUDIT: SEC_ARCH_LEAD] - Global freeze on node topological clicks during layout configurations.
+        if (document.body.classList.contains('edit-mode-active')) return;
         if (e.target.classList.contains('port') || e.target.classList.contains('bit-dot')) return;
         if (e.shiftKey) return; // Reserved for Port Interaction
         if (node.type.startsWith('IN-')) {
@@ -177,6 +179,8 @@ const InteractionHandler = {
      * @INTENT: Trigger configuration modals for components (clocks, multi-bit inputs) on double-click.
      */
     handleNodeDblClick(e, node, div) {
+        // [AUDIT: SEC_ARCH_LEAD] - Global freeze on node topological double-clicks during layout configurations.
+        if (document.body.classList.contains('edit-mode-active')) return;
         Sim.wakeQueue();
         e.stopPropagation();
         if (e.target.classList.contains('port')) return;
