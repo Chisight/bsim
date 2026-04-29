@@ -3,7 +3,7 @@ const WasmEngine = {
     instance: null,
     memArray: null,
     REGION_A_OFFSET: 0,
-    // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Align JS bridge with expanded 1MB Wasm instruction boundary.
+    // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Align JS bridge with expanded 1MB Wasm instruction boundary.
     REGION_B_OFFSET: 262144, // 1048576 bytes / 4 bytes per Int32
     instructionCount: 0,
     idMap: new Map(), // nodeId -> wasmIdx (Region A)
@@ -11,7 +11,7 @@ const WasmEngine = {
     flatWires: [],
 
     /**
-     * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for Wasm kernel initialization.
+     * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for Wasm kernel initialization.
      * @ARCH: KERNEL_LOADER
      * @IO: WASM_FETCH
      * @INTENT: Asynchronously initialize the WebAssembly execution environment and linear memory buffer.
@@ -40,11 +40,11 @@ const WasmEngine = {
         } catch (e) {
             console.error('[WasmEngine] Initialization failed:', e);
         }
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Wasm kernel initialization lifecycle termination.
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Wasm kernel initialization lifecycle termination.
     },
 
     /**
-     * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for netlist expansion and hierarchical flattening.
+     * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for netlist expansion and hierarchical flattening.
      * @ARCH: NETLIST_EXPANDER
      * @CONSTRAINT: RECURSIVE_RESOLUTION
      * @INTENT: Recursively expand hierarchical macros into primitive gates for the linear execution kernel.
@@ -70,7 +70,7 @@ const WasmEngine = {
                 const bits = parseInt(io.type.split('-')[1]) || 1;
                 if (targetIdx < currentIdx + bits) {
                     const bitOffset = targetIdx - currentIdx;
-                    // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Re-enabled index inversion to fix MSB/LSB parity alignment for custom chips.
+                    // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Re-enabled index inversion to fix MSB/LSB parity alignment for custom chips.
                     const bIdx = bits > 1 ? (bits - 1 - bitOffset) : 0;
                     return { nodeId: `${gid}:${io.id}`, portId: isInput ? `in${bIdx}` : `out${bIdx}` };
                 }
@@ -126,19 +126,19 @@ const WasmEngine = {
             fWires.push({ from: finalFrom, to: finalTo });
         });
 
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Returning flattened object graph with prefix context: ${prefix || 'ROOT'}
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Returning flattened object graph with prefix context: ${prefix || 'ROOT'}
         return { nodes: fNodes, wires: fWires };
     },
 
     /**
-     * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for Wasm linear memory synchronization and instruction assembly.
+     * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for Wasm linear memory synchronization and instruction assembly.
      * @ARCH: SYNC_BRIDGE
      * @STATE: LINEAR_ALLOCATION
      * @INTENT: Synchronize the JS object graph with Wasm linear memory, assigning static slots and building instructions.
      */
     syncLayout(nodes, wires) {
         if (!this.ready) {
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: syncLayout aborted, engine not ready.
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: syncLayout aborted, engine not ready.
             return;
         }
         const flattened = this._flattenNetlist(nodes, wires);
@@ -148,7 +148,7 @@ const WasmEngine = {
         this.instructionCount = 0;
 
         // Expanded Memory Matrix calculation based on flat nodes, not parents
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Ensure memory allocation accounts for 1MB instruction base.
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Ensure memory allocation accounts for 1MB instruction base.
         const requiredBytes = 1048576 + (this.flatNodes.length * 256);
         const requiredPages = Math.ceil(requiredBytes / 65536);
         const currentPages = this.memory.buffer.byteLength / 65536;
@@ -198,7 +198,7 @@ const WasmEngine = {
 
         let virtualNodeCount = slot + 10;
         /**
-         * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for logical driver resolution.
+         * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for logical driver resolution.
          * @ARCH: SIGNAL_RESOLVER
          * @STATE: DRIVER_GRAPH
          * @INTENT: Perform a deep-search through the netlist to identify all logical drivers for a specific port.
@@ -235,7 +235,7 @@ const WasmEngine = {
                         const num = currPortId.match(/\d+/) ? currPortId.match(/\d+/)[0] : '0';
 
                         if (isInputProxy) {
-                            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Prevent parent macro boundary jump to preserve deep hierarchical netlist recursion in Wasm compiler.
+                            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Prevent parent macro boundary jump to preserve deep hierarchical netlist recursion in Wasm compiler.
                             if (currPortId.startsWith('out')) trace(currNodeId, `in${num}`);
                             else if (currPortId.startsWith('in')) trace(currNodeId, node.type === 'IN-1' ? 'out' : `out${num}`);
                         } else {
@@ -256,7 +256,7 @@ const WasmEngine = {
                 });
             };
             trace(startNodeId, startPortId);
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Returning ${drivers.size} drivers for ${startNodeId}:${startPortId}.
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Returning ${drivers.size} drivers for ${startNodeId}:${startPortId}.
             return drivers.size > 0 ? Array.from(drivers) : [0]; // Unconnected inputs default to GROUND (0)
         };
 
@@ -273,7 +273,7 @@ const WasmEngine = {
                 this.instructionCount++;
                 currentIdx = vTargetIdx;
             }
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Bus resolution tree built. Final index: ${currentIdx}
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Bus resolution tree built. Final index: ${currentIdx}
             return currentIdx;
         };
 
@@ -299,7 +299,7 @@ const WasmEngine = {
                         const bits = parseInt(io.type.split('-')[1]) || 1;
                         if (targetIdx < currentIdx + bits) {
                             const bitOffset = targetIdx - currentIdx;
-                            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Restored bit inversion to prevent upside-down 8-bit mapping.
+                            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Restored bit inversion to prevent upside-down 8-bit mapping.
                             const bIdx = bits > 1 ? (bits - 1 - bitOffset) : 0;
                             queryNode = `${w.from.nodeId}:${io.id}`;
                             queryPort = `in${bIdx}`;
@@ -309,7 +309,7 @@ const WasmEngine = {
                     }
                 }
             }
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Resolve all drivers for the current wire to ensure proper state propagation in the linear memory array.
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Resolve all drivers for the current wire to ensure proper state propagation in the linear memory array.
             const dIdx = resolveAllDriverIndices(queryNode, queryPort);
             if (dIdx.length > 0) this.wireIdxMap.set(i, dIdx[0]);
         });
@@ -339,7 +339,7 @@ const WasmEngine = {
                 const NATIVE_GATES = new Set(['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR']);
                 if (NATIVE_GATES.has(node.type) && (currPortId === 'out' || currPortId === 'q' || currPortId === 'nq')) isOutput = true;
                 if (node.type.startsWith('IN-') && !currNodeId.includes(':')) isOutput = true;
-                // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Identify output nodes for topological sorting.
+                // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Identify output nodes for topological sorting.
                 if (isOutput && !isPassThrough) {
                     drivers.add(currNodeId);
                     return;
@@ -357,22 +357,22 @@ const WasmEngine = {
                         else if (currPortId.startsWith('out')) trace(currNodeId, `in${num}`);
                     }
                 }
-                // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Trace wire connections to find drivers.
+                // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Trace wire connections to find drivers.
                 this.flatWires.forEach(w => {
                     if (w.to.nodeId === currNodeId && w.to.portId === currPortId) trace(w.from.nodeId, w.from.portId);
                     else if (w.from.nodeId === currNodeId && w.from.portId === currPortId) trace(w.to.nodeId, w.to.portId);
                 });
             };
             trace(startNodeId, startPortId);
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Return the list of drivers for the current wire.
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Return the list of drivers for the current wire.
             return Array.from(drivers);
         };
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for topological sorting.
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for topological sorting.
         this.flatNodes.forEach(receiverNode => {
             const isSequential = ['DFF', 'TFF', 'CLOCK'].includes(receiverNode.type);
             if (isSequential) return; // Sequential nodes act as bounds
             const t = receiverNode.type;
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Identify input ports for topological sorting.
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Identify input ports for topological sorting.
             let inputPorts = [];
             if (['NAND', 'AND', 'OR', 'XOR', 'NOR', 'XNOR'].includes(t)) inputPorts = ['a', 'b'];
             else if (t === 'NOT') inputPorts = ['a'];
@@ -381,7 +381,7 @@ const WasmEngine = {
                 const bits = parseInt(t.split('-')[1]) || 1;
                 for (let i = 0; i < bits; i++) inputPorts.push(`in${i}`);
             }
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Trace wire connections to find drivers.
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Trace wire connections to find drivers.
             inputPorts.forEach(port => {
                 const drivers = findDriverNodes(receiverNode.id, port);
                 drivers.forEach(driverId => {
@@ -399,7 +399,7 @@ const WasmEngine = {
         let sortedNodes = [];
         let queue = [];
         inDegree.forEach((deg, id) => { if (deg === 0) queue.push(id); });
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Execute topological sort.
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Execute topological sort.
         while (queue.length > 0) {
             const u = queue.shift();
             const node = this.flatNodes.find(n => n.id === u);
@@ -438,7 +438,7 @@ const WasmEngine = {
 
             const getA = () => buildBusTree(resolveAllDriverIndices(n.id, 'a'));
             const getB = () => buildBusTree(resolveAllDriverIndices(n.id, 'b'));
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Emit instructions into Region B.
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Emit instructions into Region B.
             if (t === 'NAND') {
                 emitNAND(mapped, getA(), getB());
             } else if (t === 'NOT') {
@@ -500,33 +500,33 @@ const WasmEngine = {
         });
 
         console.log(`[WasmEngine] Optimized execution graph built with ${this.instructionCount} instructions.`);
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: SYNC_BRIDGE synchronization complete. linear instruction count: ${this.instructionCount}
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: SYNC_BRIDGE synchronization complete. linear instruction count: ${this.instructionCount}
     },
 
     /**
-     * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for Wasm execution step.
+     * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for Wasm execution step.
      * @IO: KERNEL_STEP
      * @CONSTRAINT: DETERMINISTIC_TICK
      * @INTENT: Trigger a single simulation cycle in the Wasm engine.
      */
     executeTick() {
         if (!this.ready || !this.instance) {
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Early exit, Wasm engine not ready.
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Early exit, Wasm engine not ready.
             return;
         }
         this.instance.exports.tick(this.instructionCount);
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Wasm tick executed successfully.
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Wasm tick executed successfully.
     },
 
     /**
-     * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for state mutation (Host to Wasm).
+     * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for state mutation (Host to Wasm).
      * @STATE: MEMORY_UPDATE
      * @IO: HOST_TO_WASM
      * @INTENT: Write external signal values (user inputs, clocks) into Wasm linear memory.
      */
     writeState(nodeId, value) {
         if (!this.ready) {
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Early exit, Wasm memory not ready for write.
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Early exit, Wasm memory not ready for write.
             return;
         }
         const mapped = this.idMap.get(nodeId);
@@ -538,7 +538,7 @@ const WasmEngine = {
         } else {
             this.memArray[this.REGION_A_OFFSET + mapped] = value;
         }
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Node ${nodeId} state written to Wasm memory.
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Node ${nodeId} state written to Wasm memory.
     },
 
     /**
@@ -547,43 +547,43 @@ const WasmEngine = {
      */
     readWireState(wireIndex) {
         if (!this.ready || !this.wireIdxMap.has(wireIndex)) {
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire ${wireIndex} state read failure (unmapped or not ready).
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire ${wireIndex} state read failure (unmapped or not ready).
             return null;
         }
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire ${wireIndex} state read success.
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire ${wireIndex} state read success.
         return this.memArray[this.REGION_A_OFFSET + this.wireIdxMap.get(wireIndex)];
     },
 
     /**
-     * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for memory index mapping.
+     * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for memory index mapping.
      * @ARCH: MEMORY_MAPPER
      * @INTENT: Map a specific node and port pair to its exact index in the Wasm linear memory buffer.
      */
     getSpecificIdx(id, port) {
         const mapped = this.idMap.get(id);
         if (mapped === undefined) {
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Mapping failure for ${id}:${port} (id not found).
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Mapping failure for ${id}:${port} (id not found).
             return undefined;
         }
         if (Array.isArray(mapped)) {
             if (port === 'q') {
-                // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Bit mapping for ${id}:${port} -> index ${mapped[0]} (primary).
+                // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Bit mapping for ${id}:${port} -> index ${mapped[0]} (primary).
                 return mapped[0];
             }
             if (port === 'nq') {
-                // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Bit mapping for ${id}:${port} -> index ${mapped[1]} (secondary).
+                // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Bit mapping for ${id}:${port} -> index ${mapped[1]} (secondary).
                 return mapped[1];
             }
             const bit = parseInt(port.replace(/\D/g, '')) || 0;
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Bus bit mapping for ${id}:${port} -> bit ${bit} -> index ${mapped[bit]}.
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Bus bit mapping for ${id}:${port} -> bit ${bit} -> index ${mapped[bit]}.
             return mapped[bit] !== undefined ? mapped[bit] : mapped[0];
         }
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Linear mapping for ${id}:${port} -> index ${mapped}.
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Linear mapping for ${id}:${port} -> index ${mapped}.
         return mapped;
     },
 
     /**
-     * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for state readback.
+     * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for state readback.
      * @ARCH: SYNC_BRIDGE
      * @STATE: MEMORY_READBACK
      * @IO: WASM_TO_HOST
@@ -591,28 +591,28 @@ const WasmEngine = {
      */
     readState(nodeId) {
         if (!this.ready) {
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Read failure for ${nodeId} (memory not ready).
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Read failure for ${nodeId} (memory not ready).
             return 0;
         }
         const mapped = this.idMap.get(nodeId);
         if (Array.isArray(mapped)) {
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Vector read success for ${nodeId}.
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Vector read success for ${nodeId}.
             return mapped.map(idx => this.memArray[this.REGION_A_OFFSET + idx]);
         } else {
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Scalar read success for ${nodeId}.
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Scalar read success for ${nodeId}.
             return this.memArray[this.REGION_A_OFFSET + mapped];
         }
     },
 
     /**
-     * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for hierarchical pin probing.
+     * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for hierarchical pin probing.
      * @IO: SIGNAL_PROBE
      * @ARCH: SYNC_BRIDGE
      * @INTENT: Probe a specific pin state, resolving through hierarchical proxy nodes to find the physical driver.
      */
     readPinState(nodeId, portId) {
         if (!this.ready || !this.memArray) {
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Pin probe failure for ${nodeId}:${portId} (system offline).
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Pin probe failure for ${nodeId}:${portId} (system offline).
             return null;
         }
 
@@ -633,7 +633,7 @@ const WasmEngine = {
                     const bits = parseInt(io.type.split('-')[1]) || 1;
                     if (targetIdx < currentIdx + bits) {
                         const bitOffset = targetIdx - currentIdx;
-                        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Restored bit inversion to prevent upside-down 8-bit mapping.
+                        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Restored bit inversion to prevent upside-down 8-bit mapping.
                         const bIdx = bits > 1 ? (bits - 1 - bitOffset) : 0;
                         targetNodeId = `${nodeId}:${io.id}`;
                         targetPortId = isInput ? `in${bIdx}` : `out${bIdx}`;
@@ -711,7 +711,7 @@ const WasmEngine = {
                     targetPortId = drv.port;
                 } else {
                     // Force ground (0) on unconnected sterile pins to prevent parity drift
-                    // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Unconnected sterile pin detected at ${targetNodeId}:${targetPortId}. Grounded to 0.
+                    // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Unconnected sterile pin detected at ${targetNodeId}:${targetPortId}. Grounded to 0.
                     return 0;
                 }
             }
@@ -719,26 +719,26 @@ const WasmEngine = {
 
         let idx = this.getSpecificIdx(targetNodeId, targetPortId);
         if (idx === undefined) {
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Pin probe failed for ${targetNodeId}:${targetPortId} (resolution failed).
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Pin probe failed for ${targetNodeId}:${targetPortId} (resolution failed).
             return null;
         }
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Enforce REGION_A_OFFSET mapping to prevent layout boundary circumvention.
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: SYNC_BRIDGE pin probe success. Mapped bit-index: ${idx}. Relation: [Resolved: ${targetNodeId}:${targetPortId} from original ${nodeId}:${portId}].
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Enforce REGION_A_OFFSET mapping to prevent layout boundary circumvention.
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: SYNC_BRIDGE pin probe success. Mapped bit-index: ${idx}. Relation: [Resolved: ${targetNodeId}:${targetPortId} from original ${nodeId}:${portId}].
         return this.memArray[this.REGION_A_OFFSET + idx];
     },
 
     /**
-     * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for memory map extraction.
+     * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for memory map extraction.
      * @ARCH: DIAGNOSTIC_TOOL
      * @IO: CONSOLE_EXPORT
      * @INTENT: Generate and display a structured map of the Wasm linear memory allocation for all flattened nodes.
      */
     exportMemoryMap() {
-        console.group("WASM LINEAR MEMORY MAP (v1.23.79)");
+        console.group("WASM LINEAR MEMORY MAP (v1.23.80)");
         console.log("Region A (States) Offset: 0");
         console.log("Region B (Instructions) Offset: 1048576 (byte)");
 
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Align diagnostic export with true Engine.wat physical memory layout, removing metadata phantom mapping.
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Align diagnostic export with true Engine.wat physical memory layout, removing metadata phantom mapping.
         const map = this.flatNodes.map((node) => {
             const mapped = this.idMap.get(node.id);
             const isArray = Array.isArray(mapped);
@@ -751,7 +751,7 @@ const WasmEngine = {
 
         console.table(map);
         console.groupEnd();
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Memory map exported to console.
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Memory map exported to console.
         return map;
     }
 };

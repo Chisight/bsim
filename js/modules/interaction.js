@@ -3,7 +3,7 @@
  */
 const InteractionHandler = {
     /**
-     * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for node translation.
+     * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for node translation.
      * @ARCH: UI_CONTROLLER
      * @IO: UI_INTERACTION
      * @STATE: NODE_POSITION
@@ -12,7 +12,7 @@ const InteractionHandler = {
     handleNodeDrag(e, node, div) {
         console.debug('[DEBUG] Node onmousedown triggered. Node ID:', node.id, '| Button pressed:', e.button);
         if (e.target.classList.contains('port')) {
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Drag aborted, port interaction detected.
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Drag aborted, port interaction detected.
             return;
         }
         
@@ -20,7 +20,7 @@ const InteractionHandler = {
             e.preventDefault(); e.stopPropagation();
             const menu = document.getElementById('context-menu');
             if (!menu) {
-                // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Context menu aborted, DOM target missing.
+                // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Context menu aborted, DOM target missing.
                 return;
             }
 
@@ -28,16 +28,27 @@ const InteractionHandler = {
             menu.style.left = e.clientX + 'px';
             menu.style.top = e.clientY + 'px';
 
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Context menu parity: expose component-specific parameterization and macro geometry endpoints on canvas instances.
             const isNative = !node.isCustom;
             const renameAction = `onclick="Sim.modal('Rename Component','Label:','prompt',v=>{if(v && v.trim()!==''){node.label=v.trim(); const l=document.getElementById('${node.id}').querySelector('.gate-label'); if(l)l.innerText=node.label; Sim.autoSave();}},'${node.label}'); document.getElementById('context-menu').style.display='none';"`;
             const editAction = isNative ? '' : `onclick="Sim.uiEditChip('${node.type}'); document.getElementById('context-menu').style.display='none';"`;
+            const geomAction = isNative ? '' : `onclick="Sim.uiScaleChip('${node.type}'); document.getElementById('context-menu').style.display='none';"`;
             
+            let configOption = '';
+            if (node.type === 'CLOCK') {
+                configOption = `<div class="menu-item" onclick="Sim.handleNodeDblClick(new Event('dblclick'), Sim.nodes.find(n=>n.id==='${node.id}'), document.getElementById('${node.id}')); document.getElementById('context-menu').style.display='none';">Configure Frequency</div>`;
+            } else if (node.type.startsWith('IN-') && node.type !== 'IN-1') {
+                configOption = `<div class="menu-item" onclick="Sim.uiEnterValue('${node.id}'); document.getElementById('context-menu').style.display='none';">Set Input Value</div>`;
+            }
+
             menu.innerHTML = `
+                ${configOption}
                 <div class="menu-item" ${renameAction}>Rename</div>
+                ${!isNative ? `<div class="menu-item" ${geomAction}>Set Geometry</div>` : ''}
                 <div class="menu-item ${isNative ? 'disabled' : ''}" ${editAction}>Edit Internals</div>
                 <div class="menu-item danger" onclick="History.execute(new DeleteNodeCommand(Sim.nodes.find(n=>n.id==='${node.id}'))); document.getElementById('context-menu').style.display='none';">Delete</div>
             `;
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Context menu displayed for node ${node.id}.
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Context menu displayed for node ${node.id}.
             return; 
         }
         
@@ -104,14 +115,14 @@ const InteractionHandler = {
             const boundaryMoves = boundaryWires.map(item => ({ wire: item.wire, ox: item.ox, oy: item.oy, nx: undefined, ny: undefined }));
 
             if (moves.length > 0) History.execute(new MoveNodeCommand(moves, [...wMoves, ...boundaryMoves]));
-            // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Node translation finalized. Commands dispatched: ${moves.length}.
+            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Node translation finalized. Commands dispatched: ${moves.length}.
         };
         document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp, { once: true });
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Node drag lifecycle initialized for ${node.id}.
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Node drag lifecycle initialized for ${node.id}.
     },
 
     /**
-     * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for logical state toggle.
+     * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for logical state toggle.
      * @ARCH: SIGNAL_INJECTOR
      * @IO: UI_INTERACTION
      * @STATE: NODE_STATE
@@ -142,11 +153,11 @@ const InteractionHandler = {
             }
             Sim.updateNodeVisual(node);
         }
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Node interaction complete for ${node.id}.
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Node interaction complete for ${node.id}.
     },
 
     /**
-     * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for configuration modal activation.
+     * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for configuration modal activation.
      * @ARCH: UI_ORCHESTRATOR
      * @IO: UI_INTERACTION
      * @ARCH: UI_MODAL
@@ -185,11 +196,11 @@ const InteractionHandler = {
                 }
             }, node.label);
         }
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Modal configuration triggered for ${node.id}.
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Modal configuration triggered for ${node.id}.
     },
 
     /**
-     * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for wire splitting.
+     * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for wire splitting.
      * @ARCH: NETLIST_MODIFIER
      * @ARCH: NETLIST_MUTATION
      * @INTENT: Split an existing wire by inserting a logical JUNCTION node at the specified coordinates.
@@ -215,11 +226,11 @@ const InteractionHandler = {
             }
         });
         Sim.autoSave();
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire split successful at (${clickX}, ${clickY}).
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire split successful at (${clickX}, ${clickY}).
     },
 
     /**
-     * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for wire context manipulation.
+     * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for wire context manipulation.
      * @ARCH: UI_CONTROLLER
      * @IO: UI_INTERACTION
      * @ARCH: NETLIST_MUTATION
@@ -301,11 +312,11 @@ const InteractionHandler = {
                 oldOrthoDir: wire.orthoDir || 'H'
             };
         }
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire interaction handled for ${wire.id}.
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire interaction handled for ${wire.id}.
     },
 
     /**
-     * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for marquee selection initialization.
+     * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for marquee selection initialization.
      * @ARCH: SELECTION_CONTROLLER
      * @IO: UI_INTERACTION
      * @STATE: SELECTION_STATE
@@ -525,11 +536,11 @@ const InteractionHandler = {
             isDragging = false;
             marquee.style.display = 'none';
         });
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Marquee selection listeners initialized.
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Marquee selection listeners initialized.
     },
 
     /**
-     * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for selection serialization.
+     * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for selection serialization.
      * @ARCH: CLIPBOARD_ENGINE
      * @STATE: CLIPBOARD_MANAGEMENT
      * @INTENT: Serialize selected nodes and wires into the internal clipboard buffer.
@@ -539,11 +550,11 @@ const InteractionHandler = {
         const nodesToCopy = Sim.nodes.filter(n => Sim.selection.has(n.id));
         const wiresToCopy = Sim.wires.filter(w => Sim.selection.has(w.from.nodeId) && Sim.selection.has(w.to.nodeId));
         Sim._clipboard = { nodes: JSON.parse(JSON.stringify(nodesToCopy)), wires: JSON.parse(JSON.stringify(wiresToCopy)) };
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Copied ${nodesToCopy.length} nodes to clipboard.
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Copied ${nodesToCopy.length} nodes to clipboard.
     },
 
     /**
-     * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for selection instantiation.
+     * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for selection instantiation.
      * @ARCH: NETLIST_MODIFIER
      * @ARCH: NETLIST_MUTATION
      * @STATE: SELECTION_STATE
@@ -586,11 +597,11 @@ const InteractionHandler = {
             const el = document.getElementById(n.id);
             if (el) el.classList.add('selected');
         });
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Selection pasted and re-indexed.
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Selection pasted and re-indexed.
     },
 
     /**
-     * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for global clipboard listeners.
+     * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for global clipboard listeners.
      * @ARCH: INTERACTION_HANDLER
      * @IO: KEYBOARD_INTERACTION
      * @INTENT: Register global keyboard shortcuts for clipboard (Ctrl+C/V) and deletion operations.
@@ -614,11 +625,11 @@ const InteractionHandler = {
                 }
             }
         });
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Clipboard listeners registered.
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Clipboard listeners registered.
     },
 
     /**
-     * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Entry trace for physical wire creation.
+     * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for physical wire creation.
      * @ARCH: NETLIST_INTERCONNECT
      * @IO: SIGNAL_INTERCONNECT
      * @INTENT: Establish a logical bridge between node ports with strict width parity enforcement.
@@ -664,7 +675,7 @@ const InteractionHandler = {
         };
         Sim.wires.push(wire);
         Sim.updateWireVisuals();
-        // [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire created successfully between ${sourceNodeId} and ${targetNodeId}.
+        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire created successfully between ${sourceNodeId} and ${targetNodeId}.
         return true;
     }
 };
