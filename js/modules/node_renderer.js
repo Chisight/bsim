@@ -4,7 +4,7 @@
  */
 const NodeRenderer = {
     /**
-     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for node DOM instantiation.
+     * [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - Entry trace for node DOM instantiation.
      * @ARCH: UI_RENDERING
      * @IO: DOM_FACTORY
      * @INTENT: Dynamically generate and inject the HTML/DOM representation for a specific logic node, including its ports and visual labels.
@@ -77,8 +77,9 @@ const NodeRenderer = {
             } else if (node.isCustom) {
                 const chipDef = Sim.library[node.type];
                 if (chipDef) {
-                    const ins = chipDef.nodes.filter(n => n.type.startsWith('IN-')).sort((a, b) => a.y - b.y);
-                    const outs = chipDef.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-')).sort((a, b) => a.y - b.y);
+                    // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - Apply secondary X-axis sorting to prevent creation-order drift for horizontal components.
+                    const ins = chipDef.nodes.filter(n => n.type.startsWith('IN-')).sort((a, b) => (a.y - b.y) || (a.x - b.x));
+                    const outs = chipDef.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-')).sort((a, b) => (a.y - b.y) || (a.x - b.x));
                     
                     let totalIns = 0;
                     ins.forEach(n => totalIns += (parseInt(n.type.split('-')[1]) || 1));
@@ -139,7 +140,7 @@ const NodeRenderer = {
         document.getElementById('scene').appendChild(div);
         if (window.Sim && Sim._domCacheMap) Sim._domCacheMap.delete(node.id);
         Sim.updateNodeVisual(node);
-        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Node rendered and appended to DOM: ${node.id} (${node.type}).
+        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Node rendered and appended to DOM: ${node.id} (${node.type}).
     }
 };
 

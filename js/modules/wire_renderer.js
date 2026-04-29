@@ -14,7 +14,7 @@ const WireRenderer = {
     },
 
     /**
-     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for SVG wire layer redraw.
+     * [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - Entry trace for SVG wire layer redraw.
      * @ARCH: UI_RENDERING
      * @IO: SVG_LAYER_MUTATION
      * @INTENT: Main entry point for redrawing the entire SVG wire layer based on current netlist connectivity and signal states.
@@ -22,7 +22,7 @@ const WireRenderer = {
     drawWires() {
         const svg = document.getElementById('svg-layer');
         if (!svg) {
-            // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire redraw aborted, SVG layer missing.
+            // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire redraw aborted, SVG layer missing.
             return;
         }
         
@@ -88,7 +88,7 @@ const WireRenderer = {
         }
 
         this._renderCrossingMasks(svg);
-        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: SVG wire layer update complete. Rendered ${Sim.wires.length} wires.
+        // [AUDIT: v1.23.75 | SEC_ARCH_LEAD] - EXIT_TRACE: SVG wire layer update complete. Rendered ${Sim.wires.length} wires.
     },
 
     /**
