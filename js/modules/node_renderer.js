@@ -4,7 +4,7 @@
  */
 const NodeRenderer = {
     /**
-     * [AUDIT: v1.23.76 | SEC_ARCH_LEAD] - Entry trace for node DOM instantiation.
+     * [AUDIT: v1.23.77 | SEC_ARCH_LEAD] - Entry trace for node DOM instantiation.
      * @ARCH: UI_RENDERING
      * @IO: DOM_FACTORY
      * @INTENT: Dynamically generate and inject the HTML/DOM representation for a specific logic node, including its ports and visual labels.
@@ -36,7 +36,8 @@ const NodeRenderer = {
             for (let i = 0; i < bits; i++) {
                 const bIdx = bits - 1 - i; // TOP is MSB, BOTTOM is LSB
                 const topPct = bits === 1 ? 50 : ((i + 0.5) / bits) * 100;
-                const labelText = (bits > 1) ? `${node.label}[${bIdx}]` : node.label;
+                // [AUDIT: v1.23.77 | SEC_ARCH_LEAD] - UI Scaling: Render single-digit pin indices for buses to prevent layout clipping.
+                const labelText = (bits > 1) ? bIdx : '';
                 portsHtml += `<div class="port output" data-port="out${bIdx}" style="top:${topPct}%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${bIdx}')">
                     <div class="port-meta"><span class="port-label">${labelText}</span><div class="bit-dot inline-dot" data-bit="${bIdx}" onclick="event.stopPropagation(); Sim.toggleBit(event, '${node.id}', ${bIdx})"></div></div>
                 </div>`;
@@ -45,12 +46,14 @@ const NodeRenderer = {
             for (let i = 0; i < bits; i++) {
                 const bIdx = bits - 1 - i; // TOP is MSB, BOTTOM is LSB
                 const topPct = bits === 1 ? 50 : ((i + 0.5) / bits) * 100;
-                const labelText = (bits > 1) ? `${node.label}[${bIdx}]` : node.label;
+                // [AUDIT: v1.23.77 | SEC_ARCH_LEAD] - UI Scaling: Render single-digit pin indices for buses to prevent layout clipping.
+                const labelText = (bits > 1) ? bIdx : '';
                 portsHtml += `<div class="port input" data-port="in${bIdx}" style="top:${topPct}%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'in${bIdx}')">
                     <div class="port-meta"><div class="bit-dot inline-dot" data-bit="${bIdx}"></div><span class="port-label">${labelText}</span></div>
                 </div>`;
             }
-        } else {
+        }
+ else {
             if (node.type === 'JUNCTION') portsHtml = `<div class="port input output" data-port="j" style="top:50%;left:50%;transform:translate(-50%,-50%)" onmousedown="if(!Sim.wiring.active) return; event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'j')"></div>`;
             else if (node.type === 'CLOCK') portsHtml = `<div class="port output" data-port="out0" style="top:50%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out0')"><span class="port-label">CLK</span></div>`;
             else if (['NAND', 'AND', 'OR', 'NOR', 'XOR', 'XNOR'].includes(node.type)) {
@@ -77,7 +80,7 @@ const NodeRenderer = {
             } else if (node.isCustom) {
                 const chipDef = Sim.library[node.type];
                 if (chipDef) {
-                    // [AUDIT: v1.23.76 | SEC_ARCH_LEAD] - Apply secondary X-axis sorting to prevent creation-order drift for horizontal components.
+                    // [AUDIT: v1.23.77 | SEC_ARCH_LEAD] - Apply secondary X-axis sorting to prevent creation-order drift for horizontal components.
                     const ins = chipDef.nodes.filter(n => n.type.startsWith('IN-')).sort((a, b) => (a.y - b.y) || (a.x - b.x));
                     const outs = chipDef.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-')).sort((a, b) => (a.y - b.y) || (a.x - b.x));
                     
@@ -98,7 +101,8 @@ const NodeRenderer = {
                         for (let i = 0; i < bits; i++) {
                             const bIdx = bits > 1 ? (bits - 1 - i) : 0;
                             const portId = `in${cIn}`;
-                            const lbl = bits > 1 ? `${p.label}[${bIdx}]` : p.label;
+                            // [AUDIT: v1.23.77 | SEC_ARCH_LEAD] - UI Scaling: Render single-digit pin indices for custom macro buses.
+                            const lbl = bits > 1 ? bIdx : p.label;
                             portsHtml += `<div class="port input" data-port="${portId}" style="top:${((cIn + 0.5) / totalIns) * 100}%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', '${portId}')"><span class="port-label">${lbl}</span></div>`;
                             cIn++;
                         }
@@ -110,7 +114,8 @@ const NodeRenderer = {
                         for (let i = 0; i < bits; i++) {
                             const bIdx = bits > 1 ? (bits - 1 - i) : 0;
                             const portId = `out${cOut}`;
-                            const lbl = bits > 1 ? `${p.label}[${bIdx}]` : p.label;
+                            // [AUDIT: v1.23.77 | SEC_ARCH_LEAD] - UI Scaling: Render single-digit pin indices for custom macro buses.
+                            const lbl = bits > 1 ? bIdx : p.label;
                             portsHtml += `<div class="port output" data-port="${portId}" style="top:${((cOut + 0.5) / totalOuts) * 100}%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', '${portId}')"><span class="port-label">${lbl}</span></div>`;
                             cOut++;
                         }
@@ -140,7 +145,7 @@ const NodeRenderer = {
         document.getElementById('scene').appendChild(div);
         if (window.Sim && Sim._domCacheMap) Sim._domCacheMap.delete(node.id);
         Sim.updateNodeVisual(node);
-        // [AUDIT: v1.23.76 | SEC_ARCH_LEAD] - EXIT_TRACE: Node rendered and appended to DOM: ${node.id} (${node.type}).
+        // [AUDIT: v1.23.77 | SEC_ARCH_LEAD] - EXIT_TRACE: Node rendered and appended to DOM: ${node.id} (${node.type}).
     }
 };
 
