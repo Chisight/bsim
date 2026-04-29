@@ -246,6 +246,90 @@ const DebugTerminal = {
         return false;
     },
 
+    // [AUDIT: v1.24.01 | SEC_ARCH_LEAD] - VFS directory reader for tree traversal and path-based listing.
+    getVirtualDir(path) {
+        let dirs = [], files = [];
+        if (path === '/') dirs = ['home', 'etc'];
+        else if (path === '/home') dirs = ['bsim'];
+        else if (path === '/etc') dirs = ['lib'];
+        else if (path === '/etc/lib') dirs = ['primitives', 'custom'];
+        else if (path === '/home/bsim') {
+            Sim.tabs.forEach((t, i) => dirs.push(`tab-${i+1}`));
+        }
+        else if (path === '/etc/lib/primitives') {
+            files = ['NAND', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'CLOCK'].map(n => `[Gate] ${n}`);
+        }
+        else if (path.startsWith('/etc/lib/custom')) {
+            const searchDir = path.replace('/etc/lib/custom', '').replace(/^\//, '');
+            const subdirs = new Set();
+            Object.keys(Sim.library).forEach(name => {
+                const folder = Sim.library[name].folder || '';
+                if (folder === searchDir) files.push(`[Macro] ${name}`);
+                else if (folder.startsWith(searchDir ? searchDir + '/' : '')) {
+                    const sub = folder.substring(searchDir ? searchDir.length + 1 : 0).split('/')[0];
+                    if (sub) subdirs.add(sub);
+                }
+            });
+            dirs = Array.from(subdirs);
+        }
+        else if (path.startsWith('/home/bsim/')) {
+            const tMatch = path.match(/^\/home\/bsim\/(tab-\d+|[^/]+)(?:\/(editor))?$/);
+            if (tMatch) {
+                const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === tMatch[1] || t.id === tMatch[1]);
+                if (tab) {
+                    if (!tMatch[2]) {
+                        if (Sim.activeTabId === tab.id) {
+                            if (Sim.activeEditingChip && Sim.workspaceStack.length > 0) {
+                                dirs.push('editor');
+                                Sim.workspaceStack[0].nodes.forEach(n => files.push(`[${n.type}] ${n.id}`));
+                            } else if (!Sim.activeEditingChip && Sim.activeSplitChip) {
+                                dirs.push('editor');
+                                Sim.nodes.forEach(n => files.push(`[${n.type}] ${n.id}`));
+                            } else {
+                                Sim.nodes.forEach(n => files.push(`[${n.type}] ${n.id}`));
+                            }
+                        } else {
+                            tab.nodes.forEach(n => files.push(`[${n.type}] ${n.id}`));
+                        }
+                    } else {
+                        if (Sim.activeTabId === tab.id) {
+                            if (Sim.activeEditingChip) {
+                                Sim.nodes.forEach(n => files.push(`[${n.type}] ${n.id}`));
+                            } else if (Sim.activeSplitChip) {
+                                const sf = document.querySelector('#split-editor-frame iframe') || document.querySelector('#popup-editor-wrap iframe');
+                                if (sf && sf.contentWindow && sf.contentWindow.Sim) {
+                                    sf.contentWindow.Sim.nodes.forEach(n => files.push(`[${n.type}] ${n.id}`));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return { dirs, files };
+    },
+
+    runTree(path, prefix = '') {
+        const contents = this.getVirtualDir(path);
+        const total = contents.dirs.length + contents.files.length;
+        let current = 0;
+        
+        contents.dirs.forEach(d => {
+            current++;
+            const isLast = current === total;
+            const pointer = isLast ? '└── ' : '├── ';
+            this.print(`${prefix.replace(/ /g, '&nbsp;')}${pointer}<span style="color:#0af; font-weight:bold;">${d}/</span>`, 'sys');
+            this.runTree(path === '/' ? `/${d}` : `${path}/${d}`, prefix + (isLast ? '    ' : '│   '));
+        });
+        
+        contents.files.forEach(f => {
+            current++;
+            const isLast = current === total;
+            const pointer = isLast ? '└── ' : '├── ';
+            this.print(`${prefix.replace(/ /g, '&nbsp;')}${pointer}<span style="color:#0f5;">${f}</span>`, 'ok');
+        });
+    },
+
     getNodesForCwd() {
         const tMatch = this.cwd.match(/^\/home\/bsim\/(tab-\d+|[^/]+)(?:\/(editor))?$/);
         if (!tMatch) return [];
@@ -282,22 +366,19 @@ const DebugTerminal = {
             if (parts.length === 1) {
                 const cmds = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv'];
                 matches = cmds.filter(c => c.startsWith(prefix));
-            } else if (cmd === 'cd' || cmd === 'ls') {
-                // Simplistic autocomplete for directories based on current pwd context
+            } else if (cmd === 'cd' || cmd === 'ls' || cmd === 'tree') {
+                // [AUDIT: v1.24.01 | SEC_ARCH_LEAD] - Dynamic VFS path autocomplete.
+                let searchPath = prefix.includes('/') ? prefix.substring(0, prefix.lastIndexOf('/')) : '';
+                let searchPrefix = prefix.includes('/') ? prefix.substring(prefix.lastIndexOf('/') + 1) : prefix;
+                let targetDir = this.resolvePath(searchPath || '.');
+                
                 let opts = [];
-                if (this.cwd === '/') opts = ['home/', 'etc/'];
-                else if (this.cwd === '/home') opts = ['bsim/'];
-                else if (this.cwd === '/home/bsim') opts = Sim.tabs.map((t,i) => `tab-${i+1}/`);
-                else if (this.cwd === '/etc') opts = ['lib/'];
-                else if (this.cwd === '/etc/lib') opts = ['primitives/', 'custom/'];
-                else if (this.cwd.startsWith('/home/bsim/')) {
-                    const tabMatch = this.cwd.match(/^\/home\/bsim\/(tab-\d+|[^/]+)$/);
-                    if (tabMatch) {
-                        const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === tabMatch[1] || t.id === tabMatch[1]);
-                        if (tab && Sim.activeTabId === tab.id && (Sim.activeEditingChip || Sim.activeSplitChip)) opts = ['editor/'];
-                    }
+                const vfs = this.getVirtualDir(targetDir);
+                if (vfs) {
+                    opts = vfs.dirs.map(d => `${d}/`);
                 }
-                matches = opts.filter(d => d.startsWith(prefix));
+                
+                matches = opts.filter(d => d.startsWith(searchPrefix)).map(d => (searchPath ? searchPath + '/' : '') + d);
             } else {
                 const cNodes = this.getNodesForCwd();
                 matches = cNodes.map(n => n.id).filter(id => id.toLowerCase().startsWith(prefix));
@@ -432,7 +513,8 @@ const DebugTerminal = {
                 this.print("  pwd                 - Print Working Directory (VFS)");
                 this.print("  cd <path>           - Change Directory (VFS)");
                 this.print("  mv <chip> <folder>  - Move chip to a library folder");
-                this.print("  ls [-l]             - List workspace nodes or VFS contents");
+                this.print("  ls [-l] [path]      - List workspace nodes or VFS contents");
+                this.print("  tree [path]         - Display directory structure recursively");
                 this.print("  spawn <type> [x y]  - Add a node (e.g., spawn NAND 100 100)");
                 this.print("  rm <id> [id2...]    - Delete nodes (or 'rm all')");
                 this.print("  set <nodeId> <val>  - Set input node value (e.g., set node-xyz 1)");
@@ -487,31 +569,47 @@ const DebugTerminal = {
             case 'verbosity':
                 if (args[1]) { this.verbosity = parseInt(args[1]); this.print(`Verbosity -> ${this.verbosity}`); }
                 break;
+            case 'tree':
+                let treePath = this.cwd;
+                const treeArg = args.find(a => a !== 'tree' && !a.startsWith('-'));
+                if (treeArg) {
+                    treePath = this.resolvePath(treeArg);
+                    if (!this.isValidDir(treePath)) return this.print(`tree: no such file or directory: ${treeArg}`, 'err');
+                }
+                this.print(`--- TREE: ${treePath} ---`, "warn");
+                this.runTree(treePath);
+                break;
             case 'ls':
                 const verbose = args.includes('-l') || args.includes('-v');
+                let targetPath = this.cwd;
+                const pathArg = args.find(a => a !== 'ls' && !a.startsWith('-'));
+                if (pathArg) {
+                    targetPath = this.resolvePath(pathArg);
+                    if (!this.isValidDir(targetPath)) return this.print(`ls: no such file or directory: ${pathArg}`, 'err');
+                }
                 
-                if (this.cwd === '/') {
+                if (targetPath === '/') {
                     this.print(`[Dir] <span style="color:#0af; font-weight:bold;">home/</span>`, "ok");
                     this.print(`[Dir] <span style="color:#0af; font-weight:bold;">etc/</span>`, "ok");
                     return;
-                } else if (this.cwd === '/home') {
+                } else if (targetPath === '/home') {
                     this.print(`[Dir] <span style="color:#0af; font-weight:bold;">bsim/</span>`, "ok");
                     return;
-                } else if (this.cwd === '/etc') {
+                } else if (targetPath === '/etc') {
                     this.print(`[Dir] <span style="color:#0af; font-weight:bold;">lib/</span>`, "ok");
                     return;
-                } else if (this.cwd === '/etc/lib') {
+                } else if (targetPath === '/etc/lib') {
                     this.print(`[Dir] <span style="color:#0af; font-weight:bold;">primitives/</span>`, "ok");
                     this.print(`[Dir] <span style="color:#0af; font-weight:bold;">custom/</span>`, "ok");
                     return;
-                } else if (this.cwd === '/etc/lib/primitives') {
+                } else if (targetPath === '/etc/lib/primitives') {
                     this.print(`--- MACRO LIBRARY: Primitives ---`, "warn");
                     ['NAND', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'CLOCK'].forEach(p => {
                         this.print(`[Gate] <span style="color:#0f5">${p}</span>`, "ok");
                     });
                     return;
-                } else if (this.cwd.startsWith('/etc/lib/custom')) {
-                    const searchDir = this.cwd.replace('/etc/lib/custom', '').replace(/^\//, '');
+                } else if (targetPath.startsWith('/etc/lib/custom')) {
+                    const searchDir = targetPath.replace('/etc/lib/custom', '').replace(/^\//, '');
                     this.print(`--- MACRO LIBRARY: Custom/${searchDir} ---`, "warn");
                     let found = 0;
                     const subdirs = new Set();
@@ -531,7 +629,7 @@ const DebugTerminal = {
                     });
                     if (found === 0) this.print("Directory empty.", "sys");
                     return;
-                } else if (this.cwd === '/home/bsim') {
+                } else if (targetPath === '/home/bsim') {
                     this.print(`--- WORKSPACES ---`, "warn");
                     Sim.tabs.forEach((t, i) => {
                         const alias = `tab-${i+1}`;
@@ -542,7 +640,7 @@ const DebugTerminal = {
                 }
 
                 // Must be inside a tab workspace (/home/bsim/tab-X/...)
-                const tMatch = this.cwd.match(/^\/home\/bsim\/(tab-\d+|[^/]+)(?:\/(editor))?$/);
+                const tMatch = targetPath.match(/^\/home\/bsim\/(tab-\d+|[^/]+)(?:\/(editor))?$/);
                 if (!tMatch) return this.print("Invalid directory.", "err");
 
                 const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === tMatch[1] || t.id === tMatch[1]);
@@ -576,7 +674,7 @@ const DebugTerminal = {
                     }
                 }
 
-                this.print(`--- DIRECTORY: ${this.cwd} ---`, "warn");
+                this.print(`--- DIRECTORY: ${targetPath} ---`, "warn");
                 if (showEditorDir) {
                     const cName = Sim.activeEditingChip || Sim.activeSplitChip;
                     this.print(`[Dir] <span style="color:#ffca28; font-weight:bold;">editor/</span> <span style="color:#667">(${cName})</span>`, "ok");
