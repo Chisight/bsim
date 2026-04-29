@@ -33,8 +33,9 @@ const InteractionHandler = {
 
             // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Context menu parity: expose component-specific parameterization and macro geometry endpoints on canvas instances.
             // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Node Prefs extension: spatial edit mode for I/O bounds and internal pin layout arrays.
+            // [AUDIT: v1.24.15 | SEC_ARCH_LEAD] - Fixed string interpolation collision and enforced DOM recalculation for I/O labels.
             const isNative = !node.isCustom;
-            const renameAction = `onclick="Sim.modal('Rename Component','Label:','prompt',v=>{if(v && v.trim()!==''){node.label=v.trim(); const l=document.getElementById('${node.id}').querySelector('.gate-label'); if(l)l.innerText=node.label; Sim.autoSave();}},'${node.label}'); document.getElementById('context-menu').style.display='none';"`;
+            const renameAction = `onclick="const n=Sim.nodes.find(x=>x.id==='${node.id}'); Sim.modal('Rename Component','Label:','prompt',v=>{if(v!==null){n.label=v.trim(); const el=document.getElementById('${node.id}'); const l=el?.querySelector('.gate-label'); if(l)l.innerText=n.label; if(n.type.startsWith('IN-')||n.type.startsWith('OUT-')||n.type.startsWith('PROBE-')){if(typeof NodeRenderer!=='undefined')NodeRenderer.renderNode(n); Sim.updateWireVisuals();} Sim.autoSave();}}, n.label || ''); document.getElementById('context-menu').style.display='none';"`;
             const editAction = isNative ? '' : `onclick="Sim.uiEditChip('${node.type}'); document.getElementById('context-menu').style.display='none';"`;
             const geomAction = isNative ? '' : `onclick="Sim.uiScaleChip('${node.type}'); document.getElementById('context-menu').style.display='none';"`;
             
@@ -213,7 +214,8 @@ const InteractionHandler = {
             Sim.uiEnterValue(node.id);
         } else if (node.type !== 'JUNCTION') {
             Sim.modal('Rename Component', 'Label:', 'prompt', (v) => {
-                if (v && v.trim() !== '') {
+                // [AUDIT: v1.24.15 | SEC_ARCH_LEAD] - Permitted empty string assignment to clear component labels.
+                if (v !== null) {
                     node.label = v.trim();
                     const lbl = div.querySelector('.gate-label');
                     if (lbl) lbl.innerText = node.label;
@@ -223,7 +225,7 @@ const InteractionHandler = {
                     }
                     Sim.autoSave();
                 }
-            }, node.label);
+            }, node.label || '');
         }
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Modal configuration triggered for ${node.id}.
     },
