@@ -8,6 +8,8 @@ const Sim = {
     library: {},
     workspaceStack: [],
     activeEditingChip: null,
+    tabs: [{ id: 'tab-1', name: 'Main', nodes: [], wires: [], historyStack: [], historyIndex: -1 }],
+    activeTabId: 'tab-1',
     wireMap: new Map(),
     _netlistDirty: true, // [wasm] flag to indicate that the netlist needs to be recompiled
     showToasts: true,
@@ -82,6 +84,7 @@ const Sim = {
 
         View.init();
         this.loadAutoSave();
+        this.updateTabsUI();
         this.updateSidebar();
         this.updateHUD();
         this.updateLibraryUI();
@@ -263,10 +266,29 @@ const Sim = {
                     }
                 });
 
+                // [AUDIT: v1.23.99 | SEC_ARCH_LEAD] - Synchronize current active context into tab state before serialization.
+                const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+                if (activeTab && this.workspaceStack.length === 0) {
+                    activeTab.nodes = cNodes;
+                    activeTab.wires = cWires;
+                    if (window.History) {
+                        activeTab.historyStack = History.stack;
+                        activeTab.historyIndex = History.index;
+                    }
+                }
+
+                const safeTabs = this.tabs.map(t => ({
+                    id: t.id, name: t.name,
+                    nodes: (t.id === this.activeTabId && this.workspaceStack.length === 0) ? cNodes : (t.nodes || []).map(cleanNode).filter(n => n !== null),
+                    wires: (t.id === this.activeTabId && this.workspaceStack.length === 0) ? cWires : (t.wires || []).map(cleanWire).filter(w => w !== null),
+                    historyStack: t.historyStack || [], historyIndex: t.historyIndex !== undefined ? t.historyIndex : -1
+                }));
+
                 const project = { 
                     nodes: wsStack.length > 0 ? wsStack[0].nodes : cNodes, 
                     wires: wsStack.length > 0 ? wsStack[0].wires : cWires, 
                     library: safeLib, workspaceStack: wsStack, activeEditingChip: this.activeEditingChip,
+                    tabs: safeTabs, activeTabId: this.activeTabId,
                     // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - Append toast positioning to auto-save preferences payload.
                     prefs: { snapNodes: this.snapNodes, snapWires: this.snapWires, confirmDelete: this.confirmDelete, showStats: this.showStats, showTooltips: this.showTooltips, tutorialMode: this.tutorialMode, hudPos: this.hudPos, toastPos: this.toastPos } 
                 };
@@ -295,8 +317,28 @@ const Sim = {
                 this.workspaceStack = parsed.workspaceStack || [];
                 this.activeEditingChip = parsed.activeEditingChip || null;
                 
+                // [AUDIT: v1.23.99 | SEC_ARCH_LEAD] - Hydrate multi-tab states from persistence blob.
+                if (parsed.tabs && parsed.tabs.length > 0) {
+                    this.tabs = parsed.tabs;
+                    this.activeTabId = parsed.activeTabId || this.tabs[0].id;
+                } else {
+                    this.tabs = [{ id: 'tab-1', name: 'Main', nodes: parsed.nodes || [], wires: [], historyStack: [], historyIndex: -1 }];
+                    this.activeTabId = 'tab-1';
+                }
+                
                 let activeNodes = parsed.nodes;
                 let activeWires = parsed.wires;
+                
+                if (this.workspaceStack.length === 0) {
+                    const t = this.tabs.find(x => x.id === this.activeTabId);
+                    if (t) {
+                        activeNodes = t.nodes; activeWires = t.wires;
+                        if (window.History) {
+                            History.stack = t.historyStack || [];
+                            History.index = t.historyIndex !== undefined ? t.historyIndex : -1;
+                        }
+                    }
+                }
                 
                 // Restore Chip Editor context if we refreshed while editing
                 if (this.activeEditingChip && this.library[this.activeEditingChip]) {
@@ -2045,6 +2087,90 @@ const Sim = {
                 </label>
             </div>
         `, 'confirm');
+    },
+
+    /**
+     * [AUDIT: v1.23.99 | SEC_ARCH_LEAD] - Multi-tab context switching logic.
+     * @ARCH: WORKSPACE_MANAGER
+     * @STATE: CONTEXT_SWITCH
+     * @INTENT: Manage tab instances, synchronize active working memory to inactive tabs, and hydrate DOM states.
+     */
+    updateTabsUI() {
+        const tb = document.getElementById('tab-bar');
+        if (!tb) return;
+        let html = '';
+        this.tabs.forEach((t, i) => {
+            html += `<div class="tab ${t.id === this.activeTabId ? 'active' : ''}" onclick="Sim.uiSwitchTab('${t.id}')">
+                ${t.name}
+                ${this.tabs.length > 1 ? `<span class="tab-close" onclick="event.stopPropagation(); Sim.uiCloseTab('${t.id}')">✖</span>` : ''}
+            </div>`;
+        });
+        html += `<div class="tab-btn" onclick="Sim.uiNewTab()">+</div>`;
+        tb.innerHTML = html;
+    },
+
+    uiNewTab() {
+        if (this.activeEditingChip) return this.toast('Cannot create tabs while editing a chip.', 'warning');
+        const newId = 'tab-' + Math.random().toString(36).substr(2, 5);
+        this.tabs.push({ id: newId, name: `Board ${this.tabs.length + 1}`, nodes: [], wires: [], historyStack: [], historyIndex: -1 });
+        this.uiSwitchTab(newId);
+    },
+
+    uiSwitchTab(id) {
+        if (this.activeEditingChip) return this.toast('Exit chip editor before switching tabs.', 'warning');
+        if (this.activeTabId === id) return;
+
+        // 1. Save current state to old tab
+        const oldTab = this.tabs.find(t => t.id === this.activeTabId);
+        if (oldTab) {
+            oldTab.nodes = JSON.parse(JSON.stringify(this.nodes));
+            oldTab.wires = JSON.parse(JSON.stringify(this.wires));
+            if (window.History) {
+                oldTab.historyStack = History.stack;
+                oldTab.historyIndex = History.index;
+            }
+        }
+
+        // 2. Clear current workspace
+        this.nodes = []; this.wires = []; this.wireMap.clear();
+        document.getElementById('scene').innerHTML = '';
+
+        // 3. Load new state
+        this.activeTabId = id;
+        const newTab = this.tabs.find(t => t.id === id);
+        if (newTab) {
+            newTab.nodes.forEach(n => {
+                this.nodes.push(n);
+                if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(n);
+            });
+            this.wires = newTab.wires;
+            if (window.History) {
+                History.stack = newTab.historyStack || [];
+                History.index = newTab.historyIndex !== undefined ? newTab.historyIndex : -1;
+                History.updateButtons();
+            }
+        }
+
+        this.updateTabsUI();
+        this.updateWireVisuals();
+        this.seedQueue(); this.processQueue();
+        this.autoSave();
+    },
+
+    uiCloseTab(id) {
+        if (this.tabs.length <= 1) return;
+        this.modal('Close Tab', 'Are you sure? Unsaved changes in this tab will be lost.', 'danger', (ok) => {
+            if (ok) {
+                const idx = this.tabs.findIndex(t => t.id === id);
+                this.tabs = this.tabs.filter(t => t.id !== id);
+                if (this.activeTabId === id) {
+                    this.uiSwitchTab(this.tabs[Math.max(0, idx - 1)].id);
+                } else {
+                    this.updateTabsUI();
+                    this.autoSave();
+                }
+            }
+        });
     },
 
     /**
