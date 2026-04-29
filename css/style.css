@@ -32,7 +32,7 @@ body, html {
 
 /* [AUDIT: v1.23.99 | SEC_ARCH_LEAD] - Upgraded shell structure for auto-collapsing navbars and workspace tabs. */
 nav {
-    min-height: 50px; flex-shrink: 0;
+    min-height: 55px; flex-shrink: 0;
     background: var(--panel); padding: 0 20px;
     display: flex; align-items: center; gap: 4px; flex-wrap: wrap;
     border-bottom: 1px solid var(--border); z-index: 1000; font-size: 12px;
