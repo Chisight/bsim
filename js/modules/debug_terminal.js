@@ -4,6 +4,7 @@
 const DebugTerminal = {
     verbosity: 2,
     visible: false,
+    cwd: '/home/bsim', // Virtual File System Root
     
     RECIPES: {
         'NOT': {
@@ -94,7 +95,8 @@ const DebugTerminal = {
         this.buildUI();
         this.attachHooks();
         this.overrideConsole();
-        console.log("[TERM] V8/WASM Debugger Initialized. Press Ctrl+P.");
+        // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Updated terminal hotkey to avoid native print dialog collisions.
+        console.log("[TERM] V8/WASM Debugger Initialized. Press Ctrl+Alt+P.");
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Debug terminal subsystem operational.
     },
 
@@ -121,6 +123,8 @@ const DebugTerminal = {
             .dt-warn { color: #ffaa00; }
             .dt-sys { color: #8888aa; }
             .dt-ok { color: #00ffaa; }
+            .dt-menu-item { padding: 6px 15px; color: #aaa; cursor: pointer; user-select: none; }
+            .dt-menu-item:hover { background: #252530; color: #fff; }
         `;
         document.head.appendChild(style);
     },
@@ -136,12 +140,12 @@ const DebugTerminal = {
         this.ui.id = 'dt-wrap';
         this.ui.innerHTML = `
             <div id="dt-head">
-                <div style="font-weight:bold; color:#888;">user@bsim: ~/workspace</div>
+                <div style="font-weight:bold; color:#888;">user@bsim: <span id="dt-header-cwd">/home/bsim</span></div>
                 <div><span id="dt-min" style="cursor:pointer; margin-right:8px;">_</span><span id="dt-close" style="cursor:pointer;">X</span></div>
             </div>
             <div id="dt-out"></div>
             <div id="dt-in-row">
-                <span id="dt-prompt">bsim:~$</span>
+                <span id="dt-prompt">bsim:<span id="dt-prompt-cwd">~</span>$</span>
                 <input id="dt-in" type="text" autocomplete="off" spellcheck="false" />
             </div>
         `;
@@ -189,6 +193,13 @@ const DebugTerminal = {
         };
 
         // Input Handle
+        // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Restore custom context menu for terminal clipboard actions.
+        this.ui.oncontextmenu = (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            this.showContextMenu(e.clientX, e.clientY);
+        };
+
         this.inp.onkeydown = (e) => {
             if (e.key === 'Enter') {
                 const cmd = this.inp.value.trim();
@@ -210,19 +221,169 @@ const DebugTerminal = {
      * @IO: AUTO_COMPLETE
      * @INTENT: Handle tab-completion for commands and node IDs, with visual workspace highlighting.
      */
+    // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Advanced Virtual File System path resolution.
+    resolvePath(target) {
+        let next = target.startsWith('/') ? target : (this.cwd.endsWith('/') ? this.cwd + target : this.cwd + '/' + target);
+        let parts = next.split('/').filter(p => p);
+        let res = [];
+        for (let p of parts) {
+            if (p === '..') res.pop();
+            else if (p !== '.') res.push(p);
+        }
+        return '/' + res.join('/');
+    },
+
+    isValidDir(path) {
+        if (['/', '/home', '/home/bsim', '/etc', '/etc/lib', '/etc/lib/primitives', '/etc/lib/custom'].includes(path)) return true;
+        if (path.startsWith('/etc/lib/custom/')) return true; // Assume virtual folders exist if chips are in them
+        const tMatch = path.match(/^\/home\/bsim\/(tab-\d+|[^/]+)(?:\/(editor))?$/);
+        if (tMatch) {
+            const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === tMatch[1] || t.id === tMatch[1]);
+            if (!tab) return false;
+            if (tMatch[2] === 'editor') return (Sim.activeTabId === tab.id && (!!Sim.activeEditingChip || !!Sim.activeSplitChip));
+            return true;
+        }
+        return false;
+    },
+
+    // [AUDIT: v1.24.01 | SEC_ARCH_LEAD] - VFS directory reader for tree traversal and path-based listing.
+    getVirtualDir(path) {
+        let dirs = [], files = [];
+        if (path === '/') dirs = ['home', 'etc'];
+        else if (path === '/home') dirs = ['bsim'];
+        else if (path === '/etc') dirs = ['lib'];
+        else if (path === '/etc/lib') dirs = ['primitives', 'custom'];
+        else if (path === '/home/bsim') {
+            Sim.tabs.forEach((t, i) => dirs.push(`tab-${i+1}`));
+        }
+        else if (path === '/etc/lib/primitives') {
+            files = ['NAND', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'CLOCK'].map(n => `[Gate] ${n}`);
+        }
+        else if (path.startsWith('/etc/lib/custom')) {
+            const searchDir = path.replace('/etc/lib/custom', '').replace(/^\//, '');
+            const subdirs = new Set();
+            Object.keys(Sim.library).forEach(name => {
+                const folder = Sim.library[name].folder || '';
+                if (folder === searchDir) files.push(`[Macro] ${name}`);
+                else if (folder.startsWith(searchDir ? searchDir + '/' : '')) {
+                    const sub = folder.substring(searchDir ? searchDir.length + 1 : 0).split('/')[0];
+                    if (sub) subdirs.add(sub);
+                }
+            });
+            dirs = Array.from(subdirs);
+        }
+        else if (path.startsWith('/home/bsim/')) {
+            const tMatch = path.match(/^\/home\/bsim\/(tab-\d+|[^/]+)(?:\/(editor))?$/);
+            if (tMatch) {
+                const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === tMatch[1] || t.id === tMatch[1]);
+                if (tab) {
+                    if (!tMatch[2]) {
+                        if (Sim.activeTabId === tab.id) {
+                            if (Sim.activeEditingChip && Sim.workspaceStack.length > 0) {
+                                dirs.push('editor');
+                                Sim.workspaceStack[0].nodes.forEach(n => files.push(`[${n.type}] ${n.id}`));
+                            } else if (!Sim.activeEditingChip && Sim.activeSplitChip) {
+                                dirs.push('editor');
+                                Sim.nodes.forEach(n => files.push(`[${n.type}] ${n.id}`));
+                            } else {
+                                Sim.nodes.forEach(n => files.push(`[${n.type}] ${n.id}`));
+                            }
+                        } else {
+                            tab.nodes.forEach(n => files.push(`[${n.type}] ${n.id}`));
+                        }
+                    } else {
+                        if (Sim.activeTabId === tab.id) {
+                            if (Sim.activeEditingChip) {
+                                Sim.nodes.forEach(n => files.push(`[${n.type}] ${n.id}`));
+                            } else if (Sim.activeSplitChip) {
+                                const sf = document.querySelector('#split-editor-frame iframe') || document.querySelector('#popup-editor-wrap iframe');
+                                if (sf && sf.contentWindow && sf.contentWindow.Sim) {
+                                    sf.contentWindow.Sim.nodes.forEach(n => files.push(`[${n.type}] ${n.id}`));
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+        return { dirs, files };
+    },
+
+    runTree(path, prefix = '') {
+        const contents = this.getVirtualDir(path);
+        const total = contents.dirs.length + contents.files.length;
+        let current = 0;
+        
+        contents.dirs.forEach(d => {
+            current++;
+            const isLast = current === total;
+            const pointer = isLast ? '└── ' : '├── ';
+            this.print(`${prefix.replace(/ /g, '&nbsp;')}${pointer}<span style="color:#0af; font-weight:bold;">${d}/</span>`, 'sys');
+            this.runTree(path === '/' ? `/${d}` : `${path}/${d}`, prefix + (isLast ? '    ' : '│   '));
+        });
+        
+        contents.files.forEach(f => {
+            current++;
+            const isLast = current === total;
+            const pointer = isLast ? '└── ' : '├── ';
+            this.print(`${prefix.replace(/ /g, '&nbsp;')}${pointer}<span style="color:#0f5;">${f}</span>`, 'ok');
+        });
+    },
+
+    getNodesForCwd() {
+        const tMatch = this.cwd.match(/^\/home\/bsim\/(tab-\d+|[^/]+)(?:\/(editor))?$/);
+        if (!tMatch) return [];
+        const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === tMatch[1] || t.id === tMatch[1]);
+        if (!tab) return [];
+        if (tMatch[2] === 'editor') {
+            if (Sim.activeTabId === tab.id) {
+                if (Sim.activeEditingChip) return Sim.nodes;
+                if (Sim.activeSplitChip) {
+                    const sf = document.querySelector('#split-editor-frame iframe') || document.querySelector('#popup-editor-wrap iframe');
+                    if (sf && sf.contentWindow && sf.contentWindow.Sim) return sf.contentWindow.Sim.nodes;
+                }
+            }
+        } else {
+            if (Sim.activeTabId === tab.id) {
+                if (Sim.activeEditingChip && Sim.workspaceStack.length > 0) return Sim.workspaceStack[0].nodes;
+                if (!Sim.activeEditingChip && Sim.activeSplitChip) return Sim.nodes;
+                return Sim.nodes;
+            }
+            return tab.nodes;
+        }
+        return [];
+    },
+
+    // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Context-aware autocomplete via VFS integration.
     handleTab() {
         const val = this.inp.value;
         if (!this._acState) {
             const parts = val.split(' ');
-            const isCmd = parts.length === 1;
+            const cmd = parts[0].toLowerCase();
             const prefix = parts[parts.length - 1].toLowerCase();
             let matches = [];
             
-            if (isCmd) {
-                const cmds = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace'];
+            if (parts.length === 1) {
+                const cmds = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv'];
                 matches = cmds.filter(c => c.startsWith(prefix));
+            } else if (cmd === 'cd' || cmd === 'ls' || cmd === 'tree') {
+                // [AUDIT: v1.24.01 | SEC_ARCH_LEAD] - Dynamic VFS path autocomplete.
+                let searchPath = prefix.includes('/') ? prefix.substring(0, prefix.lastIndexOf('/')) : '';
+                let searchPrefix = prefix.includes('/') ? prefix.substring(prefix.lastIndexOf('/') + 1) : prefix;
+                let targetDir = this.resolvePath(searchPath || '.');
+                
+                let opts = [];
+                const vfs = this.getVirtualDir(targetDir);
+                if (vfs) {
+                    opts = vfs.dirs.map(d => `${d}/`);
+                }
+                
+                matches = opts.filter(d => d.startsWith(searchPrefix)).map(d => (searchPath ? searchPath + '/' : '') + d);
             } else {
-                matches = Sim.nodes.map(n => n.id).filter(id => id.toLowerCase().startsWith(prefix));
+                const cNodes = this.getNodesForCwd();
+                matches = cNodes.map(n => n.id).filter(id => id.toLowerCase().startsWith(prefix));
+                const shortMatches = cNodes.map(n => n.id.replace('node-', '')).filter(id => id.toLowerCase().startsWith(prefix));
+                matches = [...new Set([...matches, ...shortMatches])];
             }
             
             if (matches.length === 0) return;
@@ -236,9 +397,44 @@ const DebugTerminal = {
         parts[parts.length - 1] = match;
         this.inp.value = parts.join(' ') + (this._acState.parts.length === 1 && this._acState.matches.length === 1 ? ' ' : '');
         
-        if (this._acState.parts.length > 1) {
-            this.highlightNode(match);
+        if (this._acState.parts.length > 1 && parts[0].toLowerCase() !== 'cd') {
+            const fullId = match.startsWith('node-') ? match : 'node-' + match;
+            this.highlightNode(fullId);
         }
+    },
+
+    // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Repaired object literal syntax and updated object references for clipboard context menu.
+    showContextMenu(x, y) {
+        let menu = document.getElementById('dt-ctx-menu');
+        if (!menu) {
+            menu = document.createElement('div');
+            menu.id = 'dt-ctx-menu';
+            menu.style.cssText = 'position:fixed; background:#1a1a23; border:1px solid #334; border-radius:6px; z-index:10000; padding:5px 0; box-shadow:0 10px 25px rgba(0,0,0,0.6); display:none; flex-direction:column; min-width:140px; font-family:"JetBrains Mono", monospace; font-size:12px;';
+            document.body.appendChild(menu);
+            document.addEventListener('click', () => menu.style.display = 'none');
+        }
+        menu.innerHTML = `
+            <div class="dt-menu-item" onclick="document.execCommand('copy')">Copy</div>
+            <div class="dt-menu-item" onclick="navigator.clipboard.readText().then(t => { document.getElementById('dt-in').value += t; document.getElementById('dt-in').focus(); })">Paste</div>
+            <div class="dt-menu-item" onclick="document.execCommand('cut')">Cut</div>
+            <div style="height:1px; background:#334; margin:4px 0;"></div>
+            <div class="dt-menu-item" onclick="window.open(window.location.href, '_blank')">New Tab</div>
+            <div class="dt-menu-item" onclick="DebugTerminal.saveContents()">Save Contents</div>
+            <div class="dt-menu-item" onclick="DebugTerminal.exec('clear')">Clear Terminal</div>
+        `;
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+        menu.style.display = 'flex';
+    },
+
+    saveContents() {
+        const text = this.out.innerText;
+        const blob = new Blob([text], {type: 'text/plain'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'bsim_terminal_log.txt';
+        a.click();
+        this.print("Terminal contents saved.", "ok");
     },
 
     highlightNode(id) {
@@ -257,7 +453,7 @@ const DebugTerminal = {
      */
     attachHooks() {
         window.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key.toLowerCase() === 'p') {
+            if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'p') {
                 e.preventDefault();
                 this.toggle(!this.visible);
             }
@@ -314,7 +510,11 @@ const DebugTerminal = {
         switch (c) {
             case 'help':
                 this.print("Commands: exit, clear, verbosity [0-3], synth [gate], trace [nodeId]");
-                this.print("  ls [-l]             - List workspace nodes (-l for verbose layout)");
+                this.print("  pwd                 - Print Working Directory (VFS)");
+                this.print("  cd <path>           - Change Directory (VFS)");
+                this.print("  mv <chip> <folder>  - Move chip to a library folder");
+                this.print("  ls [-l] [path]      - List workspace nodes or VFS contents");
+                this.print("  tree [path]         - Display directory structure recursively");
                 this.print("  spawn <type> [x y]  - Add a node (e.g., spawn NAND 100 100)");
                 this.print("  rm <id> [id2...]    - Delete nodes (or 'rm all')");
                 this.print("  set <nodeId> <val>  - Set input node value (e.g., set node-xyz 1)");
@@ -324,29 +524,177 @@ const DebugTerminal = {
                 this.print("  synth <gate>        - Hierarchically compiles logic from NANDs.");
                 this.print("  trace [nodeId]      - Output topological connections and logic states.");
                 break;
+            case 'pwd':
+                this.print(this.cwd, 'sys');
+                break;
+            case 'cd':
+                // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Safe boundary traversal for virtual file system.
+                let target = args[1];
+                if (!target || target === '~') target = '/home/bsim';
+                let nextPath = this.resolvePath(target);
+                
+                if (this.isValidDir(nextPath)) {
+                    this.cwd = nextPath;
+                } else {
+                    return this.print(`cd: no such file or directory: ${args[1]}`, "err");
+                }
+                
+                document.getElementById('dt-header-cwd').innerText = this.cwd;
+                let promptDir = this.cwd;
+                if (this.cwd.startsWith('/home/bsim')) {
+                    promptDir = this.cwd.replace('/home/bsim', '~');
+                }
+                if (promptDir === '') promptDir = '/';
+                document.getElementById('dt-prompt-cwd').innerText = promptDir;
+                break;
+            case 'mv':
+                if (args.length < 3) return this.print("Usage: mv <chip> <folder>", "err");
+                const targetChip = args[1];
+                let destFolder = args[2];
+                
+                if (destFolder.startsWith('/etc/lib/custom/')) destFolder = destFolder.replace('/etc/lib/custom/', '');
+                else if (destFolder === '/etc/lib/custom') destFolder = '';
+                
+                if (Sim.library[targetChip]) {
+                    Sim.library[targetChip].folder = destFolder;
+                    Sim.updateLibraryUI();
+                    Sim.autoSave();
+                    this.print(`Moved ${targetChip} to /etc/lib/custom/${destFolder}`, "ok");
+                } else {
+                    this.print(`Chip '${targetChip}' not found in library.`, "err");
+                }
+                break;
             case 'exit': this.toggle(false); break;
             case 'clear': this.out.innerHTML = ''; break;
             case 'verbosity':
                 if (args[1]) { this.verbosity = parseInt(args[1]); this.print(`Verbosity -> ${this.verbosity}`); }
                 break;
+            case 'tree':
+                let treePath = this.cwd;
+                const treeArg = args.find(a => a !== 'tree' && !a.startsWith('-'));
+                if (treeArg) {
+                    treePath = this.resolvePath(treeArg);
+                    if (!this.isValidDir(treePath)) return this.print(`tree: no such file or directory: ${treeArg}`, 'err');
+                }
+                this.print(`--- TREE: ${treePath} ---`, "warn");
+                this.runTree(treePath);
+                break;
             case 'ls':
                 const verbose = args.includes('-l') || args.includes('-v');
-                this.print(`--- NODE LIST (${Sim.nodes.length}) ---`, "warn");
+                let targetPath = this.cwd;
+                const pathArg = args.find(a => a !== 'ls' && !a.startsWith('-'));
+                if (pathArg) {
+                    targetPath = this.resolvePath(pathArg);
+                    if (!this.isValidDir(targetPath)) return this.print(`ls: no such file or directory: ${pathArg}`, 'err');
+                }
+                
+                if (targetPath === '/') {
+                    this.print(`[Dir] <span style="color:#0af; font-weight:bold;">home/</span>`, "ok");
+                    this.print(`[Dir] <span style="color:#0af; font-weight:bold;">etc/</span>`, "ok");
+                    return;
+                } else if (targetPath === '/home') {
+                    this.print(`[Dir] <span style="color:#0af; font-weight:bold;">bsim/</span>`, "ok");
+                    return;
+                } else if (targetPath === '/etc') {
+                    this.print(`[Dir] <span style="color:#0af; font-weight:bold;">lib/</span>`, "ok");
+                    return;
+                } else if (targetPath === '/etc/lib') {
+                    this.print(`[Dir] <span style="color:#0af; font-weight:bold;">primitives/</span>`, "ok");
+                    this.print(`[Dir] <span style="color:#0af; font-weight:bold;">custom/</span>`, "ok");
+                    return;
+                } else if (targetPath === '/etc/lib/primitives') {
+                    this.print(`--- MACRO LIBRARY: Primitives ---`, "warn");
+                    ['NAND', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'CLOCK'].forEach(p => {
+                        this.print(`[Gate] <span style="color:#0f5">${p}</span>`, "ok");
+                    });
+                    return;
+                } else if (targetPath.startsWith('/etc/lib/custom')) {
+                    const searchDir = targetPath.replace('/etc/lib/custom', '').replace(/^\//, '');
+                    this.print(`--- MACRO LIBRARY: Custom/${searchDir} ---`, "warn");
+                    let found = 0;
+                    const subdirs = new Set();
+                    Object.keys(Sim.library).forEach(name => {
+                        const folder = Sim.library[name].folder || '';
+                        if (folder === searchDir) {
+                            this.print(`[Macro] <span style="color:#0f5">${name}</span>`, "ok");
+                            found++;
+                        } else if (folder.startsWith(searchDir ? searchDir + '/' : '')) {
+                            const sub = folder.substring(searchDir ? searchDir.length + 1 : 0).split('/')[0];
+                            if (sub) subdirs.add(sub);
+                        }
+                    });
+                    subdirs.forEach(d => {
+                        this.print(`[Dir] <span style="color:#0af; font-weight:bold;">${d}/</span>`, "ok");
+                        found++;
+                    });
+                    if (found === 0) this.print("Directory empty.", "sys");
+                    return;
+                } else if (targetPath === '/home/bsim') {
+                    this.print(`--- WORKSPACES ---`, "warn");
+                    Sim.tabs.forEach((t, i) => {
+                        const alias = `tab-${i+1}`;
+                        const tag = t.id === Sim.activeTabId ? '<span style="color:#ffca28">*</span>' : ' ';
+                        this.print(`${tag} [Dir] <span style="color:#0af; font-weight:bold;">${alias}/</span> <span style="color:#667">(id: ${t.id}, name: ${t.name})</span>`, "ok");
+                    });
+                    return;
+                }
+
+                // Must be inside a tab workspace (/home/bsim/tab-X/...)
+                const tMatch = targetPath.match(/^\/home\/bsim\/(tab-\d+|[^/]+)(?:\/(editor))?$/);
+                if (!tMatch) return this.print("Invalid directory.", "err");
+
+                const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === tMatch[1] || t.id === tMatch[1]);
+                if (!tab) return this.print("Invalid workspace.", "err");
+
+                let nodesToList = [];
+                let showEditorDir = false;
+
+                if (!tMatch[2]) { // e.g. /home/bsim/tab-1
+                    if (Sim.activeTabId === tab.id) {
+                        if (Sim.activeEditingChip && Sim.workspaceStack.length > 0) {
+                            nodesToList = Sim.workspaceStack[0].nodes;
+                            showEditorDir = true;
+                        } else if (!Sim.activeEditingChip && Sim.activeSplitChip) {
+                            nodesToList = Sim.nodes;
+                            showEditorDir = true;
+                        } else {
+                            nodesToList = Sim.nodes;
+                        }
+                    } else {
+                        nodesToList = tab.nodes;
+                    }
+                } else { // e.g. /home/bsim/tab-1/editor
+                    if (Sim.activeTabId === tab.id) {
+                        if (Sim.activeEditingChip) {
+                            nodesToList = Sim.nodes;
+                        } else if (Sim.activeSplitChip) {
+                            const sf = document.querySelector('#split-editor-frame iframe') || document.querySelector('#popup-editor-wrap iframe');
+                            if (sf && sf.contentWindow && sf.contentWindow.Sim) nodesToList = sf.contentWindow.Sim.nodes;
+                        }
+                    }
+                }
+
+                this.print(`--- DIRECTORY: ${targetPath} ---`, "warn");
+                if (showEditorDir) {
+                    const cName = Sim.activeEditingChip || Sim.activeSplitChip;
+                    this.print(`[Dir] <span style="color:#ffca28; font-weight:bold;">editor/</span> <span style="color:#667">(${cName})</span>`, "ok");
+                }
+
                 if (verbose) {
-                    Sim.nodes.forEach(n => {
-                        const out = `[<span style="color:#0af">${n.id}</span>] ${n.type.padEnd(8)} @(${Math.round(n.x)},${Math.round(n.y)}) val:${JSON.stringify(n.val)}`;
-                        this.print(out, "ok");
+                    nodesToList.forEach(n => {
+                        const out = `[<span style="color:#0f5">${n.id}</span>] ${n.type.padEnd(8)} @(${Math.round(n.x)},${Math.round(n.y)}) val:${JSON.stringify(n.val)}`;
+                        this.print(out, "sys");
                     });
                 } else {
                     const groups = {};
-                    Sim.nodes.forEach(n => {
+                    nodesToList.forEach(n => {
                         if (!groups[n.type]) groups[n.type] = [];
                         groups[n.type].push(n.id);
                     });
                     for (const [type, ids] of Object.entries(groups)) {
                         const shortIds = ids.map(id => {
                             const short = id.replace('node-', '');
-                            return `<span style="color:#0af" title="${id}">${short}</span>`;
+                            return `<span style="color:#0f5" title="${id}">${short}</span>`;
                         }).join(', ');
                         this.print(`<b>${type.padEnd(8)}</b> (${ids.length}): ${shortIds}`, "sys");
                     }
@@ -517,4 +865,6 @@ const DebugTerminal = {
     }
 };
 
+window.DebugTerminal = DebugTerminal;
+Sim.dt = DebugTerminal;
 window.addEventListener('DOMContentLoaded', () => DebugTerminal.init());

@@ -8,6 +8,9 @@ const Sim = {
     library: {},
     workspaceStack: [],
     activeEditingChip: null,
+    activeSplitChip: null,
+    tabs: [{ id: 'tab-1', name: 'Main', nodes: [], wires: [], historyStack: [], historyIndex: -1 }],
+    activeTabId: 'tab-1',
     wireMap: new Map(),
     _netlistDirty: true, // [wasm] flag to indicate that the netlist needs to be recompiled
     showToasts: true,
@@ -82,6 +85,7 @@ const Sim = {
 
         View.init();
         this.loadAutoSave();
+        this.updateTabsUI();
         this.updateSidebar();
         this.updateHUD();
         this.updateLibraryUI();
@@ -263,10 +267,29 @@ const Sim = {
                     }
                 });
 
+                // [AUDIT: v1.23.99 | SEC_ARCH_LEAD] - Synchronize current active context into tab state before serialization.
+                const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+                if (activeTab && this.workspaceStack.length === 0) {
+                    activeTab.nodes = cNodes;
+                    activeTab.wires = cWires;
+                    if (window.History) {
+                        activeTab.historyStack = History.stack;
+                        activeTab.historyIndex = History.index;
+                    }
+                }
+
+                const safeTabs = this.tabs.map(t => ({
+                    id: t.id, name: t.name,
+                    nodes: (t.id === this.activeTabId && this.workspaceStack.length === 0) ? cNodes : (t.nodes || []).map(cleanNode).filter(n => n !== null),
+                    wires: (t.id === this.activeTabId && this.workspaceStack.length === 0) ? cWires : (t.wires || []).map(cleanWire).filter(w => w !== null),
+                    historyStack: t.historyStack || [], historyIndex: t.historyIndex !== undefined ? t.historyIndex : -1
+                }));
+
                 const project = { 
                     nodes: wsStack.length > 0 ? wsStack[0].nodes : cNodes, 
                     wires: wsStack.length > 0 ? wsStack[0].wires : cWires, 
                     library: safeLib, workspaceStack: wsStack, activeEditingChip: this.activeEditingChip,
+                    tabs: safeTabs, activeTabId: this.activeTabId,
                     // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - Append toast positioning to auto-save preferences payload.
                     prefs: { snapNodes: this.snapNodes, snapWires: this.snapWires, confirmDelete: this.confirmDelete, showStats: this.showStats, showTooltips: this.showTooltips, tutorialMode: this.tutorialMode, hudPos: this.hudPos, toastPos: this.toastPos } 
                 };
@@ -295,8 +318,28 @@ const Sim = {
                 this.workspaceStack = parsed.workspaceStack || [];
                 this.activeEditingChip = parsed.activeEditingChip || null;
                 
+                // [AUDIT: v1.23.99 | SEC_ARCH_LEAD] - Hydrate multi-tab states from persistence blob.
+                if (parsed.tabs && parsed.tabs.length > 0) {
+                    this.tabs = parsed.tabs;
+                    this.activeTabId = parsed.activeTabId || this.tabs[0].id;
+                } else {
+                    this.tabs = [{ id: 'tab-1', name: 'Main', nodes: parsed.nodes || [], wires: [], historyStack: [], historyIndex: -1 }];
+                    this.activeTabId = 'tab-1';
+                }
+                
                 let activeNodes = parsed.nodes;
                 let activeWires = parsed.wires;
+                
+                if (this.workspaceStack.length === 0) {
+                    const t = this.tabs.find(x => x.id === this.activeTabId);
+                    if (t) {
+                        activeNodes = t.nodes; activeWires = t.wires;
+                        if (window.History) {
+                            History.stack = t.historyStack || [];
+                            History.index = t.historyIndex !== undefined ? t.historyIndex : -1;
+                        }
+                    }
+                }
                 
                 // Restore Chip Editor context if we refreshed while editing
                 if (this.activeEditingChip && this.library[this.activeEditingChip]) {
@@ -1719,44 +1762,62 @@ const Sim = {
             lib.appendChild(span);
         });
 
-        // 4. Inject Custom Library Chips
+        // 4. Inject Custom Library Chips (Hierarchical VFS Rendering)
+        const groups = { '': [] };
         Object.keys(this.library).forEach(name => {
-            const span = document.createElement('span');
-            span.className = 'status-chip custom';
-            span.innerText = name;
+            const folder = this.library[name].folder || '';
+            if (!groups[folder]) groups[folder] = [];
+            groups[folder].push(name);
+        });
 
-            // Recursion Guard
-            if (name === this.activeEditingChip) {
-                span.style.opacity = '0.3';
-                span.title = 'Cannot place a chip inside itself';
-                span.onclick = () => this.toast('Cannot place a chip inside itself', 'warning');
-                span.ondblclick = () => this.toast('Already editing this chip', 'warning');
-            } else {
-                span.onclick = () => this.addNode(name);
-                span.ondblclick = () => { if (typeof this.uiEditChip === 'function') this.uiEditChip(name); };
+        // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Dynamic collapsible folder instantiation for macro library.
+        Object.keys(groups).sort().forEach(folder => {
+            let container = lib;
+            if (folder !== '') {
+                const fDiv = document.createElement('div');
+                fDiv.className = 'lib-folder';
+                fDiv.innerHTML = `<span class="folder-title" onclick="this.parentElement.classList.toggle('collapsed')">📁 ${folder}</span><div class="folder-contents"></div>`;
+                lib.appendChild(fDiv);
+                container = fDiv.querySelector('.folder-contents');
             }
 
-            span.oncontextmenu = (e) => {
-                e.preventDefault();
-                menu.style.display = 'block';
+            groups[folder].sort().forEach(name => {
+                const span = document.createElement('span');
+                span.className = 'status-chip custom';
+                span.innerText = name;
 
-                // Bounds checking to prevent off-screen clipping
-                const menuH = 120;
-                const menuW = 150;
-                let top = e.clientY;
-                let left = e.clientX;
+                if (name === this.activeEditingChip) {
+                    span.style.opacity = '0.3';
+                    span.title = 'Cannot place a chip inside itself';
+                    span.onclick = () => this.toast('Cannot place a chip inside itself', 'warning');
+                    span.ondblclick = () => this.toast('Already editing this chip', 'warning');
+                } else {
+                    span.onclick = () => this.addNode(name);
+                    span.ondblclick = () => { if (typeof this.uiEditChip === 'function') this.uiEditChip(name); };
+                }
 
-                if (top + menuH > window.innerHeight) top -= menuH;
-                if (left + menuW > window.innerWidth) left -= menuW;
+                span.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    menu.style.display = 'block';
 
-                menu.style.left = left + 'px';
-                menu.style.top = top + 'px';
+                    const menuH = 120;
+                    const menuW = 150;
+                    let top = e.clientY;
+                    let left = e.clientX;
 
-                menu.innerHTML = '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.uiEditChip(\'' + name + '\')">Edit Internals</div>' +
-                    '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.modal(\'Rename Chip\',\'New name:\',\'prompt\',nn=>{if(nn && !Sim.library[nn]){Sim.library[nn]=Sim.library[\'' + name + '\']; delete Sim.library[\'' + name + '\']; Sim.nodes.forEach(n=>{if(n.type===\'' + name + '\')n.type=nn;}); Sim.updateLibraryUI(); Sim.autoSave(); }},\'' + name + '\')">Rename</div>' +
-                    '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#ff4757; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#ff6b81\'" onmouseout="this.style.color=\'#ff4757\'" onclick="if(Sim.activeEditingChip===\'' + name + '\') Sim.uiExitChipEdit(); Sim.uiDeleteChip(\'' + name + '\')">Delete</div>';
-            };
-            lib.appendChild(span);
+                    if (top + menuH > window.innerHeight) top -= menuH;
+                    if (left + menuW > window.innerWidth) left -= menuW;
+
+                    menu.style.left = left + 'px';
+                    menu.style.top = top + 'px';
+
+                    menu.innerHTML = '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.uiEditChip(\'' + name + '\')">Edit Internals</div>' +
+                        '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.modal(\'Rename Chip\',\'New name:\',\'prompt\',nn=>{if(nn && !Sim.library[nn]){Sim.library[nn]=Sim.library[\'' + name + '\']; delete Sim.library[\'' + name + '\']; Sim.nodes.forEach(n=>{if(n.type===\'' + name + '\')n.type=nn;}); Sim.updateLibraryUI(); Sim.autoSave(); }},\'' + name + '\')">Rename</div>' +
+                        '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.modal(\'Move Chip\',\'New Folder Path:\',\'prompt\',f=>{if(f!==null){Sim.library[\'' + name + '\'].folder=f; Sim.updateLibraryUI(); Sim.autoSave(); }},\'' + (Sim.library[name].folder||'') + '\')">Move</div>' +
+                        '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#ff4757; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#ff6b81\'" onmouseout="this.style.color=\'#ff4757\'" onclick="if(Sim.activeEditingChip===\'' + name + '\') Sim.uiExitChipEdit(); Sim.uiDeleteChip(\'' + name + '\')">Delete</div>';
+                };
+                container.appendChild(span);
+            });
         });
     },
 
@@ -2048,6 +2109,90 @@ const Sim = {
     },
 
     /**
+     * [AUDIT: v1.23.99 | SEC_ARCH_LEAD] - Multi-tab context switching logic.
+     * @ARCH: WORKSPACE_MANAGER
+     * @STATE: CONTEXT_SWITCH
+     * @INTENT: Manage tab instances, synchronize active working memory to inactive tabs, and hydrate DOM states.
+     */
+    updateTabsUI() {
+        const tb = document.getElementById('tab-bar');
+        if (!tb) return;
+        let html = '';
+        this.tabs.forEach((t, i) => {
+            html += `<div class="tab ${t.id === this.activeTabId ? 'active' : ''}" onclick="Sim.uiSwitchTab('${t.id}')">
+                ${t.name}
+                ${this.tabs.length > 1 ? `<span class="tab-close" onclick="event.stopPropagation(); Sim.uiCloseTab('${t.id}')">✖</span>` : ''}
+            </div>`;
+        });
+        html += `<div class="tab-btn" onclick="Sim.uiNewTab()">+</div>`;
+        tb.innerHTML = html;
+    },
+
+    uiNewTab() {
+        if (this.activeEditingChip) return this.toast('Cannot create tabs while editing a chip.', 'warning');
+        const newId = 'tab-' + Math.random().toString(36).substr(2, 5);
+        this.tabs.push({ id: newId, name: `Board ${this.tabs.length + 1}`, nodes: [], wires: [], historyStack: [], historyIndex: -1 });
+        this.uiSwitchTab(newId);
+    },
+
+    uiSwitchTab(id) {
+        if (this.activeEditingChip) return this.toast('Exit chip editor before switching tabs.', 'warning');
+        if (this.activeTabId === id) return;
+
+        // 1. Save current state to old tab
+        const oldTab = this.tabs.find(t => t.id === this.activeTabId);
+        if (oldTab) {
+            oldTab.nodes = JSON.parse(JSON.stringify(this.nodes));
+            oldTab.wires = JSON.parse(JSON.stringify(this.wires));
+            if (window.History) {
+                oldTab.historyStack = History.stack;
+                oldTab.historyIndex = History.index;
+            }
+        }
+
+        // 2. Clear current workspace
+        this.nodes = []; this.wires = []; this.wireMap.clear();
+        document.getElementById('scene').innerHTML = '';
+
+        // 3. Load new state
+        this.activeTabId = id;
+        const newTab = this.tabs.find(t => t.id === id);
+        if (newTab) {
+            newTab.nodes.forEach(n => {
+                this.nodes.push(n);
+                if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(n);
+            });
+            this.wires = newTab.wires;
+            if (window.History) {
+                History.stack = newTab.historyStack || [];
+                History.index = newTab.historyIndex !== undefined ? newTab.historyIndex : -1;
+                History.updateButtons();
+            }
+        }
+
+        this.updateTabsUI();
+        this.updateWireVisuals();
+        this.seedQueue(); this.processQueue();
+        this.autoSave();
+    },
+
+    uiCloseTab(id) {
+        if (this.tabs.length <= 1) return;
+        this.modal('Close Tab', 'Are you sure? Unsaved changes in this tab will be lost.', 'danger', (ok) => {
+            if (ok) {
+                const idx = this.tabs.findIndex(t => t.id === id);
+                this.tabs = this.tabs.filter(t => t.id !== id);
+                if (this.activeTabId === id) {
+                    this.uiSwitchTab(this.tabs[Math.max(0, idx - 1)].id);
+                } else {
+                    this.updateTabsUI();
+                    this.autoSave();
+                }
+            }
+        });
+    },
+
+    /**
      * @ARCH: WORKSPACE_RESET
      * @IO: LOCAL_STORAGE_DELETE
      * @INTENT: Completely wipe the active workspace, library, and autosave to start a fresh project.
@@ -2077,20 +2222,28 @@ const Sim = {
      * @STATE: LIBRARY_PERSISTENCE
      * @INTENT: Snapshot the current workspace into a new custom chip definition and register it in the library.
      */
+    // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Hierarchical namespacing injection for macro library.
     uiSaveAsGate() {
-        this.modal('Save Custom Chip', 'Enter unique name for this logic:', 'prompt', (name) => {
-            if (name && name.trim()) {
-                const n = name.trim();
+        this.modal('Save Custom Chip', 'Enter name (e.g., FolderName/ChipName):', 'prompt', (input) => {
+            if (input && input.trim()) {
+                let n = input.trim();
+                let folder = '';
+                if (n.includes('/')) {
+                    const parts = n.split('/');
+                    n = parts.pop().trim();
+                    folder = parts.join('/').trim();
+                }
                 if (this.library[n]) {
                     this.toast('A chip with this name already exists!', 'warning');
                     return;
                 }
                 this.library[n] = {
+                    folder: folder,
                     nodes: JSON.parse(JSON.stringify(this.nodes)),
                     wires: JSON.parse(JSON.stringify(this.wires))
                 };
                 this.updateLibraryUI();
-                this.toast(`Chip "${n}" saved to library`, 'success');
+                this.toast(`Chip "${n}" saved to ${folder ? 'folder ' + folder : 'library'}`, 'success');
                 this.autoSave();
             }
         });
@@ -2552,6 +2705,84 @@ const Sim = {
      * @STATE: LIBRARY_SYNC
      * @INTENT: Save current chip logic to the library and return to the parent workspace context.
      */
+    // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Architecture augmentation for dual-pane editing layout with workspace clearing.
+    uiSplitEditor(direction) {
+        if (!this.activeEditingChip) return;
+        const targetChip = this.activeEditingChip;
+        const tab = document.querySelector(`.tab[onclick*="${this.activeTabId}"]`);
+        
+        let splitFrame = document.getElementById('split-editor-frame');
+        let popupWrap = document.getElementById('popup-editor-wrap');
+        
+        if (splitFrame) splitFrame.remove();
+        if (popupWrap) popupWrap.remove();
+        
+        const main = document.getElementById('main');
+        main.classList.remove('workspace-split', 'split-left', 'split-right');
+        
+        const chipUrl = `?chip=${encodeURIComponent(targetChip)}`;
+
+        if (direction === 'popup') {
+            popupWrap = document.createElement('div');
+            popupWrap.id = 'popup-editor-wrap';
+            popupWrap.style.cssText = 'position: fixed; top: 100px; left: 100px; width: 600px; height: 400px; background: rgba(10, 10, 15, 0.95); backdrop-filter: blur(8px); border: 1px solid #334; border-radius: 6px; display: flex; flex-direction: column; z-index: 9000; resize: both; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.8);';
+            
+            popupWrap.innerHTML = `
+                <div id="popup-editor-head" style="background: #111; padding: 6px 10px; color: #888; cursor: move; display: flex; justify-content: space-between; user-select: none; border-bottom: 1px solid #222; font-family: 'JetBrains Mono', monospace; font-size: 12px;">
+                    <div style="font-weight:bold; color:#ffca28;">CHIP EDITOR: ${targetChip}</div>
+                    <span onclick="document.getElementById('popup-editor-wrap').remove(); document.querySelector('.tab.has-split')?.classList.remove('has-split'); Sim.activeSplitChip = null;" style="cursor:pointer; font-weight:bold; color:#ff4757;">X</span>
+                </div>
+                <iframe src="${chipUrl}" style="flex:1; border:none; width:100%; height:100%; background:var(--bg);"></iframe>
+            `;
+            document.body.appendChild(popupWrap);
+            
+            let isDragging = false, startX, startY, initX, initY;
+            const head = popupWrap.querySelector('#popup-editor-head');
+            head.onmousedown = (e) => {
+                if (e.target.tagName === 'SPAN') return;
+                isDragging = true;
+                startX = e.clientX; startY = e.clientY;
+                const rect = popupWrap.getBoundingClientRect();
+                initX = rect.left; initY = rect.top;
+            };
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                popupWrap.style.left = (initX + (e.clientX - startX)) + 'px';
+                popupWrap.style.top = (initY + (e.clientY - startY)) + 'px';
+            });
+            document.addEventListener('mouseup', () => isDragging = false);
+
+            if (tab) tab.classList.add('has-split');
+            this.toast(`Popup editor spawned for ${targetChip}`, 'success');
+            
+        } else {
+            splitFrame = document.createElement('div');
+            splitFrame.id = 'split-editor-frame';
+            splitFrame.style.cssText = 'flex: 1; display: flex; flex-direction: column; border: none; background: var(--bg); min-width: 0; z-index: 10; position: relative;';
+            splitFrame.innerHTML = `
+                <div style="background: #111; padding: 6px 10px; color: #888; display: flex; justify-content: space-between; border-bottom: 1px solid #222; font-family: 'JetBrains Mono', monospace; font-size: 12px;">
+                    <div style="font-weight:bold; color:#ffca28;">CHIP EDITOR: ${targetChip}</div>
+                    <span onclick="document.getElementById('split-editor-frame').remove(); document.getElementById('main').classList.remove('workspace-split', 'split-left', 'split-right'); document.querySelector('.tab.has-split')?.classList.remove('has-split'); Sim.activeSplitChip = null;" style="cursor:pointer; font-weight:bold; color:#ff4757;">X</span>
+                </div>
+                <iframe src="${chipUrl}" style="flex:1; border:none; width:100%; height:100%; background:var(--bg);"></iframe>
+            `;
+            
+            main.classList.add('workspace-split');
+            if (direction === 'left') {
+                main.classList.add('split-left');
+                main.insertBefore(splitFrame, main.firstChild);
+            } else if (direction === 'right') {
+                main.classList.add('split-right');
+                main.appendChild(splitFrame);
+            }
+            if (tab) tab.classList.add('has-split');
+            this.toast(`Split pane activated: ${direction.toUpperCase()}`, 'info');
+        }
+        this.activeSplitChip = targetChip;
+        // Restore parent workspace in main view.
+        this.uiExitChipEdit();
+    },
+
     uiExitChipEdit() {
         if (this.workspaceStack.length === 0 || !this.activeEditingChip) return;
 

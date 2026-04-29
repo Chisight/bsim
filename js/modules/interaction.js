@@ -359,11 +359,30 @@ const InteractionHandler = {
             menu.style.left = e.clientX + 'px';
             menu.style.top = e.clientY + 'px';
 
-            // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - Context menu expanded with multi-bit I/O sub-menus, NAND primitive, and custom macro spawning.
+            // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Context menu upgraded to support dynamic hierarchical folders for custom macros.
             let customChipsHtml = '';
             const customChips = Object.keys(Sim.library);
             if (customChips.length > 0) {
-                let chipsList = customChips.map(c => `<div class="menu-item" onclick="Sim.addNode('${c}', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">${c}</div>`).join('');
+                const groups = { '': [] };
+                customChips.forEach(name => {
+                    const f = Sim.library[name].folder || '';
+                    if (!groups[f]) groups[f] = [];
+                    groups[f].push(name);
+                });
+                
+                let chipsList = '';
+                Object.keys(groups).sort().forEach(folder => {
+                    if (folder !== '') {
+                        chipsList += `<div class="menu-item has-sub" style="color:#aaa;">📁 ${folder}<div class="sub-menu">`;
+                    }
+                    groups[folder].forEach(c => {
+                        chipsList += `<div class="menu-item" onclick="Sim.addNode('${c}', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">${c}</div>`;
+                    });
+                    if (folder !== '') {
+                        chipsList += `</div></div>`;
+                    }
+                });
+
                 customChipsHtml = `
                     <div class="menu-item has-sub" style="color:#ffca28; font-weight:bold">
                         Spawn Custom
