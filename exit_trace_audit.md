@@ -1,22 +1,26 @@
-# Exit Trace Audit Log (v1.23.81)
+# Exit Trace Audit Log (v1.23.92)
 
 This document maps every logical exit point and function boundary instrumented with high-density `EXIT_TRACE` markers to isolate signal anomalies.
 
 ## 1. Simulation Kernel (`js/sim.js`)
 | Function | Line | Intent |
 | :--- | :--- | :--- |
-| `calculateNextState` | 457 | State calculated for node. |
-| `processQueue` | 514 | Early exit, simulation queue empty. |
-| `processQueue` | 680 | Wasm-accelerated simulation tick complete. |
-| `processQueue` | 769 | V8-based simulation tick complete. |
-| `runWasmParityCheck` | 782 | Diagnostics aborted, Wasm Engine not linked. |
-| `runWasmParityCheck` | 801 | Diagnostics aborted, mixed-mode netlist detected. |
-| `runWasmParityCheck` | 953 | Parity diagnostics suite finalized. |
-| `addNode` | 1118 | Node added to workspace. |
-| `updateNodeVisual` | 1257 | Node visual state synchronized. |
-| `getDrivingSignal` | 1422 | Driver resolution complete (Floating). |
-| `seedQueue` | 1436 | Queue seeded for full propagation sweep. |
-| `autoSave` | 273 | AutoSave operation finalized. |
+| `calculateNextState` | 458 | State calculated for node. |
+| `processQueue` | 530 | Early exit, simulation queue empty. |
+| `processQueue` | 696 | Wasm-accelerated simulation tick complete. |
+| `processQueue` | 785 | V8-based simulation tick complete. |
+| `runWasmParityCheck` | 798 | Diagnostics aborted, Wasm Engine not linked. |
+| `runWasmParityCheck` | 817 | Diagnostics aborted, mixed-mode netlist detected. |
+| `runWasmParityCheck` | 969 | Parity diagnostics suite finalized. |
+| `addNode` | 1134 | Node added to workspace. |
+| `updateNodeVisual` | 1312 | Node visual state synchronized. |
+| `getDrivingSignal` | 1479 | Driver resolution complete (Floating). |
+| `seedQueue` | 1493 | Queue seeded for full propagation sweep. |
+| `toast` | 1876 | Toast aborted, notifications disabled. |
+| `toast` | 1880 | Toast aborted, debug mode inactive. |
+| `toast` | 1950 | Toast notification lifecycle initiated. |
+| `uiSaveLayout.btn.onclick` | 2263 | Global layout mutation finalized and persisted. |
+| `autoSave` | 274 | AutoSave operation finalized. |
 
 ## 2. WebAssembly Bridge (`js/modules/wasm_bridge.js`)
 | Function | Line | Intent |
@@ -54,10 +58,10 @@ This document maps every logical exit point and function boundary instrumented w
 ## 4. UI Interaction (`js/modules/interaction.js`)
 | Function | Line | Intent |
 | :--- | :--- | :--- |
-| `onNodeMouseDown` | 15 | Drag aborted, port interaction detected. |
-| `onNodeContextMenu` | 23 | Context menu aborted, DOM target missing. |
-| `onNodeContextMenu` | 40 | Context menu displayed for node. |
-| `MoveCommand.execute` | 107 | Node translation finalized. |
+| `handleNodeDrag` | 18 | Drag aborted, port interaction detected. |
+| `handleNodeDrag` | 26 | Context menu aborted, DOM target missing. |
+| `handleNodeDrag` | 63 | Context menu displayed for node. |
+| `handleNodeDrag.onUp` | 130 | Node translation finalized. |
 
 ## 5. Persistence Layer (`js/modules/persistence.js`)
 | Function | Line | Intent |
@@ -91,7 +95,7 @@ This document maps every logical exit point and function boundary instrumented w
 ## 9. App Orchestration & Viewport (`js/app.js`, `js/view.js`)
 | Function | Line | Intent |
 | :--- | :--- | :--- |
-| `window.onload` | 51 | Application bootstrap sequence finalized. |
+| `window.onload` | 68 | Application bootstrap sequence finalized. |
 | `History.execute` | 16 | History execute sequence finalized. |
 | `History.undo` | 32 | History undo sequence finalized. |
 | `History.redo` | 46 | History redo sequence finalized. |

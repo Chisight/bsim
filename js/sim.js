@@ -1872,8 +1872,14 @@ const Sim = {
      * @INTENT: Display interactive, draggable toast notifications with persistent positioning.
      */
     toast(msg, type = 'info', duration = 3000) {
-        if (!this.showToasts) return;
-        if (type === 'debug' && !this.debugToasts) return;
+        if (!this.showToasts) {
+            // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - EXIT_TRACE: Toast aborted, notifications disabled.
+            return;
+        }
+        if (type === 'debug' && !this.debugToasts) {
+            // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - EXIT_TRACE: Toast aborted, debug mode inactive.
+            return;
+        }
 
         let el = document.getElementById('ui-toast-el');
         if (!el) {
@@ -1941,6 +1947,7 @@ const Sim = {
         if (duration > 0) {
             this._toastTimer = setTimeout(() => el.classList.remove('show'), duration);
         }
+        // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - EXIT_TRACE: Toast notification lifecycle initiated.
     },
 
     /**
@@ -2253,6 +2260,7 @@ const Sim = {
                 this.updateWireVisuals();
                 this.autoSave();
                 this.toast(`Global layout applied to all ${state.node.type} components.`, 'success');
+                // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - EXIT_TRACE: Global layout mutation finalized and persisted.
             };
             tEl.appendChild(btn);
         }
