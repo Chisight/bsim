@@ -246,7 +246,11 @@ const Sim = {
                     return {
                         id: n.id, type: n.type, x: n.x, y: n.y, label: n.label,
                         val: n.val, state: n.state, outputs: n.outputs, isCustom: n.isCustom,
-                        freq: n.freq, interval: n.interval, lastTick: n.lastTick, meta: n.meta
+                        freq: n.freq, interval: n.interval, lastTick: n.lastTick, meta: n.meta,
+                        customWidth: n.customWidth, customHeight: n.customHeight,
+                        pinX: n.pinX, pinY: n.pinY, pinW: n.pinW, pinH: n.pinH,
+                        infoX: n.infoX, infoY: n.infoY, infoW: n.infoW, infoH: n.infoH,
+                        _lastX: n._lastX, _lastY: n._lastY
                     };
                 };
                 const cleanWire = (w) => {
@@ -348,7 +352,7 @@ const Sim = {
                     if (t) {
                         activeNodes = t.nodes; activeWires = t.wires;
                         if (window.History) {
-                            History.stack = t.historyStack || [];
+                            History.stack = t.historyStack ? [...t.historyStack] : [];
                             History.index = t.historyIndex !== undefined ? t.historyIndex : -1;
                         }
                     }
@@ -366,11 +370,13 @@ const Sim = {
                     this.workspaceStack = [];
                 }
 
+                // [AUDIT: v1.24.07 | SEC_ARCH_LEAD] - Hydrate nodes securely to sever memory linkage with the VFS layout array.
                 if (Array.isArray(activeNodes)) {
                     activeNodes.forEach(n => { 
                         if (n && n.id) {
-                            this.nodes.push(n); 
-                            if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(n); 
+                            const cloned = JSON.parse(JSON.stringify(n));
+                            this.nodes.push(cloned); 
+                            if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(cloned); 
                         }
                     });
                 }
@@ -407,7 +413,7 @@ const Sim = {
                     });
                 }
 
-                this.wires = Array.isArray(activeWires) ? activeWires : [];
+                this.wires = Array.isArray(activeWires) ? JSON.parse(JSON.stringify(activeWires)) : [];
                 this.updateWireVisuals();
                 this.seedQueue();
                 this.processQueue();
@@ -1873,11 +1879,27 @@ const Sim = {
             return;
         }
         console.warn('[DEBUG] uiEditChip triggered for library chip:', name);
+        const cleanNode = (n) => JSON.parse(JSON.stringify({
+            id: n.id, type: n.type, x: n.x, y: n.y, label: n.label,
+            val: n.val, state: n.state, outputs: n.outputs, isCustom: n.isCustom,
+            freq: n.freq, interval: n.interval, lastTick: n.lastTick, meta: n.meta,
+            customWidth: n.customWidth, customHeight: n.customHeight,
+            pinX: n.pinX, pinY: n.pinY, pinW: n.pinW, pinH: n.pinH,
+            infoX: n.infoX, infoY: n.infoY, infoW: n.infoW, infoH: n.infoH,
+            _lastX: n._lastX, _lastY: n._lastY
+        }));
+        
+        const cleanWire = (w) => JSON.parse(JSON.stringify({
+            from: { nodeId: w.from.nodeId, portId: w.from.portId },
+            to: { nodeId: w.to.nodeId, portId: w.to.portId },
+            midX: w.midX, midY: w.midY, orthoDir: w.orthoDir
+        }));
+
         this.workspaceStack.push({
-            nodes: JSON.parse(JSON.stringify(this.nodes)),
-            wires: JSON.parse(JSON.stringify(this.wires)),
+            nodes: this.nodes.map(cleanNode),
+            wires: this.wires.map(cleanWire),
             wireMap: new Map(this.wireMap),
-            historyStack: window.History ? History.stack : [],
+            historyStack: window.History ? [...History.stack] : [],
             historyIndex: window.History ? History.index : -1
         });
 
@@ -2164,17 +2186,34 @@ const Sim = {
         this.uiSwitchTab(newId);
     },
 
+    // [AUDIT: v1.24.07 | SEC_ARCH_LEAD] - Isolated workspace state contexts to resolve tab bleeding and JSON circular reference crashes.
     uiSwitchTab(id) {
         if (this.activeEditingChip) return this.toast('Exit chip editor before switching tabs.', 'warning');
         if (this.activeTabId === id) return;
 
+        const cleanNode = (n) => JSON.parse(JSON.stringify({
+            id: n.id, type: n.type, x: n.x, y: n.y, label: n.label,
+            val: n.val, state: n.state, outputs: n.outputs, isCustom: n.isCustom,
+            freq: n.freq, interval: n.interval, lastTick: n.lastTick, meta: n.meta,
+            customWidth: n.customWidth, customHeight: n.customHeight,
+            pinX: n.pinX, pinY: n.pinY, pinW: n.pinW, pinH: n.pinH,
+            infoX: n.infoX, infoY: n.infoY, infoW: n.infoW, infoH: n.infoH,
+            _lastX: n._lastX, _lastY: n._lastY
+        }));
+        
+        const cleanWire = (w) => JSON.parse(JSON.stringify({
+            from: { nodeId: w.from.nodeId, portId: w.from.portId },
+            to: { nodeId: w.to.nodeId, portId: w.to.portId },
+            midX: w.midX, midY: w.midY, orthoDir: w.orthoDir
+        }));
+
         // 1. Save current state to old tab
         const oldTab = this.tabs.find(t => t.id === this.activeTabId);
         if (oldTab) {
-            oldTab.nodes = JSON.parse(JSON.stringify(this.nodes));
-            oldTab.wires = JSON.parse(JSON.stringify(this.wires));
+            oldTab.nodes = this.nodes.map(cleanNode);
+            oldTab.wires = this.wires.map(cleanWire);
             if (window.History) {
-                oldTab.historyStack = History.stack;
+                oldTab.historyStack = [...History.stack];
                 oldTab.historyIndex = History.index;
             }
         }
@@ -2187,13 +2226,14 @@ const Sim = {
         this.activeTabId = id;
         const newTab = this.tabs.find(t => t.id === id);
         if (newTab) {
-            newTab.nodes.forEach(n => {
-                this.nodes.push(n);
-                if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(n);
+            (newTab.nodes || []).forEach(n => {
+                const c = cleanNode(n);
+                this.nodes.push(c);
+                if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(c);
             });
-            this.wires = newTab.wires;
+            this.wires = (newTab.wires || []).map(cleanWire);
             if (window.History) {
-                History.stack = newTab.historyStack || [];
+                History.stack = newTab.historyStack ? [...newTab.historyStack] : [];
                 History.index = newTab.historyIndex !== undefined ? newTab.historyIndex : -1;
                 History.updateButtons();
             }
@@ -2266,10 +2306,25 @@ const Sim = {
                     this.toast('A chip with this name already exists!', 'warning');
                     return;
                 }
+                const cleanNode = (nd) => JSON.parse(JSON.stringify({
+                    id: nd.id, type: nd.type, x: nd.x, y: nd.y, label: nd.label,
+                    val: nd.val, state: nd.state, outputs: nd.outputs, isCustom: nd.isCustom,
+                    freq: nd.freq, interval: nd.interval, lastTick: nd.lastTick, meta: nd.meta,
+                    customWidth: nd.customWidth, customHeight: nd.customHeight,
+                    pinX: nd.pinX, pinY: nd.pinY, pinW: nd.pinW, pinH: nd.pinH,
+                    infoX: nd.infoX, infoY: nd.infoY, infoW: nd.infoW, infoH: nd.infoH,
+                    _lastX: nd._lastX, _lastY: nd._lastY
+                }));
+                const cleanWire = (w) => JSON.parse(JSON.stringify({
+                    from: { nodeId: w.from.nodeId, portId: w.from.portId },
+                    to: { nodeId: w.to.nodeId, portId: w.to.portId },
+                    midX: w.midX, midY: w.midY, orthoDir: w.orthoDir
+                }));
+
                 this.library[n] = {
                     folder: folder,
-                    nodes: JSON.parse(JSON.stringify(this.nodes)),
-                    wires: JSON.parse(JSON.stringify(this.wires))
+                    nodes: this.nodes.map(cleanNode),
+                    wires: this.wires.map(cleanWire)
                 };
                 this.updateLibraryUI();
                 this.toast(`Chip "${n}" saved to ${folder ? 'folder ' + folder : 'library'}`, 'success');
@@ -2815,9 +2870,25 @@ const Sim = {
     uiExitChipEdit() {
         if (this.workspaceStack.length === 0 || !this.activeEditingChip) return;
 
+        const cleanNode = (n) => JSON.parse(JSON.stringify({
+            id: n.id, type: n.type, x: n.x, y: n.y, label: n.label,
+            val: n.val, state: n.state, outputs: n.outputs, isCustom: n.isCustom,
+            freq: n.freq, interval: n.interval, lastTick: n.lastTick, meta: n.meta,
+            customWidth: n.customWidth, customHeight: n.customHeight,
+            pinX: n.pinX, pinY: n.pinY, pinW: n.pinW, pinH: n.pinH,
+            infoX: n.infoX, infoY: n.infoY, infoW: n.infoW, infoH: n.infoH,
+            _lastX: n._lastX, _lastY: n._lastY
+        }));
+        
+        const cleanWire = (w) => JSON.parse(JSON.stringify({
+            from: { nodeId: w.from.nodeId, portId: w.from.portId },
+            to: { nodeId: w.to.nodeId, portId: w.to.portId },
+            midX: w.midX, midY: w.midY, orthoDir: w.orthoDir
+        }));
+
         this.library[this.activeEditingChip] = {
-            nodes: JSON.parse(JSON.stringify(this.nodes)),
-            wires: JSON.parse(JSON.stringify(this.wires))
+            nodes: this.nodes.map(cleanNode),
+            wires: this.wires.map(cleanWire)
         };
 
         const parent = this.workspaceStack.pop();
