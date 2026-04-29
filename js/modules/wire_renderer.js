@@ -87,7 +87,8 @@ const WireRenderer = {
             this._pool[i].onmousedown = null;
         }
 
-        this._renderCrossingMasks(svg);
+        // [AUDIT: v1.24.13 | SEC_ARCH_LEAD] - Disabled geometric wire crossing masks per user preference.
+        // this._renderCrossingMasks(svg);
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: SVG wire layer update complete. Rendered ${Sim.wires.length} wires.
     },
 
