@@ -266,7 +266,11 @@ footer::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px
 .bit-dot:hover { transform: scale(1.2); border-color: #888; }
 
 /* [AUDIT: SEC_ARCH_LEAD] - Disable wiring logic visually and interactively during layout configuration */
+/* [AUDIT: SEC_ARCH_LEAD] - Deep interaction freeze during layout config */
 body.edit-mode-active .port { pointer-events: none; opacity: 0.2; }
+body.edit-mode-active .bit-dot { pointer-events: none; }
+body.edit-mode-active .visual-extra { pointer-events: none; opacity: 0.5; }
+body.edit-mode-active .gate-label { pointer-events: none; opacity: 0.5; }
 
 .pin-container { position: absolute; display: flex; flex-wrap: wrap; align-content: center; justify-content: center; min-width: 16px; min-height: 16px; gap: 2px; z-index: 10; }
 .pin-container.in { left: 8px; top: 50%; transform: translateY(-50%); }

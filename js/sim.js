@@ -1,6 +1,6 @@
 /**
- * Simulator Core v1.23.84 (Modular Professional)
- * REFINED: Relaxed pin indicator scaling constraints with dynamic snap-to-fit flexbox overflow resolution.
+ * Simulator Core v1.23.85 (Modular Professional)
+ * SECURED: Locked down node interaction and added border grab-zones for intuitive pin layout manipulation.
  */
 const Sim = {
     nodes: [],
@@ -1996,6 +1996,16 @@ const Sim = {
             target.style.outline = '2px dashed #ff00aa';
             target.style.cursor = 'move';
             target.style.transform = 'none'; // Release absolute centering lock for dragging
+            
+            // [AUDIT: SEC_ARCH_LEAD] - Dynamic cursor feedback for grab-zones.
+            this._editHover = (ev) => {
+                const rect = target.getBoundingClientRect();
+                const scale = View.scale || 1;
+                const hx = (ev.clientX - rect.left) / scale;
+                const hy = (ev.clientY - rect.top) / scale;
+                target.style.cursor = (hx > target.offsetWidth - 12 || hy > target.offsetHeight - 12) ? 'se-resize' : 'move';
+            };
+            target.addEventListener('mousemove', this._editHover);
         } else {
             el.style.cursor = 'se-resize';
         }
@@ -2004,6 +2014,13 @@ const Sim = {
             if (e.button !== 0) return;
             e.preventDefault();
             e.stopPropagation();
+            
+            // [AUDIT: SEC_ARCH_LEAD] - Contextual grab-zone detection for intuitive border-resizing vs center-dragging.
+            const rect = target.getBoundingClientRect();
+            const scale = View.scale || 1;
+            const clickX = (e.clientX - rect.left) / scale;
+            const clickY = (e.clientY - rect.top) / scale;
+            const isResizing = mode === 'pins' && (clickX > target.offsetWidth - 12 || clickY > target.offsetHeight - 12);
             
             const startX = e.clientX;
             const startY = e.clientY;
@@ -2026,9 +2043,10 @@ const Sim = {
                     el.style.height = node.customHeight + 'px';
                     Sim.updateWireVisuals();
                 } else if (mode === 'pins') {
-                    if (m.shiftKey) { 
+                    if (m.shiftKey || isResizing) { 
                         // [AUDIT: SEC_ARCH_LEAD] - Enforce rigid dimensional scaling clamps for inner indicator array.
                         // [AUDIT: SEC_ARCH_LEAD] - Unlocked lower bound clamps for free-form user scaling.
+                        // [AUDIT: SEC_ARCH_LEAD] - Integrated border grab-zone sizing parallel to shift-key modifier.
                         const maxW = startNodeW - startPinX;
                         const maxH = startNodeH - startPinY;
                         node.pinW = Math.max(4, Math.min(maxW, startPinW + dx));
@@ -2080,6 +2098,7 @@ const Sim = {
         
         if (target && this._editModeDown) {
             target.removeEventListener('mousedown', this._editModeDown);
+            if (this._editHover) target.removeEventListener('mousemove', this._editHover);
         }
         
         if (el) { el.style.outline = ''; el.style.cursor = ''; }
