@@ -11,8 +11,11 @@ const InteractionHandler = {
      */
     handleNodeDrag(e, node, div) {
         console.debug('[DEBUG] Node onmousedown triggered. Node ID:', node.id, '| Button pressed:', e.button);
+        // [AUDIT: SEC_ARCH_LEAD] - Prevent displacement of node topology when localized edit mode is active.
+        if (Sim.activeNodeEdit && Sim.activeNodeEdit.node.id === node.id) return;
+
         if (e.target.classList.contains('port')) {
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Drag aborted, port interaction detected.
+            // [AUDIT: SEC_ARCH_LEAD] - EXIT_TRACE: Drag aborted, port interaction detected.
             return;
         }
         

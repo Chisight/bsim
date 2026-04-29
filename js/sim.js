@@ -1,6 +1,6 @@
 /**
- * Simulator Core v1.23.81 (Modular Professional)
- * ENHANCED: Node Layout Preferences via bounded canvas-drag interpolation and global schema broadcast.
+ * Simulator Core v1.23.82 (Modular Professional)
+ * FIXED: Localized node edit drag interaction isolated from global netlist topological drags.
  */
 const Sim = {
     nodes: [],
@@ -1972,10 +1972,10 @@ const Sim = {
     },
 
     /**
-     * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for parametric node edit mode.
+     * [AUDIT: SEC_ARCH_LEAD] - Entry trace for parametric node edit mode.
      * @ARCH: UI_CONTROLLER
      * @STATE: LAYOUT_MUTATION
-     * @INTENT: Enable bounded spatial editing for internal pin indicators and node geometry.
+     * @INTENT: Enable bounded spatial editing for internal pin indicators and node geometry via click-drag isolation.
      */
     enterNodeEditMode(nodeId, mode) {
         const node = this.nodes.find(n => n.id === nodeId);
@@ -1984,7 +1984,6 @@ const Sim = {
         this.activeNodeEdit = { node, mode, og: { w: node.customWidth, h: node.customHeight, px: node.pinX, py: node.pinY, pw: node.pinW, ph: node.pinH } };
         
         el.style.outline = '2px dashed #00ffaa';
-        el.style.cursor = mode === 'pins' ? 'move' : 'se-resize';
         
         const pinCont = el.querySelector('.bit-dot')?.parentElement;
         const target = mode === 'pins' ? pinCont : el;
@@ -1995,50 +1994,77 @@ const Sim = {
             target.style.position = 'absolute';
             target.style.display = 'flex';
             target.style.flexWrap = 'wrap';
+            target.style.cursor = 'move';
+        } else {
+            el.style.cursor = 'se-resize';
         }
 
-        this._editModeMove = (e) => {
-            const sr = document.getElementById('scene').getBoundingClientRect();
-            const scale = View.scale || 1;
-            if (mode === 'icon') {
-                const nx = (e.clientX - sr.left) / scale;
-                const ny = (e.clientY - sr.top) / scale;
-                node.customWidth = Math.max(40, nx - node.x);
-                node.customHeight = Math.max(40, ny - node.y);
-                el.style.width = node.customWidth + 'px';
-                el.style.height = node.customHeight + 'px';
-                Sim.updateWireVisuals();
-            } else if (mode === 'pins') {
-                if (e.shiftKey) { 
-                    const nw = Math.max(10, (e.clientX - sr.left) / scale - node.x - (node.pinX || 0));
-                    const nh = Math.max(10, (e.clientY - sr.top) / scale - node.y - (node.pinY || 0));
-                    node.pinW = nw; node.pinH = nh;
-                    target.style.width = nw + 'px';
-                    target.style.height = nh + 'px';
-                } else { 
-                    const mx = (e.clientX - sr.left) / scale - node.x - (node.pinW || 20)/2;
-                    const my = (e.clientY - sr.top) / scale - node.y - (node.pinH || 20)/2;
-                    node.pinX = Math.max(0, Math.min((node.customWidth || 90) - 10, mx));
-                    node.pinY = Math.max(0, Math.min((node.customHeight || 90) - 10, my));
-                    target.style.left = node.pinX + 'px';
-                    target.style.top = node.pinY + 'px';
+        this._editModeDown = (e) => {
+            if (e.button !== 0) return;
+            e.preventDefault();
+            e.stopPropagation();
+            
+            const startX = e.clientX;
+            const startY = e.clientY;
+            const startPinX = node.pinX || 0;
+            const startPinY = node.pinY || 0;
+            const startPinW = node.pinW || target.offsetWidth;
+            const startPinH = node.pinH || target.offsetHeight;
+            const startNodeW = node.customWidth || parseInt(el.style.width) || 90;
+            const startNodeH = node.customHeight || parseInt(el.style.height) || 80;
+
+            const onMove = (m) => {
+                const scale = View.scale || 1;
+                const dx = (m.clientX - startX) / scale;
+                const dy = (m.clientY - startY) / scale;
+                
+                if (mode === 'icon') {
+                    node.customWidth = Math.max(40, startNodeW + dx);
+                    node.customHeight = Math.max(40, startNodeH + dy);
+                    el.style.width = node.customWidth + 'px';
+                    el.style.height = node.customHeight + 'px';
+                    Sim.updateWireVisuals();
+                } else if (mode === 'pins') {
+                    if (m.shiftKey) { 
+                        node.pinW = Math.max(10, startPinW + dx);
+                        node.pinH = Math.max(10, startPinH + dy);
+                        target.style.width = node.pinW + 'px';
+                        target.style.height = node.pinH + 'px';
+                    } else { 
+                        node.pinX = Math.max(0, Math.min((node.customWidth || parseInt(el.style.width) || 90) - (node.pinW || target.offsetWidth || 10), startPinX + dx));
+                        node.pinY = Math.max(0, Math.min((node.customHeight || parseInt(el.style.height) || 80) - (node.pinH || target.offsetHeight || 10), startPinY + dy));
+                        target.style.left = node.pinX + 'px';
+                        target.style.top = node.pinY + 'px';
+                    }
                 }
-            }
+            };
+            const onUp = () => {
+                document.removeEventListener('mousemove', onMove);
+                document.removeEventListener('mouseup', onUp);
+            };
+            document.addEventListener('mousemove', onMove);
+            document.addEventListener('mouseup', onUp);
         };
-        document.addEventListener('mousemove', this._editModeMove);
+        
+        target.addEventListener('mousedown', this._editModeDown);
         this.toast(`Edit Mode: ${mode === 'pins' ? 'Drag to move, Shift+Drag to resize' : 'Drag bottom-right to scale'}. Double-click board to save.`, 'info', 0);
     },
 
     exitNodeEditMode() {
         if (!this.activeNodeEdit) return;
-        document.removeEventListener('mousemove', this._editModeMove);
         const state = this.activeNodeEdit;
         this.activeNodeEdit = null;
         
         const el = document.getElementById(state.node.id);
-        if (el) { el.style.outline = ''; el.style.cursor = ''; }
         const pinCont = el?.querySelector('.bit-dot')?.parentElement;
-        if (pinCont) pinCont.style.outline = '';
+        const target = state.mode === 'pins' ? pinCont : el;
+        
+        if (target && this._editModeDown) {
+            target.removeEventListener('mousedown', this._editModeDown);
+        }
+        
+        if (el) { el.style.outline = ''; el.style.cursor = ''; }
+        if (pinCont) { pinCont.style.outline = ''; pinCont.style.cursor = ''; }
 
         History.execute({
             do: () => { Sim.updateWireVisuals(); },
