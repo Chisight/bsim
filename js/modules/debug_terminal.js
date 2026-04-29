@@ -584,23 +584,25 @@ const DebugTerminal = {
                 if (promptDir === '') promptDir = '/';
                 document.getElementById('dt-prompt-cwd').innerText = promptDir;
                 break;
-            case 'mv':
+            case 'mv': {
+                // [AUDIT: v1.24.05 | SEC_ARCH_LEAD] - Enforced block scope for case statement to resolve lexical declaration collisions.
                 if (args.length < 3) return this.print("Usage: mv <chip> <folder>", "err");
                 const targetChip = args[1];
-                let destFolder = args[2];
+                let mvFolder = args[2];
                 
-                if (destFolder.startsWith('/etc/lib/custom/')) destFolder = destFolder.replace('/etc/lib/custom/', '');
-                else if (destFolder === '/etc/lib/custom') destFolder = '';
+                if (mvFolder.startsWith('/etc/lib/custom/')) mvFolder = mvFolder.replace('/etc/lib/custom/', '');
+                else if (mvFolder === '/etc/lib/custom') mvFolder = '';
                 
                 if (Sim.library[targetChip]) {
-                    Sim.library[targetChip].folder = destFolder;
+                    Sim.library[targetChip].folder = mvFolder;
                     Sim.updateLibraryUI();
                     Sim.autoSave();
-                    this.print(`Moved ${targetChip} to /etc/lib/custom/${destFolder}`, "ok");
+                    this.print(`Moved ${targetChip} to /etc/lib/custom/${mvFolder}`, "ok");
                 } else {
                     this.print(`Chip '${targetChip}' not found in library.`, "err");
                 }
                 break;
+            }
             case 'exit': this.toggle(false); break;
             case 'clear': this.out.innerHTML = ''; break;
             case 'verbosity':
@@ -936,17 +938,19 @@ const DebugTerminal = {
                 if (!dNode) return this.print("Node/Macro not found.", "err");
                 this.print(`<pre style="margin:0; font-size:10px; line-height:1.2;">${JSON.stringify(dNode, null, 2)}</pre>`, "sys");
                 break;
-            case 'cp':
+            case 'cp': {
+                // [AUDIT: v1.24.05 | SEC_ARCH_LEAD] - Enforced block scope to prevent let/const hoisting conflicts across switch cases.
                 if (args.length < 3) return this.print("Usage: cp <src> <dest>", "err");
                 if (!Sim.library[args[1]]) return this.print(`Source ${args[1]} not found in library.`, "err");
                 if (Sim.library[args[2]]) return this.print(`Dest ${args[2]} already exists.`, "err");
                 Sim.library[args[2]] = JSON.parse(JSON.stringify(Sim.library[args[1]]));
-                let destFolder = this.cwd.startsWith('/etc/lib/custom') ? this.cwd.replace(/^\/etc\/lib\/custom\/?/, '') : '';
-                Sim.library[args[2]].folder = destFolder;
+                let cpFolder = this.cwd.startsWith('/etc/lib/custom') ? this.cwd.replace(/^\/etc\/lib\/custom\/?/, '') : '';
+                Sim.library[args[2]].folder = cpFolder;
                 Sim.updateLibraryUI();
                 Sim.autoSave();
                 this.print(`Copied ${args[1]} to ${args[2]}`, "ok");
                 break;
+            }
             case 'touch':
                 if (!args[1]) return this.print("Usage: touch <macroName>", "err");
                 if (Sim.library[args[1]]) return this.print(`Macro ${args[1]} already exists.`, "err");
