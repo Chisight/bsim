@@ -1,22 +1,24 @@
-# BrowserSim v1.23.64 - Modular Professional Logic Simulator
+# BrowserSim v1.23.91 - Modular Professional Logic Simulator
 
 BrowserSim is a high-performance, modular digital logic simulator built for the web. It allows users to design, simulate, and synthesize complex digital circuits using an atomic NAND-based foundation.
 
 ## 🚀 Key Features
 
 - **Hybrid Simulation Engine**: Utilizes a high-frequency WebAssembly (WASM) kernel for O(1) signal propagation in pure-native circuits, with a robust V8 object-graph fallback for mixed-mode simulation.
-- **MRAP Diagnostic Hardening**: (New in v1.23.64) Full codebase instrumentation with `@ARCH` architectural tags and high-density `EXIT_TRACE` markers for zero-trust state observability.
-- **Custom Chip Creation**: Design sub-circuits and encapsulate them into reusable library components.
+- **Parametric Layout Engine**: (New in v1.23.91) Hardened spatial mutator for custom chip icons, featuring 8-way proportional scaling, rigid boundary clamping, and independent coordinate translation for pins and data readouts.
+- **Inline Structural Editing**: Double-click multi-bit data readouts (Hex/Dec/Bin) to access an integrated structural editor for rapid value entry and validation.
+- **MRAP Diagnostic Hardening**: Full codebase instrumentation with `@ARCH` architectural tags and high-density `EXIT_TRACE` markers for zero-trust state observability and deterministic layout history.
+- **Custom Chip Creation**: Design sub-circuits and encapsulate them into reusable library components with customizable pinouts and visual interfaces.
 - **Advanced Diagnostics**: Built-in Parity Diagnostics suite and Wasm Linear Memory Mapping to ensure consistency between the WASM kernel and JavaScript execution.
 - **Logic Synthesis**: Integrated truth table generator and logic synthesizer to optimize and verify circuit behavior.
-- **Hardware Analysis**: Automated Bill of Materials (BOM) estimation for hardware implementations.
-- **Professional UX**: Features a responsive grid workspace, keyboard shortcuts (Undo/Redo, Delete), and a persistent auto-save layer.
+- **Professional UX**: Features a responsive grid workspace, global keyboard shortcuts (`Ctrl+Z`, `Ctrl+Y`, `Del`), and a deep interaction-lock system to prevent topological corruption during layout edits.
 
 ## 🛠 Technology Stack
 
 - **Core**: Vanilla JavaScript (ES6+)
 - **Simulation**: WebAssembly (WAT source compiled to binary)
-- **UI/UX**: HTML5, CSS3 (Custom Design System)
+- **UI/UX**: HTML5, CSS3 (Custom Design System with proportional hitboxes)
+- **State Management**: Structural Command Pattern for all netlist and layout mutations, ensuring 100% deterministic Undo/Redo.
 - **Persistence**: LocalStorage-based zero-trust auto-save & `.bsim` file export/import.
 
 ## 📁 Project Structure
@@ -29,14 +31,14 @@ modular-sim/
 ├── js/
 │   ├── app.js          # Main application initializer
 │   ├── sim.js          # Core simulation engine
-│   ├── history.js      # Undo/Redo command manager
+│   ├── history.js      # Undo/Redo command manager (Structural History)
 │   ├── view.js         # Workspace viewport and scaling logic
 │   ├── synthesizer.js  # Logic synthesis pipeline
 │   └── modules/
 │       ├── wasm_bridge.js   # Interface between JS and WASM
 │       ├── persistence.js   # Project export/import logic
 │       ├── node_renderer.js # Component rendering subsystem
-│       └── wire_renderer.js # High-performance SVG wire engine
+│       └── interaction.js   # Global event handler and interaction kernel
 └── wasm-core/          # Source files for the simulation kernel
 ```
 
@@ -44,8 +46,9 @@ modular-sim/
 
 1. **Add Components**: Select gates from the sidebar or footer to place them on the workspace.
 2. **Wire Nodes**: Click a port and drag to another port to create a connection.
-3. **Interact**: Double-click inputs to toggle state, or use the "New Chip" feature to build hierarchical designs.
-4. **Export**: Save your progress as a `.bsim` file for later use or export a PNG diagram of your circuit.
+3. **Customize Layout**: Right-click any node and select `Node Prefs` to resize icons, relocate pins, or adjust readout positions. Double-click the workspace to save your changes.
+4. **Interact**: Double-click data readouts to edit multi-bit values inline, or toggle single-bit inputs with a single click.
+5. **Export**: Save your progress as a `.bsim` file for later use or export a PNG diagram of your circuit.
 
 ## 🔬 Diagnostics
 
