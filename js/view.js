@@ -10,7 +10,7 @@ const View = {
     zoomLevels: [0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
 
     /**
-     * [AUDIT: v1.23.77 | SEC_ARCH_LEAD] - Entry trace for viewport controller initialization.
+     * [AUDIT: v1.23.78 | SEC_ARCH_LEAD] - Entry trace for viewport controller initialization.
      * @ARCH: VIEWPORT_INITIALIZATION
      * @IO: MOUSE_EVENT_LISTENERS
      * @INTENT: Initialize global event listeners for workspace panning and mouse-wheel zooming.
@@ -68,11 +68,11 @@ const View = {
             
             this.apply();
         }, { passive: false });
-        // [AUDIT: v1.23.77 | SEC_ARCH_LEAD] - EXIT_TRACE: Viewport event listeners operational.
+        // [AUDIT: v1.23.78 | SEC_ARCH_LEAD] - EXIT_TRACE: Viewport event listeners operational.
     },
 
     /**
-     * [AUDIT: v1.23.77 | SEC_ARCH_LEAD] - Entry trace for viewport matrix synchronization.
+     * [AUDIT: v1.23.78 | SEC_ARCH_LEAD] - Entry trace for viewport matrix synchronization.
      * @IO: CSS_TRANSFORM_SYNC
      * @STATE: VIEWPORT_MATRIX
      * @INTENT: Synchronize the DOM and SVG layers with the current internal pan/zoom transformation matrix.
@@ -85,7 +85,7 @@ const View = {
         document.getElementById('grid-layer').style.backgroundSize = `${gs}px ${gs}px`;
         // Force wire recalculation on view matrix change
         if (window.Sim) Sim.updateWireVisuals();
-        // [AUDIT: v1.23.77 | SEC_ARCH_LEAD] - EXIT_TRACE: Viewport transformation applied to DOM/SVG.
+        // [AUDIT: v1.23.78 | SEC_ARCH_LEAD] - EXIT_TRACE: Viewport transformation applied to DOM/SVG.
     }
 };
 
