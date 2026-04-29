@@ -1,6 +1,6 @@
 /**
- * Simulator Core v1.23.85 (Modular Professional)
- * SECURED: Locked down node interaction and added border grab-zones for intuitive pin layout manipulation.
+ * Simulator Core v1.23.86 (Modular Professional)
+ * FIXED: Bidirectional pin-container scaling and center-drag translation priority.
  */
 const Sim = {
     nodes: [],
@@ -2015,12 +2015,15 @@ const Sim = {
             e.preventDefault();
             e.stopPropagation();
             
-            // [AUDIT: SEC_ARCH_LEAD] - Contextual grab-zone detection for intuitive border-resizing vs center-dragging.
+            // [AUDIT: SEC_ARCH_LEAD] - Enhanced grab-zone logic: scale from edges, move from center.
             const rect = target.getBoundingClientRect();
             const scale = View.scale || 1;
             const clickX = (e.clientX - rect.left) / scale;
             const clickY = (e.clientY - rect.top) / scale;
-            const isResizing = mode === 'pins' && (clickX > target.offsetWidth - 12 || clickY > target.offsetHeight - 12);
+            
+            // Define zones: Scale if clicking outer 15% of the boundary
+            const threshold = 12;
+            const isResizing = mode === 'pins' && (clickX > target.offsetWidth - threshold || clickY > target.offsetHeight - threshold || clickX < threshold || clickY < threshold);
             
             const startX = e.clientX;
             const startY = e.clientY;
@@ -2043,18 +2046,34 @@ const Sim = {
                     el.style.height = node.customHeight + 'px';
                     Sim.updateWireVisuals();
                 } else if (mode === 'pins') {
-                    if (m.shiftKey || isResizing) { 
-                        // [AUDIT: SEC_ARCH_LEAD] - Enforce rigid dimensional scaling clamps for inner indicator array.
-                        // [AUDIT: SEC_ARCH_LEAD] - Unlocked lower bound clamps for free-form user scaling.
-                        // [AUDIT: SEC_ARCH_LEAD] - Integrated border grab-zone sizing parallel to shift-key modifier.
-                        const maxW = startNodeW - startPinX;
-                        const maxH = startNodeH - startPinY;
-                        node.pinW = Math.max(4, Math.min(maxW, startPinW + dx));
-                        node.pinH = Math.max(4, Math.min(maxH, startPinH + dy));
+                    if (isResizing || m.shiftKey) { 
+                        // [AUDIT: SEC_ARCH_LEAD] - Bidirectional scaling logic.
+                        if (clickX < threshold) { // Scale Left
+                            const newW = Math.max(16, startPinW - dx);
+                            if (newW !== startPinW) {
+                                node.pinX = Math.max(0, startPinX + (startPinW - newW));
+                                node.pinW = newW;
+                            }
+                        } else { // Scale Right
+                            node.pinW = Math.max(16, Math.min(startNodeW - node.pinX, startPinW + dx));
+                        }
+
+                        if (clickY < threshold) { // Scale Up
+                            const newH = Math.max(16, startPinH - dy);
+                            if (newH !== startPinH) {
+                                node.pinY = Math.max(0, startPinY + (startPinH - newH));
+                                node.pinH = newH;
+                            }
+                        } else { // Scale Down
+                            node.pinH = Math.max(16, Math.min(startNodeH - node.pinY, startPinH + dy));
+                        }
+                        
                         target.style.width = node.pinW + 'px';
                         target.style.height = node.pinH + 'px';
+                        target.style.left = node.pinX + 'px';
+                        target.style.top = node.pinY + 'px';
                     } else { 
-                        // [AUDIT: SEC_ARCH_LEAD] - Constrain inner indicator translation to strictly within host bounds.
+                        // Move from Center
                         const maxW = startNodeW - (node.pinW || target.offsetWidth || 16);
                         const maxH = startNodeH - (node.pinH || target.offsetHeight || 16);
                         node.pinX = Math.max(0, Math.min(maxW, startPinX + dx));
