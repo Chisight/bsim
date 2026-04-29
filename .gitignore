@@ -33,3 +33,10 @@ Thumbs.db
 modular_sim_audit_scratchpad.md
 .env
 .env.local
+
+# Agent Configuration
+.agents/
+
+# Audit Logs and Markdown
+*.md
+!README.md
