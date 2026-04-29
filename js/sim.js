@@ -2683,24 +2683,67 @@ const Sim = {
         if (!this.activeEditingChip) return;
         const tab = document.querySelector(`.tab[onclick*="${this.activeTabId}"]`);
         
-        if (direction === 'popup') {
-            this.toast(`Popup editor spawned for ${this.activeEditingChip}`, 'success');
-            window.open(`?chip=${encodeURIComponent(this.activeEditingChip)}`, '_blank', 'width=800,height=600');
-            if (tab) tab.classList.remove('has-split');
-            return;
-        }
+        let splitFrame = document.getElementById('split-editor-frame');
+        let popupWrap = document.getElementById('popup-editor-wrap');
+        
+        if (splitFrame) splitFrame.remove();
+        if (popupWrap) popupWrap.remove();
         
         const main = document.getElementById('main');
-        if (direction === 'left') {
-            main.classList.add('workspace-split', 'split-left');
-            main.classList.remove('split-right');
-        } else if (direction === 'right') {
-            main.classList.add('workspace-split', 'split-right');
-            main.classList.remove('split-left');
-        }
+        main.classList.remove('workspace-split', 'split-left', 'split-right');
         
-        if (tab) tab.classList.add('has-split');
-        this.toast(`Split pane activated: ${direction.toUpperCase()}`, 'info');
+        const chipUrl = `?chip=${encodeURIComponent(this.activeEditingChip)}`;
+
+        if (direction === 'popup') {
+            popupWrap = document.createElement('div');
+            popupWrap.id = 'popup-editor-wrap';
+            popupWrap.style.cssText = 'position: fixed; top: 100px; left: 100px; width: 600px; height: 400px; background: rgba(10, 10, 15, 0.95); backdrop-filter: blur(8px); border: 1px solid #334; border-radius: 6px; display: flex; flex-direction: column; z-index: 9000; resize: both; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.8);';
+            
+            popupWrap.innerHTML = `
+                <div id="popup-editor-head" style="background: #111; padding: 6px 10px; color: #888; cursor: move; display: flex; justify-content: space-between; user-select: none; border-bottom: 1px solid #222; font-family: 'JetBrains Mono', monospace; font-size: 12px;">
+                    <div style="font-weight:bold; color:#ffca28;">CHIP EDITOR: ${this.activeEditingChip}</div>
+                    <span onclick="document.getElementById('popup-editor-wrap').remove(); document.querySelector('.tab.has-split')?.classList.remove('has-split');" style="cursor:pointer; font-weight:bold; color:#ff4757;">X</span>
+                </div>
+                <iframe src="${chipUrl}" style="flex:1; border:none; width:100%; height:100%; background:var(--bg);"></iframe>
+            `;
+            document.body.appendChild(popupWrap);
+            
+            let isDragging = false, startX, startY, initX, initY;
+            const head = popupWrap.querySelector('#popup-editor-head');
+            head.onmousedown = (e) => {
+                if (e.target.tagName === 'SPAN') return;
+                isDragging = true;
+                startX = e.clientX; startY = e.clientY;
+                const rect = popupWrap.getBoundingClientRect();
+                initX = rect.left; initY = rect.top;
+            };
+            document.addEventListener('mousemove', (e) => {
+                if (!isDragging) return;
+                popupWrap.style.left = (initX + (e.clientX - startX)) + 'px';
+                popupWrap.style.top = (initY + (e.clientY - startY)) + 'px';
+            });
+            document.addEventListener('mouseup', () => isDragging = false);
+
+            if (tab) tab.classList.add('has-split');
+            this.toast(`Popup editor spawned for ${this.activeEditingChip}`, 'success');
+            
+        } else {
+            splitFrame = document.createElement('iframe');
+            splitFrame.id = 'split-editor-frame';
+            splitFrame.src = chipUrl;
+            splitFrame.style.cssText = 'flex: 1; border: none; background: var(--bg); min-width: 0;';
+            
+            main.classList.add('workspace-split');
+            if (direction === 'left') {
+                main.classList.add('split-left');
+                main.insertBefore(splitFrame, main.firstChild);
+            } else if (direction === 'right') {
+                main.classList.add('split-right');
+                main.appendChild(splitFrame);
+            }
+            if (tab) tab.classList.add('has-split');
+            this.toast(`Split pane activated: ${direction.toUpperCase()}`, 'info');
+        }
     },
 
     uiExitChipEdit() {

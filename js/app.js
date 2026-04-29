@@ -14,6 +14,21 @@ window.onload = () => {
         document.getElementById('workspace').appendChild(mq);
     }
 
+    // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Handle chip deep-linking for split pane iframes.
+    const urlParams = new URLSearchParams(window.location.search);
+    if (urlParams.has('chip')) {
+        setTimeout(() => {
+            const targetChip = urlParams.get('chip');
+            if (Sim.library && Sim.library[targetChip]) {
+                Sim.uiEditChip(targetChip);
+                ['top-nav', 'bottom-nav', 'tab-bar', 'top-reveal', 'bottom-reveal'].forEach(id => {
+                    const el = document.getElementById(id);
+                    if (el) el.style.display = 'none';
+                });
+            }
+        }, 150);
+    }
+
     // [AUDIT: v1.23.99 | SEC_ARCH_LEAD] - Injected edge-detection telemetry for auto-hiding navigation shells.
     let hoverTopTimer, hoverBotTimer;
     document.addEventListener('mousemove', (e) => {
