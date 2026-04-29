@@ -33,13 +33,30 @@ window.onload = () => {
     window.onerror = (msg, url, line) => {
         console.error(`[ModularSim Error] ${msg} at ${url}:${line}`);
     };
+
+    // [AUDIT: SEC_ARCH_LEAD] - Global keyboard shortcut bindings for state history traversal.
+    window.addEventListener('keydown', (e) => {
+        // Prevent interfering with modal inputs or text fields
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        
+        if (e.ctrlKey || e.metaKey) {
+            if (e.key.toLowerCase() === 'z') {
+                if (e.shiftKey) History.redo();
+                else History.undo();
+                e.preventDefault();
+            } else if (e.key.toLowerCase() === 'y') {
+                History.redo();
+                e.preventDefault();
+            }
+        }
+    });
     
     /**
      * @STATE: BSIM_METADATA
      * @INTENT: Define the application semantic versioning for runtime compatibility checks.
      */
-    // [AUDIT: SEC_ARCH_LEAD] - Semantic version increment following proportional layout hitboxes and global event lock.
-    window.LOADED_BSIM_VERSION = "1.23.88";
+    // [AUDIT: SEC_ARCH_LEAD] - Semantic version increment following structural history commands and global keybinds.
+    window.LOADED_BSIM_VERSION = "1.23.89";
     console.log(`BrowserSim v${window.LOADED_BSIM_VERSION} Modular Professional Initialized.`);
     
     if (window.EXPECTED_BSIM_VERSION && window.EXPECTED_BSIM_VERSION !== window.LOADED_BSIM_VERSION) {

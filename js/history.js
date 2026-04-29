@@ -251,6 +251,35 @@ window.AddNodeCommand = AddNodeCommand;
 window.DeleteNodeCommand = DeleteNodeCommand;
 window.AddWireCommand = AddWireCommand;
 window.DeleteWireCommand = DeleteWireCommand;
+/**
+ * [AUDIT: SEC_ARCH_LEAD] - Layout mutation structural command for deterministic undo/redo stack.
+ * @ARCH: COMMAND_PATTERN
+ * @STATE: NETLIST_STATE
+ * @INTENT: Encapsulate layout preference mutations to preserve geometric history.
+ */
+class MutateLayoutCommand {
+    constructor(node, og, nw) {
+        this.node = node;
+        this.og = og;
+        this.nw = nw;
+    }
+    do() {
+        this.node.customWidth = this.nw.w; this.node.customHeight = this.nw.h;
+        this.node.pinX = this.nw.px; this.node.pinY = this.nw.py;
+        this.node.pinW = this.nw.pw; this.node.pinH = this.nw.ph;
+        Sim.updateNodeVisual(this.node);
+        Sim.updateWireVisuals();
+    }
+    undo() {
+        this.node.customWidth = this.og.w; this.node.customHeight = this.og.h;
+        this.node.pinX = this.og.px; this.node.pinY = this.og.py;
+        this.node.pinW = this.og.pw; this.node.pinH = this.og.ph;
+        Sim.updateNodeVisual(this.node);
+        Sim.updateWireVisuals();
+    }
+}
+
 window.MoveNodeCommand = MoveNodeCommand;
 window.PasteCommand = PasteCommand;
+window.MutateLayoutCommand = MutateLayoutCommand;
 window.History = History;

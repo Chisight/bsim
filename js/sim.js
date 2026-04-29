@@ -2144,15 +2144,14 @@ const Sim = {
         if (el) { el.style.outline = ''; el.style.cursor = ''; }
         if (pinCont) { pinCont.classList.remove('editing-pins'); pinCont.style.outline = ''; pinCont.style.cursor = ''; }
 
-        History.execute({
-            do: () => { Sim.updateWireVisuals(); },
-            undo: () => { 
-                state.node.customWidth = state.og.w; state.node.customHeight = state.og.h;
-                state.node.pinX = state.og.px; state.node.pinY = state.og.py;
-                state.node.pinW = state.og.pw; state.node.pinH = state.og.ph;
-                Sim.updateNodeVisual(state.node); Sim.updateWireVisuals(); 
-            }
-        });
+        const nw = { w: state.node.customWidth, h: state.node.customHeight, px: state.node.pinX, py: state.node.pinY, pw: state.node.pinW, ph: state.node.pinH };
+        if (nw.w !== state.og.w || nw.h !== state.og.h || nw.px !== state.og.px || nw.py !== state.og.py || nw.pw !== state.og.pw || nw.ph !== state.og.ph) {
+            // [AUDIT: SEC_ARCH_LEAD] - Delegated layout state modifications to structured history command.
+            History.execute(new MutateLayoutCommand(state.node, state.og, nw));
+        } else {
+            Sim.updateNodeVisual(state.node);
+            Sim.updateWireVisuals();
+        }
         
         this.toast('Layout saved. ', 'success', 5000);
         const tEl = document.getElementById('ui-toast-el');
