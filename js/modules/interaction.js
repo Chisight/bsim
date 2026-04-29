@@ -35,7 +35,7 @@ const InteractionHandler = {
             // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Node Prefs extension: spatial edit mode for I/O bounds and internal pin layout arrays.
             // [AUDIT: v1.24.15 | SEC_ARCH_LEAD] - Fixed string interpolation collision and enforced DOM recalculation for I/O labels.
             const isNative = !node.isCustom;
-            const renameAction = `onclick="const n=Sim.nodes.find(x=>x.id==='${node.id}'); Sim.modal('Rename Component','Label:','prompt',v=>{if(v!==null){n.label=v.trim(); const el=document.getElementById('${node.id}'); const l=el?.querySelector('.gate-label'); if(l)l.innerText=n.label; if(n.type.startsWith('IN-')||n.type.startsWith('OUT-')||n.type.startsWith('PROBE-')){if(typeof NodeRenderer!=='undefined')NodeRenderer.renderNode(n); Sim.updateWireVisuals();} Sim.autoSave();}}, n.label || ''); document.getElementById('context-menu').style.display='none';"`;
+            const renameAction = `onclick="InteractionHandler.handleNodeDblClick(new Event('dblclick'), Sim.nodes.find(n=>n.id==='${node.id}'), document.getElementById('${node.id}')); document.getElementById('context-menu').style.display='none';"`;
             const editAction = isNative ? '' : `onclick="Sim.uiEditChip('${node.type}'); document.getElementById('context-menu').style.display='none';"`;
             const geomAction = isNative ? '' : `onclick="Sim.uiScaleChip('${node.type}'); document.getElementById('context-menu').style.display='none';"`;
             
@@ -202,19 +202,45 @@ const InteractionHandler = {
         } else if (node.type.startsWith('IN-') && node.type !== 'IN-1') {
             Sim.uiEnterValue(node.id);
         } else if (node.type !== 'JUNCTION') {
-            Sim.modal('Rename Component', 'Label:', 'prompt', (v) => {
-                // [AUDIT: v1.24.15 | SEC_ARCH_LEAD] - Permitted empty string assignment to clear component labels.
-                if (v !== null) {
-                    node.label = v.trim();
-                    const lbl = div.querySelector('.gate-label');
-                    if (lbl) lbl.innerText = node.label;
-                    if (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
-                        if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(node);
-                        Sim.updateWireVisuals();
-                    }
-                    Sim.autoSave();
+            // [AUDIT: v1.24.24 | SEC_ARCH_LEAD] - Replaced modal prompt with inline DOM input injection for component relabeling.
+            const lbl = div.querySelector('.gate-label');
+            if (!lbl || lbl.querySelector('input')) return;
+
+            const ogText = node.label || '';
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = ogText;
+            input.style.cssText = 'width: 100%; height: 100%; box-sizing: border-box; background: #222; color: #fff; border: 1px solid #00ffaa; font-family: "JetBrains Mono", monospace; font-size: inherit; text-align: center; outline: none; border-radius: 2px; pointer-events: auto;';
+
+            lbl.innerText = '';
+            lbl.appendChild(input);
+            lbl.style.pointerEvents = 'auto';
+
+            const commit = () => {
+                if (!lbl.contains(input)) return;
+                const val = input.value.trim();
+                node.label = val;
+                lbl.innerText = node.label;
+                lbl.style.pointerEvents = '';
+                if (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
+                    if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(node);
+                    Sim.updateWireVisuals();
                 }
-            }, node.label || '');
+                Sim.autoSave();
+            };
+
+            input.onblur = commit;
+            input.onkeydown = (ev) => {
+                if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+                if (ev.key === 'Escape') { 
+                    lbl.innerHTML = ''; 
+                    lbl.innerText = ogText; 
+                    lbl.style.pointerEvents = '';
+                }
+            };
+            
+            input.focus();
+            input.select();
         }
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Modal configuration triggered for ${node.id}.
     },
@@ -346,6 +372,7 @@ const InteractionHandler = {
         }
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire interaction handled for ${wire.id}.
     },
+
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for marquee selection initialization.
