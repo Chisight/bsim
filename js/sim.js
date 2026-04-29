@@ -1,6 +1,6 @@
 /**
- * Simulator Core v1.23.86 (Modular Professional)
- * FIXED: Bidirectional pin-container scaling and center-drag translation priority.
+ * Simulator Core v1.23.87 (Modular Professional)
+ * FIXED: Decoupled axis-scaling logic for true edge and corner dragging. Input toggles locked during edits.
  */
 const Sim = {
     nodes: [],
@@ -1479,6 +1479,9 @@ const Sim = {
      * @INTENT: Toggle a specific bit of an input node and trigger a simulation tick.
      */
     toggleBit(e, nodeId, bitIndex) {
+        // [AUDIT: SEC_ARCH_LEAD] - Prevent input toggling while in layout mutation mode.
+        if (document.body.classList.contains('edit-mode-active')) return;
+
         if (typeof e === 'string') {
             bitIndex = nodeId;
             nodeId = e;
@@ -1997,13 +2000,23 @@ const Sim = {
             target.style.cursor = 'move';
             target.style.transform = 'none'; // Release absolute centering lock for dragging
             
-            // [AUDIT: SEC_ARCH_LEAD] - Dynamic cursor feedback for grab-zones.
+            // [AUDIT: SEC_ARCH_LEAD] - Dynamic 8-way cursor feedback mapping for edges and corners.
             this._editHover = (ev) => {
                 const rect = target.getBoundingClientRect();
                 const scale = View.scale || 1;
                 const hx = (ev.clientX - rect.left) / scale;
                 const hy = (ev.clientY - rect.top) / scale;
-                target.style.cursor = (hx > target.offsetWidth - 12 || hy > target.offsetHeight - 12) ? 'se-resize' : 'move';
+                const th = 12;
+                const hLeft = hx < th;
+                const hRight = hx > target.offsetWidth - th;
+                const hTop = hy < th;
+                const hBottom = hy > target.offsetHeight - th;
+                
+                if ((hTop && hLeft) || (hBottom && hRight)) target.style.cursor = 'nwse-resize';
+                else if ((hTop && hRight) || (hBottom && hLeft)) target.style.cursor = 'nesw-resize';
+                else if (hTop || hBottom) target.style.cursor = 'ns-resize';
+                else if (hLeft || hRight) target.style.cursor = 'ew-resize';
+                else target.style.cursor = 'move';
             };
             target.addEventListener('mousemove', this._editHover);
         } else {
@@ -2015,15 +2028,18 @@ const Sim = {
             e.preventDefault();
             e.stopPropagation();
             
-            // [AUDIT: SEC_ARCH_LEAD] - Enhanced grab-zone logic: scale from edges, move from center.
+            // [AUDIT: SEC_ARCH_LEAD] - Isolated edge and corner detection for independent axis scaling.
             const rect = target.getBoundingClientRect();
             const scale = View.scale || 1;
             const clickX = (e.clientX - rect.left) / scale;
             const clickY = (e.clientY - rect.top) / scale;
             
-            // Define zones: Scale if clicking outer 15% of the boundary
             const threshold = 12;
-            const isResizing = mode === 'pins' && (clickX > target.offsetWidth - threshold || clickY > target.offsetHeight - threshold || clickX < threshold || clickY < threshold);
+            const rLeft = clickX < threshold;
+            const rRight = clickX > target.offsetWidth - threshold;
+            const rTop = clickY < threshold;
+            const rBottom = clickY > target.offsetHeight - threshold;
+            const isResizing = mode === 'pins' && (rLeft || rRight || rTop || rBottom);
             
             const startX = e.clientX;
             const startY = e.clientY;
@@ -2047,24 +2063,24 @@ const Sim = {
                     Sim.updateWireVisuals();
                 } else if (mode === 'pins') {
                     if (isResizing || m.shiftKey) { 
-                        // [AUDIT: SEC_ARCH_LEAD] - Bidirectional scaling logic.
-                        if (clickX < threshold) { // Scale Left
+                        // [AUDIT: SEC_ARCH_LEAD] - Decoupled X/Y axis scaling to enable side-dragging and corner-dragging natively.
+                        if (rLeft) {
                             const newW = Math.max(16, startPinW - dx);
                             if (newW !== startPinW) {
                                 node.pinX = Math.max(0, startPinX + (startPinW - newW));
                                 node.pinW = newW;
                             }
-                        } else { // Scale Right
+                        } else if (rRight) {
                             node.pinW = Math.max(16, Math.min(startNodeW - node.pinX, startPinW + dx));
                         }
 
-                        if (clickY < threshold) { // Scale Up
+                        if (rTop) {
                             const newH = Math.max(16, startPinH - dy);
                             if (newH !== startPinH) {
                                 node.pinY = Math.max(0, startPinY + (startPinH - newH));
                                 node.pinH = newH;
                             }
-                        } else { // Scale Down
+                        } else if (rBottom) {
                             node.pinH = Math.max(16, Math.min(startNodeH - node.pinY, startPinH + dy));
                         }
                         
