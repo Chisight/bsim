@@ -6,6 +6,7 @@ This registry serves as the definitive source-of-truth for all hardening efforts
 1. **Zero Trust Integration**: All modules must be instrumented with `@ARCH`, `@STATE`, `@IO`, and `@CONSTRAINT` tags.
 2. **Deterministic Observability**: Every function boundary must include an `EXIT_TRACE` marker.
 3. **Wasm/V8 Parity**: Telemetry must explicitly track state transitions between JS objects and the Wasm linear memory.
+4. **Audit Immutability**: Historical `[AUDIT: vX.X.X]` markers are cryptographically sealed. Agents, LLMs, and automated pipelines are strictly forbidden from executing global version bumps on existing audit markers.
 
 ---
 

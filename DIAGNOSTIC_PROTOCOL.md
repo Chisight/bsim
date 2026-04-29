@@ -17,6 +17,8 @@ All functional blocks MUST be prefixed with MRAP domain tags to enforce architec
 ## 3. High-Density Traceability (@TRACEABILITY_V1)
 Every function exit point (including early returns and block terminators) MUST include an `EXIT_TRACE` marker.
 
+**IMMUTABILITY RULE**: Historical audit markers and version strings within `[AUDIT: ...]` tags are strictly immutable. Automated patching, regex replacements, and agent-driven refactoring MUST NOT increment or modify historical version numbers. New logic receives new markers; old logic retains its original timestamp. Retroactive version bumping of these tags is a critical protocol violation.
+
 **Format**:
 `// [AUDIT: v<VERSION> | <ROLES>] - EXIT_TRACE: <Description> [Contextual Data]`
 
