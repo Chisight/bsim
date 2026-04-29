@@ -1170,6 +1170,9 @@ const DebugTerminal = {
     }
 };
 
+// [AUDIT: v1.24.08 | SEC_ARCH_LEAD] - Resolved cross-module initialization race condition for Sim context binding.
 window.DebugTerminal = DebugTerminal;
-Sim.dt = DebugTerminal;
-window.addEventListener('DOMContentLoaded', () => DebugTerminal.init());
+window.addEventListener('DOMContentLoaded', () => {
+    if (typeof window.Sim !== 'undefined') window.Sim.dt = DebugTerminal;
+    DebugTerminal.init();
+});

@@ -1904,10 +1904,13 @@ const Sim = {
         });
 
         // Clear workspace
+        this.nodes.forEach(n => { const el = document.getElementById(n.id); if (el) el.remove(); });
+        document.querySelectorAll('.gate').forEach(el => el.remove());
         this.nodes = [];
         this.wires = [];
         this.wireMap.clear();
-        document.getElementById('scene').innerHTML = '';
+        const scene = document.getElementById('scene');
+        if (scene) scene.innerHTML = '';
 
         // Load chip internals
         const chip = this.library[name];
@@ -2219,8 +2222,12 @@ const Sim = {
         }
 
         // 2. Clear current workspace
+        // [AUDIT: v1.24.08 | SEC_ARCH_LEAD] - Deep DOM purge to prevent element orphaning during tab switch.
+        this.nodes.forEach(n => { const el = document.getElementById(n.id); if (el) el.remove(); });
+        document.querySelectorAll('.gate').forEach(el => el.remove());
         this.nodes = []; this.wires = []; this.wireMap.clear();
-        document.getElementById('scene').innerHTML = '';
+        const scene = document.getElementById('scene');
+        if (scene) scene.innerHTML = '';
 
         // 3. Load new state
         this.activeTabId = id;
@@ -2707,9 +2714,12 @@ const Sim = {
     uiNewChip() {
         this.modal('New Chip', 'Clear workspace? Your saved library will be kept.', 'confirm', (ok) => {
             if (ok) {
+                this.nodes.forEach(n => { const el = document.getElementById(n.id); if (el) el.remove(); });
+                document.querySelectorAll('.gate').forEach(el => el.remove());
                 this.nodes = []; this.wires = []; this.wireMap.clear();
-                History.stack = []; History.index = -1; History.updateButtons();
-                document.getElementById('scene').innerHTML = '';
+                if (window.History) { History.stack = []; History.index = -1; History.updateButtons(); }
+                const scene = document.getElementById('scene');
+                if (scene) scene.innerHTML = '';
                 this.updateWireVisuals(); this.seedQueue();
             }
         });
@@ -2892,8 +2902,11 @@ const Sim = {
         };
 
         const parent = this.workspaceStack.pop();
+        this.nodes.forEach(n => { const el = document.getElementById(n.id); if (el) el.remove(); });
+        document.querySelectorAll('.gate').forEach(el => el.remove());
         this.nodes = []; this.wires = []; this.wireMap.clear();
-        document.getElementById('scene').innerHTML = '';
+        const scene = document.getElementById('scene');
+        if (scene) scene.innerHTML = '';
 
         parent.nodes.forEach(n => {
             if (n.isCustom && n.type === this.activeEditingChip) {
