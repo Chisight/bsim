@@ -367,9 +367,12 @@ body.edit-mode-active .port { pointer-events: none; opacity: 0.2; }
 body.edit-mode-active .bit-dot { pointer-events: none; }
 body.edit-mode-active .visual-extra { pointer-events: none; opacity: 0.5; }
 body.edit-mode-active .gate-label { pointer-events: none; opacity: 0.5; }
+/* [AUDIT: v1.24.26 | SEC_ARCH_LEAD] - Unblocked layout mutators from global interaction freeze. */
+body.edit-mode-active .visual-extra.editing-pins, body.edit-mode-active .gate-label.editing-pins { pointer-events: auto !important; opacity: 1 !important; }
 
 /* [AUDIT: SEC_ARCH_LEAD] - Polyfill extended hitboxes for info layout mutator. */
-.pin-container.editing-pins::after, .visual-extra.editing-pins::after {
+/* [AUDIT: v1.24.26 | SEC_ARCH_LEAD] - Polyfill extended hitboxes for label layout mutator. */
+.pin-container.editing-pins::after, .visual-extra.editing-pins::after, .gate-label.editing-pins::after {
     content: '';
     position: absolute;
     top: -12px; left: -12px; right: -12px; bottom: -12px;

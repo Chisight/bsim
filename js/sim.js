@@ -25,6 +25,7 @@ const Sim = {
                 customWidth: n.customWidth, customHeight: n.customHeight,
                 pinX: n.pinX, pinY: n.pinY, pinW: n.pinW, pinH: n.pinH,
                 infoX: n.infoX, infoY: n.infoY, infoW: n.infoW, infoH: n.infoH,
+                labelX: n.labelX, labelY: n.labelY, labelW: n.labelW, labelH: n.labelH,
                 _lastX: n._lastX, _lastY: n._lastY
             }));
         } catch (e) { console.error("Data sanitization fault on node:", e); return null; }
@@ -1307,6 +1308,21 @@ const Sim = {
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Apply saved geometric properties dynamically on visual update.
         if (n.customWidth) el.style.width = n.customWidth + 'px';
         if (n.customHeight) el.style.height = n.customHeight + 'px';
+        
+        // [AUDIT: v1.24.27 | SEC_ARCH_LEAD] - Apply localized label geometry bounding box limits and dynamic font scaling.
+        const lblCont = el.querySelector('.gate-label');
+        if (lblCont && (n.labelX !== undefined || n.labelW !== undefined)) {
+            lblCont.style.position = 'absolute';
+            lblCont.style.margin = '0';
+            if (n.labelX !== undefined) lblCont.style.left = n.labelX + 'px';
+            if (n.labelY !== undefined) lblCont.style.top = n.labelY + 'px';
+            if (n.labelW !== undefined) lblCont.style.width = n.labelW + 'px';
+            if (n.labelH !== undefined) {
+                lblCont.style.height = n.labelH + 'px';
+                lblCont.style.fontSize = Math.max(8, Math.min(n.labelH * 0.6, (n.customHeight || parseInt(el.style.height) || 64) * 0.5)) + 'px';
+                lblCont.style.lineHeight = (n.labelH - 8) + 'px';
+            }
+        }
 
         const bits = parseInt(n.type.split('-')[1]) || 1;
         if (bits >= 4) {
@@ -2335,7 +2351,7 @@ const Sim = {
         const node = this.nodes.find(n => n.id === nodeId);
         const el = document.getElementById(nodeId);
         if (!node || !el) return;
-        this.activeNodeEdit = { node, mode, og: { w: node.customWidth, h: node.customHeight, px: node.pinX, py: node.pinY, pw: node.pinW, ph: node.pinH, ix: node.infoX, iy: node.infoY, iw: node.infoW, ih: node.infoH } };
+        this.activeNodeEdit = { node, mode, og: { w: node.customWidth, h: node.customHeight, px: node.pinX, py: node.pinY, pw: node.pinW, ph: node.pinH, ix: node.infoX, iy: node.infoY, iw: node.infoW, ih: node.infoH, lx: node.labelX, ly: node.labelY, lw: node.labelW, lh: node.labelH } };
         
         // [AUDIT: SEC_ARCH_LEAD] - Lock global wiring interactions to prevent misclicks during layout mutation.
         document.body.classList.add('edit-mode-active');
@@ -2344,16 +2360,26 @@ const Sim = {
         
         const pinCont = el.querySelector('.pin-container');
         const infoCont = el.querySelector('.visual-extra');
-        const target = mode === 'pins' ? pinCont : (mode === 'info' ? infoCont : el);
+        const lblCont = el.querySelector('.gate-label');
+        const target = mode === 'pins' ? pinCont : (mode === 'info' ? infoCont : (mode === 'label' ? lblCont : el));
         if (!target) return;
         
-        if (mode === 'pins' || mode === 'info') {
+        // [AUDIT: v1.24.26 | SEC_ARCH_LEAD] - Injected edit mode dispatch handling for gate label components.
+        if (mode === 'pins' || mode === 'info' || mode === 'label') {
             if (mode === 'info' && node.infoX === undefined) {
                 // [AUDIT: SEC_ARCH_LEAD] - Initialize default offset coordinates if previously relative
                 node.infoX = target.offsetLeft;
                 node.infoY = target.offsetTop;
                 node.infoW = target.offsetWidth;
                 node.infoH = target.offsetHeight;
+                target.style.position = 'absolute';
+                target.style.margin = '0';
+            }
+            if (mode === 'label' && node.labelX === undefined) {
+                node.labelX = target.offsetLeft;
+                node.labelY = target.offsetTop;
+                node.labelW = target.offsetWidth;
+                node.labelH = target.offsetHeight;
                 target.style.position = 'absolute';
                 target.style.margin = '0';
             }
@@ -2403,15 +2429,17 @@ const Sim = {
             const rRight = clickX > target.offsetWidth - thX;
             const rTop = clickY < thY;
             const rBottom = clickY > target.offsetHeight - thY;
-            const isResizing = mode === 'pins' && (rLeft || rRight || rTop || rBottom);
+            // [AUDIT: v1.24.30 | SEC_ARCH_LEAD] - Authorized boundary resizing for info readouts and labels.
+            const isResizing = (mode === 'pins' || mode === 'info' || mode === 'label') && (rLeft || rRight || rTop || rBottom);
             
             const startX = e.clientX;
             const startY = e.clientY;
             const isInfo = mode === 'info';
-            const startPinX = isInfo ? (node.infoX || 0) : (node.pinX || 0);
-            const startPinY = isInfo ? (node.infoY || 0) : (node.pinY || 0);
-            const startPinW = isInfo ? (node.infoW || target.offsetWidth) : (node.pinW || target.offsetWidth);
-            const startPinH = isInfo ? (node.infoH || target.offsetHeight) : (node.pinH || target.offsetHeight);
+            const isLabel = mode === 'label';
+            const startPinX = isInfo ? (node.infoX || 0) : (isLabel ? (node.labelX || 0) : (node.pinX || 0));
+            const startPinY = isInfo ? (node.infoY || 0) : (isLabel ? (node.labelY || 0) : (node.pinY || 0));
+            const startPinW = isInfo ? (node.infoW || target.offsetWidth) : (isLabel ? (node.labelW || target.offsetWidth) : (node.pinW || target.offsetWidth));
+            const startPinH = isInfo ? (node.infoH || target.offsetHeight) : (isLabel ? (node.labelH || target.offsetHeight) : (node.pinH || target.offsetHeight));
             const startNodeW = node.customWidth || parseInt(el.style.width) || 90;
             const startNodeH = node.customHeight || parseInt(el.style.height) || 80;
 
@@ -2426,26 +2454,26 @@ const Sim = {
                     el.style.width = node.customWidth + 'px';
                     el.style.height = node.customHeight + 'px';
                     Sim.updateWireVisuals();
-                } else if (mode === 'pins' || mode === 'info') {
+                } else if (mode === 'pins' || mode === 'info' || mode === 'label') {
                     let cX = startPinX, cY = startPinY, cW = startPinW, cH = startPinH;
                     if (isResizing || m.shiftKey) { 
-                        // [AUDIT: SEC_ARCH_LEAD] - Generalized rigid boundary clamping for independent axis scaling to prevent chip escape.
+                        // [AUDIT: v1.24.27 | SEC_ARCH_LEAD] - Adjusted scaling constraints for label geometries to permit overhangs and font scaling.
                         if (rLeft) {
-                            const nextX = Math.max(0, startPinX + dx);
+                            const nextX = mode === 'label' ? startPinX + dx : Math.max(0, startPinX + dx);
                             const diffX = nextX - startPinX;
                             cX = nextX;
                             cW = Math.max(16, startPinW - diffX);
                         } else if (rRight) {
-                            cW = Math.max(16, Math.min(startNodeW - startPinX, startPinW + dx));
+                            cW = Math.max(16, mode === 'label' ? Math.min(startNodeW * 3, startPinW + dx) : Math.min(startNodeW - startPinX, startPinW + dx));
                         }
 
                         if (rTop) {
-                            const nextY = Math.max(0, startPinY + dy);
+                            const nextY = mode === 'label' ? startPinY + dy : Math.max(0, startPinY + dy);
                             const diffY = nextY - startPinY;
                             cY = nextY;
-                            cH = Math.max(16, startPinH - diffY);
+                            cH = Math.max(10, startPinH - diffY);
                         } else if (rBottom) {
-                            cH = Math.max(16, Math.min(startNodeH - startPinY, startPinH + dy));
+                            cH = Math.max(10, mode === 'label' ? Math.min(startNodeH, startPinH + dy) : Math.min(startNodeH - startPinY, startPinH + dy));
                         }
                     } else { 
                         // Move from Center
@@ -2453,12 +2481,14 @@ const Sim = {
                         const curH = startPinH || target.offsetHeight || 16;
                         const maxW = Math.max(0, startNodeW - curW);
                         const maxH = Math.max(0, startNodeH - curH);
-                        cX = Math.max(0, Math.min(maxW, startPinX + dx));
-                        cY = Math.max(0, Math.min(maxH, startPinY + dy));
+                        cX = mode === 'label' ? startPinX + dx : Math.max(0, Math.min(maxW, startPinX + dx));
+                        cY = mode === 'label' ? startPinY + dy : Math.max(0, Math.min(maxH, startPinY + dy));
                     }
                     
                     if (mode === 'info') {
                         node.infoX = cX; node.infoY = cY; node.infoW = cW; node.infoH = cH;
+                    } else if (mode === 'label') {
+                        node.labelX = cX; node.labelY = cY; node.labelW = cW; node.labelH = cH;
                     } else {
                         node.pinX = cX; node.pinY = cY; node.pinW = cW; node.pinH = cH;
                     }
@@ -2490,7 +2520,8 @@ const Sim = {
         const el = document.getElementById(state.node.id);
         const pinCont = el?.querySelector('.pin-container');
         const infoCont = el?.querySelector('.visual-extra');
-        const target = state.mode === 'pins' ? pinCont : (state.mode === 'info' ? infoCont : el);
+        const lblCont = el?.querySelector('.gate-label');
+        const target = state.mode === 'pins' ? pinCont : (state.mode === 'info' ? infoCont : (state.mode === 'label' ? lblCont : el));
         
         if (target && this._editModeDown) {
             target.removeEventListener('mousedown', this._editModeDown);
@@ -2500,8 +2531,9 @@ const Sim = {
         if (el) { el.style.outline = ''; el.style.cursor = ''; }
         if (pinCont) { pinCont.classList.remove('editing-pins'); pinCont.style.outline = ''; pinCont.style.cursor = ''; }
         if (infoCont) { infoCont.classList.remove('editing-pins'); infoCont.style.outline = ''; infoCont.style.cursor = ''; }
+        if (lblCont) { lblCont.classList.remove('editing-pins'); lblCont.style.outline = ''; lblCont.style.cursor = ''; }
 
-        const nw = { w: state.node.customWidth, h: state.node.customHeight, px: state.node.pinX, py: state.node.pinY, pw: state.node.pinW, ph: state.node.pinH, ix: state.node.infoX, iy: state.node.infoY, iw: state.node.infoW, ih: state.node.infoH };
+        const nw = { w: state.node.customWidth, h: state.node.customHeight, px: state.node.pinX, py: state.node.pinY, pw: state.node.pinW, ph: state.node.pinH, ix: state.node.infoX, iy: state.node.infoY, iw: state.node.infoW, ih: state.node.infoH, lx: state.node.labelX, ly: state.node.labelY, lw: state.node.labelW, lh: state.node.labelH };
         if (JSON.stringify(nw) !== JSON.stringify(state.og)) {
             // [AUDIT: SEC_ARCH_LEAD] - Delegated layout state modifications to structured history command.
             History.execute(new MutateLayoutCommand(state.node, state.og, nw));
@@ -2523,6 +2555,10 @@ const Sim = {
                         n.customWidth = state.node.customWidth; n.customHeight = state.node.customHeight;
                         n.pinX = state.node.pinX; n.pinY = state.node.pinY;
                         n.pinW = state.node.pinW; n.pinH = state.node.pinH;
+                        n.infoX = state.node.infoX; n.infoY = state.node.infoY;
+                        n.infoW = state.node.infoW; n.infoH = state.node.infoH;
+                        n.labelX = state.node.labelX; n.labelY = state.node.labelY;
+                        n.labelW = state.node.labelW; n.labelH = state.node.labelH;
                         Sim.updateNodeVisual(n);
                     }
                 });

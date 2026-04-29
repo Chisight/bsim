@@ -149,15 +149,35 @@ window.onload = () => {
      * @STATE: BSIM_METADATA
      * @INTENT: Define the application semantic versioning for runtime compatibility checks.
      */
-    // [AUDIT: v1.24.25 | SEC_ARCH_LEAD] - Version increment for purging uiEnterValue popup bypass on inputs.
-    window.LOADED_BSIM_VERSION = "1.24.25";
-    console.log(`BrowserSim v${window.LOADED_BSIM_VERSION} Modular Professional Initialized.`);
-    
-    if (window.EXPECTED_BSIM_VERSION && window.EXPECTED_BSIM_VERSION !== window.LOADED_BSIM_VERSION) {
-        console.error(`[Cache Error] HTML expects v${window.EXPECTED_BSIM_VERSION} but JS loaded v${window.LOADED_BSIM_VERSION}`);
+    // [AUDIT: v1.24.30 | SEC_ARCH_LEAD] - Version increment for readout and label bounding box resize unlock.
+    window.LOADED_BSIM_VERSION = "1.24.30";
+
+    // [AUDIT: SEC_ARCH_LEAD] - Injected passive workspace boundary validation to catch upgrade mismatches.
+    window.addEventListener('load', () => {
         setTimeout(() => {
-            Sim.toast(`VERSION MISMATCH: Stale cache detected. Press Ctrl+Shift+R to update.`, 'danger', 0);
-        }, 1000);
-    }
+            let isStale = false;
+            
+            // Check 1: HTML to JS Cache Mismatch
+            if (window.EXPECTED_BSIM_VERSION && window.EXPECTED_BSIM_VERSION !== window.LOADED_BSIM_VERSION) {
+                isStale = true;
+            }
+            
+            // Check 2: Upgraded Engine vs Existing Local Storage State
+            const storedVer = localStorage.getItem('bsim_state_version');
+            if (!storedVer || storedVer !== window.LOADED_BSIM_VERSION) {
+                if (window.Sim && window.Sim.nodes && window.Sim.nodes.length > 0) isStale = true;
+                if (window.Sim && window.Sim.library && Object.keys(window.Sim.library).length > 0) isStale = true;
+            }
+
+            if (isStale) {
+                const toast = document.createElement('div');
+                toast.style.cssText = 'position:fixed; top:75px; right:20px; background:rgba(20, 10, 10, 0.95); color:#fff; padding:20px; border-radius:8px; z-index:10000; border:1px solid #ff4757; font-family:var(--font, sans-serif); max-width:320px; box-shadow:0 15px 40px rgba(0,0,0,0.8); pointer-events:auto; backdrop-filter:blur(5px);';
+                toast.innerHTML = '<div style="color:#ff4757; font-size:13px; font-weight:800; margin-bottom:10px; letter-spacing:0.5px;">⚠️ STALE WORKSPACE DETECTED</div><div style="font-weight:normal; font-size:12px; color:#aaa; line-height:1.6;">The simulator engine has been updated, but you have a stale project loaded in your interface.<br><br>To avoid rendering bugs and logic faults, please sanitize your workspace:<br><br><span style="color:#fff; font-weight:bold;">1. File &gt; Export BSIM<br>2. File &gt; New Project<br>3. File &gt; Load BSIM</span></div><button onclick="this.parentElement.remove()" style="margin-top:18px; background:#ff4757; color:#fff; border:none; padding:8px; border-radius:4px; cursor:pointer; font-weight:bold; width:100%; transition:0.2s;">I Understand</button>';
+                document.body.appendChild(toast);
+            }
+            
+            localStorage.setItem('bsim_state_version', window.LOADED_BSIM_VERSION);
+        }, 2000); // Delayed execution to ensure workspace load completion
+    });
     // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Application bootstrap sequence finalized.
 };

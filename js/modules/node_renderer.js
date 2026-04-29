@@ -41,10 +41,10 @@ const NodeRenderer = {
             let dotsHtml = '';
             for (let i = 0; i < bits; i++) {
                 const bIdx = bits - 1 - i; // TOP is MSB, BOTTOM is LSB
-                const topPct = bits === 1 ? 50 : ((i + 0.5) / bits) * 100;
-                // [AUDIT: SEC_ARCH_LEAD] - UI Scaling: Render single-digit pin indices for buses to prevent layout clipping.
+                const topStyle = bits === 1 ? "top:50%" : `top:calc(24px + ${((i + 0.5) / bits)} * (100% - 30px))`;
+                // [AUDIT: v1.24.28 | SEC_ARCH_LEAD] - Adjusted pin layout percentage calculation to prevent header collision.
                 const labelText = (bits > 1) ? bIdx : '';
-                portsHtml += `<div class="port output" data-port="out${bIdx}" style="top:${topPct}%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${bIdx}')">
+                portsHtml += `<div class="port output" data-port="out${bIdx}" style="${topStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${bIdx}')">
                     <div class="port-meta"><span class="port-label">${labelText}</span></div>
                 </div>`;
                 dotsHtml += `<div class="bit-dot" data-bit="${bIdx}" onclick="event.stopPropagation(); Sim.toggleBit(event, '${node.id}', ${bIdx})"></div>`;
@@ -54,10 +54,10 @@ const NodeRenderer = {
             let dotsHtml = '';
             for (let i = 0; i < bits; i++) {
                 const bIdx = bits - 1 - i; // TOP is MSB, BOTTOM is LSB
-                const topPct = bits === 1 ? 50 : ((i + 0.5) / bits) * 100;
-                // [AUDIT: SEC_ARCH_LEAD] - UI Scaling: Render single-digit pin indices for buses to prevent layout clipping.
+                const topStyle = bits === 1 ? "top:50%" : `top:calc(24px + ${((i + 0.5) / bits)} * (100% - 30px))`;
+                // [AUDIT: v1.24.28 | SEC_ARCH_LEAD] - Adjusted pin layout percentage calculation to prevent header collision.
                 const labelText = (bits > 1) ? bIdx : '';
-                portsHtml += `<div class="port input" data-port="in${bIdx}" style="top:${topPct}%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'in${bIdx}')">
+                portsHtml += `<div class="port input" data-port="in${bIdx}" style="${topStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'in${bIdx}')">
                     <div class="port-meta"><span class="port-label">${labelText}</span></div>
                 </div>`;
                 dotsHtml += `<div class="bit-dot" data-bit="${bIdx}"></div>`;
@@ -102,8 +102,8 @@ const NodeRenderer = {
 
                     const maxPorts = Math.max(totalIns, totalOuts);
                     if (maxPorts > 2) {
-                        div.style.minHeight = (maxPorts * 20 + 20) + 'px';
-                        div.style.height = (maxPorts * 20 + 20) + 'px';
+                        div.style.minHeight = (maxPorts * 20 + 26) + 'px';
+                        div.style.height = (maxPorts * 20 + 26) + 'px';
                     }
                     // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Override default auto-height if custom geometry is defined.
                     if (node.customHeight) { div.style.height = node.customHeight + 'px'; div.style.minHeight = node.customHeight + 'px'; }
@@ -112,12 +112,14 @@ const NodeRenderer = {
                     let cIn = 0;
                     ins.forEach((p) => {
                         const bits = parseInt(p.type.split('-')[1]) || 1;
+                        const labelBase = (p.label && p.label !== p.type) ? p.label : '';
                         for (let i = 0; i < bits; i++) {
                             const bIdx = bits > 1 ? (bits - 1 - i) : 0;
                             const portId = `in${cIn}`;
-                            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - UI Scaling: Render single-digit pin indices for custom macro buses.
-                            const lbl = bits > 1 ? bIdx : p.label;
-                            portsHtml += `<div class="port input" data-port="${portId}" style="top:${((cIn + 0.5) / totalIns) * 100}%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', '${portId}')"><span class="port-label">${lbl}</span></div>`;
+                            // [AUDIT: v1.24.28 | SEC_ARCH_LEAD] - UI Scaling: Cascade bus labels to macro pins and prevent header collision.
+                            const lbl = bits > 1 ? (labelBase + bIdx) : p.label;
+                            const topStyle = totalIns === 1 ? "top:50%" : `top:calc(24px + ${((cIn + 0.5) / totalIns)} * (100% - 30px))`;
+                            portsHtml += `<div class="port input" data-port="${portId}" style="${topStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', '${portId}')"><span class="port-label">${lbl}</span></div>`;
                             cIn++;
                         }
                     });
@@ -125,12 +127,14 @@ const NodeRenderer = {
                     let cOut = 0;
                     outs.forEach((p) => {
                         const bits = parseInt(p.type.split('-')[1]) || 1;
+                        const labelBase = (p.label && p.label !== p.type) ? p.label : '';
                         for (let i = 0; i < bits; i++) {
                             const bIdx = bits > 1 ? (bits - 1 - i) : 0;
                             const portId = `out${cOut}`;
-                            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - UI Scaling: Render single-digit pin indices for custom macro buses.
-                            const lbl = bits > 1 ? bIdx : p.label;
-                            portsHtml += `<div class="port output" data-port="${portId}" style="top:${((cOut + 0.5) / totalOuts) * 100}%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', '${portId}')"><span class="port-label">${lbl}</span></div>`;
+                            // [AUDIT: v1.24.28 | SEC_ARCH_LEAD] - UI Scaling: Cascade bus labels to macro pins and prevent header collision.
+                            const lbl = bits > 1 ? (labelBase + bIdx) : p.label;
+                            const topStyle = totalOuts === 1 ? "top:50%" : `top:calc(24px + ${((cOut + 0.5) / totalOuts)} * (100% - 30px))`;
+                            portsHtml += `<div class="port output" data-port="${portId}" style="${topStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', '${portId}')"><span class="port-label">${lbl}</span></div>`;
                             cOut++;
                         }
                     });

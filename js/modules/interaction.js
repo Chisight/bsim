@@ -49,6 +49,7 @@ const InteractionHandler = {
                     <div class="menu-item" style="color:var(--accent); font-weight:bold; cursor:default;">Node Prefs:</div>
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pins'); document.getElementById('context-menu').style.display='none';">↳ Edit Pin Layout</div>
                     ${(node.type !== 'IN-1' && node.type !== 'OUT-1') ? `<div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'info'); document.getElementById('context-menu').style.display='none';">↳ Edit Readout Layout</div>` : ''}
+                    <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'label'); document.getElementById('context-menu').style.display='none';">↳ Edit Label Layout</div>
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'icon'); document.getElementById('context-menu').style.display='none';">↳ Edit Icon Scale</div>
                 `;
             }
