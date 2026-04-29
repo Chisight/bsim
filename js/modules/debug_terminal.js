@@ -122,6 +122,8 @@ const DebugTerminal = {
             .dt-warn { color: #ffaa00; }
             .dt-sys { color: #8888aa; }
             .dt-ok { color: #00ffaa; }
+            .dt-menu-item { padding: 6px 15px; color: #aaa; cursor: pointer; user-select: none; }
+            .dt-menu-item:hover { background: #252530; color: #fff; }
         `;
         document.head.appendChild(style);
     },
@@ -190,6 +192,13 @@ const DebugTerminal = {
         };
 
         // Input Handle
+        // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Restore custom context menu for terminal clipboard actions.
+        this.ui.oncontextmenu = (e) => {
+            e.stopPropagation();
+            e.preventDefault();
+            this.showContextMenu(e.clientX, e.clientY);
+        };
+
         this.inp.onkeydown = (e) => {
             if (e.key === 'Enter') {
                 const cmd = this.inp.value.trim();
@@ -230,7 +239,7 @@ const DebugTerminal = {
         if (tMatch) {
             const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === tMatch[1] || t.id === tMatch[1]);
             if (!tab) return false;
-            if (tMatch[2] === 'editor') return (Sim.activeTabId === tab.id && !!Sim.activeEditingChip);
+            if (tMatch[2] === 'editor') return (Sim.activeTabId === tab.id && (!!Sim.activeEditingChip || !!Sim.activeSplitChip));
             return true;
         }
         return false;
@@ -242,10 +251,17 @@ const DebugTerminal = {
         const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === tMatch[1] || t.id === tMatch[1]);
         if (!tab) return [];
         if (tMatch[2] === 'editor') {
-            if (Sim.activeTabId === tab.id && Sim.activeEditingChip) return Sim.nodes;
+            if (Sim.activeTabId === tab.id) {
+                if (Sim.activeEditingChip) return Sim.nodes;
+                if (Sim.activeSplitChip) {
+                    const sf = document.querySelector('#split-editor-frame iframe') || document.querySelector('#popup-editor-wrap iframe');
+                    if (sf && sf.contentWindow && sf.contentWindow.Sim) return sf.contentWindow.Sim.nodes;
+                }
+            }
         } else {
             if (Sim.activeTabId === tab.id) {
                 if (Sim.activeEditingChip && Sim.workspaceStack.length > 0) return Sim.workspaceStack[0].nodes;
+                if (!Sim.activeEditingChip && Sim.activeSplitChip) return Sim.nodes;
                 return Sim.nodes;
             }
             return tab.nodes;
@@ -277,7 +293,7 @@ const DebugTerminal = {
                     const tabMatch = this.cwd.match(/^\/home\/bsim\/(tab-\d+|[^/]+)$/);
                     if (tabMatch) {
                         const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === tabMatch[1] || t.id === tabMatch[1]);
-                        if (tab && Sim.activeTabId === tab.id && Sim.activeEditingChip) opts = ['editor/'];
+                        if (tab && Sim.activeTabId === tab.id && (Sim.activeEditingChip || Sim.activeSplitChip)) opts = ['editor/'];
                     }
                 }
                 matches = opts.filter(d => d.startsWith(prefix));
@@ -304,6 +320,39 @@ const DebugTerminal = {
             this.highlightNode(fullId);
         }
     },
+
+    showContextMenu(x, y) {
+        let menu = document.getElementById('dt-ctx-menu');
+        if (!menu) {
+            menu = document.createElement('div');
+            menu.id = 'dt-ctx-menu';
+            menu.style.cssText = 'position:fixed; background:#1a1a23; border:1px solid #334; border-radius:6px; z-index:10000; padding:5px 0; box-shadow:0 10px 25px rgba(0,0,0,0.6); display:none; flex-direction:column; min-width:140px; font-family:"JetBrains Mono", monospace; font-size:12px;';
+            document.body.appendChild(menu);
+            document.addEventListener('click', () => menu.style.display = 'none');
+        }
+        menu.innerHTML = `
+            <div class="dt-menu-item" onclick="document.execCommand('copy')">Copy</div>
+            <div class="dt-menu-item" onclick="navigator.clipboard.readText().then(t => { document.getElementById('dt-in').value += t; document.getElementById('dt-in').focus(); })">Paste</div>
+            <div class="dt-menu-item" onclick="document.execCommand('cut')">Cut</div>
+            <div style="height:1px; background:#334; margin:4px 0;"></div>
+            <div class="dt-menu-item" onclick="window.open(window.location.href, '_blank')">New Tab</div>
+            <div class="dt-menu-item" onclick="Sim.dt.saveContents()">Save Contents</div>
+            <div class="dt-menu-item" onclick="Sim.dt.exec('clear')">Clear Terminal</div>
+        `;
+        menu.style.left = x + 'px';
+        menu.style.top = y + 'px';
+        menu.style.display = 'flex';
+    }
+
+    saveContents() {
+        const text = this.out.innerText;
+        const blob = new Blob([text], {type: 'text/plain'});
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(blob);
+        a.download = 'bsim_terminal_log.txt';
+        a.click();
+        this.print("Terminal contents saved.", "ok");
+    }
 
     highlightNode(id) {
         this.clearHighlight();
@@ -505,6 +554,9 @@ const DebugTerminal = {
                         if (Sim.activeEditingChip && Sim.workspaceStack.length > 0) {
                             nodesToList = Sim.workspaceStack[0].nodes;
                             showEditorDir = true;
+                        } else if (!Sim.activeEditingChip && Sim.activeSplitChip) {
+                            nodesToList = Sim.nodes;
+                            showEditorDir = true;
                         } else {
                             nodesToList = Sim.nodes;
                         }
@@ -512,14 +564,20 @@ const DebugTerminal = {
                         nodesToList = tab.nodes;
                     }
                 } else { // e.g. /home/bsim/tab-1/editor
-                    if (Sim.activeTabId === tab.id && Sim.activeEditingChip) {
-                        nodesToList = Sim.nodes;
+                    if (Sim.activeTabId === tab.id) {
+                        if (Sim.activeEditingChip) {
+                            nodesToList = Sim.nodes;
+                        } else if (Sim.activeSplitChip) {
+                            const sf = document.querySelector('#split-editor-frame iframe') || document.querySelector('#popup-editor-wrap iframe');
+                            if (sf && sf.contentWindow && sf.contentWindow.Sim) nodesToList = sf.contentWindow.Sim.nodes;
+                        }
                     }
                 }
 
                 this.print(`--- DIRECTORY: ${this.cwd} ---`, "warn");
                 if (showEditorDir) {
-                    this.print(`[Dir] <span style="color:#ffca28; font-weight:bold;">editor/</span> <span style="color:#667">(${Sim.activeEditingChip})</span>`, "ok");
+                    const cName = Sim.activeEditingChip || Sim.activeSplitChip;
+                    this.print(`[Dir] <span style="color:#ffca28; font-weight:bold;">editor/</span> <span style="color:#667">(${cName})</span>`, "ok");
                 }
 
                 if (verbose) {
@@ -707,4 +765,6 @@ const DebugTerminal = {
     }
 };
 
+window.DebugTerminal = DebugTerminal;
+Sim.dt = DebugTerminal;
 window.addEventListener('DOMContentLoaded', () => DebugTerminal.init());

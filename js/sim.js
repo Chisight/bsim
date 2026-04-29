@@ -8,6 +8,7 @@ const Sim = {
     library: {},
     workspaceStack: [],
     activeEditingChip: null,
+    activeSplitChip: null,
     tabs: [{ id: 'tab-1', name: 'Main', nodes: [], wires: [], historyStack: [], historyIndex: -1 }],
     activeTabId: 'tab-1',
     wireMap: new Map(),
@@ -2729,7 +2730,7 @@ const Sim = {
             popupWrap.innerHTML = `
                 <div id="popup-editor-head" style="background: #111; padding: 6px 10px; color: #888; cursor: move; display: flex; justify-content: space-between; user-select: none; border-bottom: 1px solid #222; font-family: 'JetBrains Mono', monospace; font-size: 12px;">
                     <div style="font-weight:bold; color:#ffca28;">CHIP EDITOR: ${targetChip}</div>
-                    <span onclick="document.getElementById('popup-editor-wrap').remove(); document.querySelector('.tab.has-split')?.classList.remove('has-split');" style="cursor:pointer; font-weight:bold; color:#ff4757;">X</span>
+                    <span onclick="document.getElementById('popup-editor-wrap').remove(); document.querySelector('.tab.has-split')?.classList.remove('has-split'); Sim.activeSplitChip = null;" style="cursor:pointer; font-weight:bold; color:#ff4757;">X</span>
                 </div>
                 <iframe src="${chipUrl}" style="flex:1; border:none; width:100%; height:100%; background:var(--bg);"></iframe>
             `;
@@ -2761,7 +2762,7 @@ const Sim = {
             splitFrame.innerHTML = `
                 <div style="background: #111; padding: 6px 10px; color: #888; display: flex; justify-content: space-between; border-bottom: 1px solid #222; font-family: 'JetBrains Mono', monospace; font-size: 12px;">
                     <div style="font-weight:bold; color:#ffca28;">CHIP EDITOR: ${targetChip}</div>
-                    <span onclick="document.getElementById('split-editor-frame').remove(); document.getElementById('main').classList.remove('workspace-split', 'split-left', 'split-right'); document.querySelector('.tab.has-split')?.classList.remove('has-split');" style="cursor:pointer; font-weight:bold; color:#ff4757;">X</span>
+                    <span onclick="document.getElementById('split-editor-frame').remove(); document.getElementById('main').classList.remove('workspace-split', 'split-left', 'split-right'); document.querySelector('.tab.has-split')?.classList.remove('has-split'); Sim.activeSplitChip = null;" style="cursor:pointer; font-weight:bold; color:#ff4757;">X</span>
                 </div>
                 <iframe src="${chipUrl}" style="flex:1; border:none; width:100%; height:100%; background:var(--bg);"></iframe>
             `;
@@ -2777,6 +2778,7 @@ const Sim = {
             if (tab) tab.classList.add('has-split');
             this.toast(`Split pane activated: ${direction.toUpperCase()}`, 'info');
         }
+        this.activeSplitChip = targetChip;
         // Restore parent workspace in main view.
         this.uiExitChipEdit();
     },
