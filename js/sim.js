@@ -1850,21 +1850,19 @@ const Sim = {
                     e.preventDefault();
                     menu.style.display = 'block';
 
-                    const menuH = 120;
-                    const menuW = 150;
-                    let top = e.clientY;
-                    let left = e.clientX;
-
-                    if (top + menuH > window.innerHeight) top -= menuH;
-                    if (left + menuW > window.innerWidth) left -= menuW;
-
-                    menu.style.left = left + 'px';
-                    menu.style.top = top + 'px';
+                    menu.style.left = e.clientX + 'px';
+                    menu.style.top = e.clientY + 'px';
 
                     menu.innerHTML = '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.uiEditChip(\'' + name + '\')">Edit Internals</div>' +
                         '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.modal(\'Rename Chip\',\'New name:\',\'prompt\',nn=>{if(nn && !Sim.library[nn]){Sim.library[nn]=Sim.library[\'' + name + '\']; delete Sim.library[\'' + name + '\']; Sim.nodes.forEach(n=>{if(n.type===\'' + name + '\')n.type=nn;}); Sim.updateLibraryUI(); Sim.autoSave(); }},\'' + name + '\')">Rename</div>' +
                         '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.modal(\'Move Chip\',\'New Folder Path:\',\'prompt\',f=>{if(f!==null){Sim.library[\'' + name + '\'].folder=f; Sim.updateLibraryUI(); Sim.autoSave(); }},\'' + (Sim.library[name].folder||'') + '\')">Move</div>' +
                         '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#ff4757; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#ff6b81\'" onmouseout="this.style.color=\'#ff4757\'" onclick="if(Sim.activeEditingChip===\'' + name + '\') Sim.uiExitChipEdit(); Sim.uiDeleteChip(\'' + name + '\')">Delete</div>';
+                        
+                    // [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Smart boundary collision detection for library items.
+                    menu.classList.remove('open-left', 'open-up');
+                    const rect = menu.getBoundingClientRect();
+                    if (rect.right > window.innerWidth) { menu.style.left = (window.innerWidth - rect.width - 5) + 'px'; menu.classList.add('open-left'); }
+                    if (rect.bottom > window.innerHeight) { menu.style.top = (window.innerHeight - rect.height - 5) + 'px'; menu.classList.add('open-up'); }
                 };
                 container.appendChild(span);
             });

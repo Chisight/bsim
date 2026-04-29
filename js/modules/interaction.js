@@ -60,6 +60,19 @@ const InteractionHandler = {
                 <div class="menu-item ${isNative ? 'disabled' : ''}" ${editAction}>Edit Internals</div>
                 <div class="menu-item danger" onclick="History.execute(new DeleteNodeCommand(Sim.nodes.find(n=>n.id==='${node.id}'))); document.getElementById('context-menu').style.display='none';">Delete</div>
             `;
+            
+            // [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Smart boundary collision detection for context menu positioning.
+            menu.classList.remove('open-left', 'open-up');
+            const rect = menu.getBoundingClientRect();
+            if (rect.right > window.innerWidth) {
+                menu.style.left = (window.innerWidth - rect.width - 5) + 'px';
+                menu.classList.add('open-left');
+            }
+            if (rect.bottom > window.innerHeight) {
+                menu.style.top = (window.innerHeight - rect.height - 5) + 'px';
+                menu.classList.add('open-up');
+            }
+            
             // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Context menu displayed for node ${node.id}.
             return; 
         }
@@ -271,6 +284,18 @@ const InteractionHandler = {
                 <div class="menu-item" onclick="InteractionHandler._splitWire(${wire.from.nodeId ? `'${wire.from.nodeId}'` : null}, '${wire.from.portId}', ${wire.to.nodeId ? `'${wire.to.nodeId}'` : null}, '${wire.to.portId}', ${clickX}, ${clickY}); document.getElementById('context-menu').style.display='none';">Add Node Here</div>
                 <div class="menu-item danger" onclick="History.execute(new DeleteWireCommand(Sim.wires.find(w => w.from.nodeId === '${wire.from.nodeId}' && w.to.nodeId === '${wire.to.nodeId}'))); document.getElementById('context-menu').style.display='none';">Delete Wire</div>
             `;
+            
+            // [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Smart boundary collision detection for wire context menus.
+            menu.classList.remove('open-left', 'open-up');
+            const rect = menu.getBoundingClientRect();
+            if (rect.right > window.innerWidth) {
+                menu.style.left = (window.innerWidth - rect.width - 5) + 'px';
+                menu.classList.add('open-left');
+            }
+            if (rect.bottom > window.innerHeight) {
+                menu.style.top = (window.innerHeight - rect.height - 5) + 'px';
+                menu.classList.add('open-up');
+            }
             return;
         }
 
@@ -415,6 +440,18 @@ const InteractionHandler = {
                 <div class="menu-item" style="color:#fff; font-weight:bold" onclick="Sim.addNode('NAND', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">Spawn NAND</div>
                 ${customChipsHtml}
             `;
+            
+            // [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Smart boundary collision detection for canvas context menus.
+            menu.classList.remove('open-left', 'open-up');
+            const rect = menu.getBoundingClientRect();
+            if (rect.right > window.innerWidth) {
+                menu.style.left = (window.innerWidth - rect.width - 5) + 'px';
+                menu.classList.add('open-left');
+            }
+            if (rect.bottom > window.innerHeight) {
+                menu.style.top = (window.innerHeight - rect.height - 5) + 'px';
+                menu.classList.add('open-up');
+            }
         };
 
         // Keyboard Handling (Parity with v1.20.6 Escape and Del logic)

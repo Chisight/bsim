@@ -291,6 +291,9 @@ footer::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px
     display: none; min-width: 120px; z-index: 10001; padding: 5px 0;
 }
 .menu-item.has-sub:hover .sub-menu { display: block; }
+/* [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Sub-menu boundary inversion logic. */
+#context-menu.open-left .sub-menu { left: auto; right: 100%; }
+#context-menu.open-up .sub-menu { top: auto; bottom: -1px; }
 
 .status-chip { 
     background: #22222b; padding: 5px 14px; border-radius: 5px; 

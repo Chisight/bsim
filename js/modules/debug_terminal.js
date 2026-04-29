@@ -456,6 +456,11 @@ const DebugTerminal = {
         menu.style.left = x + 'px';
         menu.style.top = y + 'px';
         menu.style.display = 'flex';
+        
+        // [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Smart boundary collision detection for terminal context menu.
+        const rect = menu.getBoundingClientRect();
+        if (rect.right > window.innerWidth) menu.style.left = (window.innerWidth - rect.width - 5) + 'px';
+        if (rect.bottom > window.innerHeight) menu.style.top = (window.innerHeight - rect.height - 5) + 'px';
     },
 
     saveContents() {
