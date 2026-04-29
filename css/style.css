@@ -106,7 +106,29 @@ nav .sub-menu .menu-item::after { display: none; }
 }
 .comp-btn:hover { border-color: var(--accent); color: #fff; background: #2a2a35; }
 
+/* [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Injected grid watermark and split-pane layout constraints. */
 #workspace { flex-grow: 1; position: relative; overflow: hidden; background-color: var(--bg); }
+#workspace::before {
+    content: '';
+    position: absolute; top: 50%; left: 50%;
+    width: 60%; height: 60%;
+    transform: translate(-50%, -50%);
+    background: url('../assets/bSim-logo.svg') no-repeat center center;
+    background-size: contain;
+    opacity: 0.04;
+    filter: invert(1);
+    pointer-events: none;
+    z-index: 0;
+}
+
+.tab.has-split {
+    border-bottom: 2px solid #ffca28 !important;
+    background: rgba(255, 202, 40, 0.1);
+}
+
+.workspace-split { display: flex; flex-direction: row; width: 100%; height: 100%; }
+.workspace-split.split-left #workspace { border-left: 2px solid var(--border); }
+.workspace-split.split-right #workspace { border-right: 2px solid var(--border); }
 
 #grid-layer {
     position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;

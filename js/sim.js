@@ -2678,6 +2678,31 @@ const Sim = {
      * @STATE: LIBRARY_SYNC
      * @INTENT: Save current chip logic to the library and return to the parent workspace context.
      */
+    // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Architecture augmentation for dual-pane editing layout.
+    uiSplitEditor(direction) {
+        if (!this.activeEditingChip) return;
+        const tab = document.querySelector(`.tab[onclick*="${this.activeTabId}"]`);
+        
+        if (direction === 'popup') {
+            this.toast(`Popup editor spawned for ${this.activeEditingChip}`, 'success');
+            window.open(`?chip=${encodeURIComponent(this.activeEditingChip)}`, '_blank', 'width=800,height=600');
+            if (tab) tab.classList.remove('has-split');
+            return;
+        }
+        
+        const main = document.getElementById('main');
+        if (direction === 'left') {
+            main.classList.add('workspace-split', 'split-left');
+            main.classList.remove('split-right');
+        } else if (direction === 'right') {
+            main.classList.add('workspace-split', 'split-right');
+            main.classList.remove('split-left');
+        }
+        
+        if (tab) tab.classList.add('has-split');
+        this.toast(`Split pane activated: ${direction.toUpperCase()}`, 'info');
+    },
+
     uiExitChipEdit() {
         if (this.workspaceStack.length === 0 || !this.activeEditingChip) return;
 

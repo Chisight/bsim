@@ -80,6 +80,29 @@ window.onload = () => {
         console.error(`[ModularSim Error] ${msg} at ${url}:${line}`);
     };
 
+    // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Split pane context menu hook for active chip editors.
+    document.getElementById('workspace').addEventListener('contextmenu', (e) => {
+        if (Sim.activeEditingChip) {
+            let menu = document.getElementById('context-menu');
+            if (!menu) return;
+            
+            setTimeout(() => {
+                if (!menu.innerHTML.includes('Split Editor')) {
+                    menu.innerHTML += `
+                        <div class="menu-item has-sub" style="color:#ffca28; font-weight:bold; border-top:1px solid #334; margin-top:5px; padding-top:5px;">
+                            Split Editor
+                            <div class="sub-menu">
+                                <div class="menu-item" onclick="Sim.uiSplitEditor('left'); document.getElementById('context-menu').style.display='none';">Left</div>
+                                <div class="menu-item" onclick="Sim.uiSplitEditor('right'); document.getElementById('context-menu').style.display='none';">Right</div>
+                                <div class="menu-item" onclick="Sim.uiSplitEditor('popup'); document.getElementById('context-menu').style.display='none';">Popup</div>
+                            </div>
+                        </div>
+                    `;
+                }
+            }, 10);
+        }
+    });
+
     // [AUDIT: SEC_ARCH_LEAD] - Global keyboard shortcut bindings for state history traversal.
     window.addEventListener('keydown', (e) => {
         // Prevent interfering with modal inputs or text fields
@@ -101,8 +124,8 @@ window.onload = () => {
      * @STATE: BSIM_METADATA
      * @INTENT: Define the application semantic versioning for runtime compatibility checks.
      */
-    // [AUDIT: v1.23.99 | SEC_ARCH_LEAD] - Semantic version increment following UI layout overhaul and workspace multi-tab implementation.
-    window.LOADED_BSIM_VERSION = "1.23.99";
+    // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Semantic version increment following asset integration and split-pane architectural scaffolding.
+    window.LOADED_BSIM_VERSION = "1.24.00";
     console.log(`BrowserSim v${window.LOADED_BSIM_VERSION} Modular Professional Initialized.`);
     
     if (window.EXPECTED_BSIM_VERSION && window.EXPECTED_BSIM_VERSION !== window.LOADED_BSIM_VERSION) {

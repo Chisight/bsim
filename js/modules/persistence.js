@@ -36,7 +36,7 @@ const ProjectManager = {
 
 
             // [AUDIT: v1.23.96 | SEC_ARCH_LEAD] - Updated fallback runtime expectation string to enforce new migration baseline.
-            const currentVer = this.parseVer(window.EXPECTED_BSIM_VERSION || "1.23.99");
+            const currentVer = this.parseVer(window.EXPECTED_BSIM_VERSION || "1.24.00");
 
             if (fileVer < currentVer) console.log(`[Migration] Upgrading schema from ${data.meta?.version} to ${window.EXPECTED_BSIM_VERSION}`);
 
@@ -114,7 +114,7 @@ const ProjectManager = {
             if (data.library) Object.values(data.library).forEach(chip => fixNetlist(chip.wires, chip.nodes));
 
             if (!data.meta) data.meta = {};
-            data.meta.version = (window.EXPECTED_BSIM_VERSION || "1.23.99") + "-Modular";
+            data.meta.version = (window.EXPECTED_BSIM_VERSION || "1.24.00") + "-Modular";
             // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Migration complete. Target version: ${data.meta.version}.
             return data;
         },
@@ -243,7 +243,7 @@ const ProjectManager = {
 
         const project = { 
             nodes: mainNodes, wires: mainWires, library: Sim.library,
-            meta: { version: "1.23.99-Modular", exportedAt: new Date().toISOString() }
+            meta: { version: "1.24.00-Modular", exportedAt: new Date().toISOString() }
         };
         
         const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
