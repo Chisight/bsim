@@ -82,7 +82,8 @@ nav .menu-item { display: inline-flex; border-radius: 4px; color: #888; font-wei
 nav .menu-item:hover { background: #252530; color: #fff; }
 nav .menu-item.has-sub::after { content: '▾'; margin-left: 6px; }
 nav .sub-menu { position: absolute; top: 100%; left: 0; background: var(--panel); border: 1px solid var(--border); border-radius: 6px; padding: 4px; display: none; flex-direction: column; min-width: 160px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); z-index: 2000; }
-nav .menu-item.has-sub:hover .sub-menu { display: flex; }
+/* [AUDIT: v1.24.23 | SEC_ARCH_LEAD] - Constrained hover reveal to direct child sub-menus to prevent nested cascade auto-opening. */
+nav > .menu-item.has-sub:hover > .sub-menu { display: flex; }
 nav .sub-menu .menu-item { padding: 8px 15px; width: 100%; box-sizing: border-box; display: block; border-radius: 4px; }
 nav .sub-menu .menu-item::after { display: none; }
 
@@ -290,7 +291,8 @@ footer::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px
     border: 1px solid #334; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6);
     display: none; min-width: 120px; z-index: 10001; padding: 5px 0;
 }
-.menu-item.has-sub:hover .sub-menu { display: block; }
+/* [AUDIT: v1.24.23 | SEC_ARCH_LEAD] - Constrained hover reveal to direct child sub-menus globally. */
+.menu-item.has-sub:hover > .sub-menu { display: block; }
 /* [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Sub-menu boundary inversion logic. */
 #context-menu.open-left .sub-menu { left: auto; right: 100%; }
 #context-menu.open-up .sub-menu { top: auto; bottom: -1px; }
