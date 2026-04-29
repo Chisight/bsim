@@ -1,6 +1,6 @@
 /**
- * Simulator Core v1.23.71 (Modular Professional)
- * FIXED: Wasm graph compiler macro boundary resolution failing on chips nested 2+ levels deep.
+ * Simulator Core v1.23.73 (Modular Professional)
+ * FIXED: Wasm Engine mapping collision for pseudo-native macro arrays.
  */
 const Sim = {
     nodes: [],
@@ -33,7 +33,7 @@ const Sim = {
     MAX_TRANSITIONS: 100,
 
     /**
-     * [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - Entry trace for simulation kernel bootstrap.
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for simulation kernel bootstrap.
      * @ARCH: KERNEL_ORCHESTRATOR
      * @IO: WORKSPACE_INITIALIZATION
      * @INTENT: Initialize simulation kernel, viewport, and global event listeners for the workspace.
@@ -122,7 +122,7 @@ const Sim = {
 
             this.updateWireVisuals();
         });
-        // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - EXIT_TRACE: Simulation kernel initialization complete.
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Simulation kernel initialization complete.
     },
 
     /**
@@ -216,7 +216,7 @@ const Sim = {
     },
 
     /**
-     * [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - Align persistence telemetry with MRAP taxonomy.
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Align persistence telemetry with MRAP taxonomy.
      * @ARCH: PERSISTENCE_MANAGER
      * @STATE: WORKSPACE_SERIAL
      * @INTENT: Periodically synchronize the current workspace state to local storage for crash recovery.
@@ -270,7 +270,7 @@ const Sim = {
                     prefs: { snapNodes: this.snapNodes, snapWires: this.snapWires, confirmDelete: this.confirmDelete, showStats: this.showStats, showTooltips: this.showTooltips, tutorialMode: this.tutorialMode, hudPos: this.hudPos } 
                 };
                 localStorage.setItem('bsim_autosave', JSON.stringify(project));
-                // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - EXIT_TRACE: AutoSave operation finalized.
+                // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: AutoSave operation finalized.
             } catch (e) {
                 console.error("[AutoSave] Serialization Failure:", e);
             }
@@ -368,7 +368,7 @@ const Sim = {
                 mapped[`out${cOut++}`] = val;
             } else {
                 for (let i = 0; i < bits; i++) {
-                    // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - Enforce linear pass-through indexing. Purged reversing mathematical flaw.
+                    // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Enforce linear pass-through indexing. Purged reversing mathematical flaw.
                     mapped[`out${cOut++}`] = Array.isArray(val) ? val[i] : val;
                 }
             }
@@ -377,7 +377,7 @@ const Sim = {
     },
 
     /**
-     * [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - Entry trace for logical signal evaluation.
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for logical signal evaluation.
      * @ARCH: SIGNAL_RESOLVER
      * @STATE: NODE_UPDATE
      * @INTENT: Evaluate the logical transfer function for a single node based on its driving signals.
@@ -452,9 +452,9 @@ const Sim = {
             for (let i = 0; i < bits; i++) state[i] = this.getDrivingSignal(node.id, `in${i}`);
             return JSON.stringify(state);
         }
-        // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - Prevent ReferenceError on untrapped generic nodes.
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Prevent ReferenceError on untrapped generic nodes.
         const finalVal = node.val !== undefined ? node.val : null;
-        // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - EXIT_TRACE: State calculated for node.
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: State calculated for node.
         return finalVal;
     },
     // =========================================================================
@@ -463,13 +463,67 @@ const Sim = {
     // =========================================================================
 
     /**
-     * [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - Entry trace for simulation tick.
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for simulation tick.
      * @ARCH: SCHEDULER
      * @CONSTRAINT: TIME_STEP_QUANTIZATION
      * @INTENT: Orchestrate the main simulation loop, delegating to Wasm for native logic blocks when possible.
      */
     processQueue() {
-        // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - Dynamic migration for legacy .bsim cross-wiring.
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - JIT Interceptor for Dual-Engine Parity. Wasm macro expansion requires sequential proxy indices ('in0'), while V8 requires strict strings ('a').
+        if (!this._wasmPortPatched && this.wasmBridge && this.wasmBridge.syncLayout) {
+            this._wasmPortPatched = true;
+            
+            const origSync = this.wasmBridge.syncLayout.bind(this.wasmBridge);
+            this.wasmBridge.syncLayout = () => {
+                const mapWire = w => {
+                    let nw = { ...w, from: { ...w.from }, to: { ...w.to } };
+                    if (nw.to.portId === 'a') nw.to.portId = 'in0';
+                    if (nw.to.portId === 'b') nw.to.portId = 'in1';
+                    if (nw.from.portId === 'q') nw.from.portId = 'out0';
+                    if (nw.from.portId === 'nq') nw.from.portId = 'out1';
+                    return nw;
+                };
+                
+                const origWires = this.wires;
+                this.wires = this.wires.map(mapWire);
+                
+                const origLib = this.library;
+                if (this.library) {
+                    this.library = {};
+                    for (const [k, v] of Object.entries(origLib)) {
+                        this.library[k] = { ...v, wires: v.wires.map(mapWire) };
+                    }
+                }
+                
+                origSync();
+                
+                this.wires = origWires;
+                this.library = origLib;
+            };
+
+            const origGetIdx = this.wasmBridge.getSpecificIdx.bind(this.wasmBridge);
+            this.wasmBridge.getSpecificIdx = (nid, pid) => {
+                if (pid === 'a') pid = 'in0';
+                else if (pid === 'b') pid = 'in1';
+                else if (pid === 'q') pid = 'out0';
+                else if (pid === 'nq') pid = 'out1';
+                return origGetIdx(nid, pid);
+            };
+
+            console.warn('[Simulator] Pseudo-native ports isolated. Engine parity stabilized.');
+            // Force Wasm recompilation with patched layout parity
+            if (this.wires && this.wires.length > 0) this.wasmBridge.syncLayout();
+        }
+
+        // [AUDIT: v1.23.72 | SEC_ARCH_LEAD] - Data corruption sanitization. Purge invalid array states from single-bit logic primitives to prevent strict equality (===) evaluation failures.
+        if (!this._stateSanitized) {
+            this.nodes.forEach(n => {
+                if (Array.isArray(n.state) && n.state.length === 1) n.state = n.state[0];
+            });
+            this._stateSanitized = true;
+        }
+
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Dynamic migration for legacy .bsim cross-wiring.
         if (!this._legacyMigrated && this.library && this.library['Full ALU']) {
             this._legacyMigrated = true;
             const uncross = (libName, fromNode, toNode, isOutToIn) => {
@@ -511,7 +565,7 @@ const Sim = {
         }
 
         if (!this.eventQueue || this.eventQueue.size === 0) {
-            // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - EXIT_TRACE: Early exit, simulation queue empty.
+            // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Early exit, simulation queue empty.
             return;
         }
 
@@ -677,7 +731,7 @@ const Sim = {
                 WireRenderer.drawWires();
                 // clear the queue
                 this.eventQueue.clear();
-                // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - EXIT_TRACE: Wasm-accelerated simulation tick complete.
+                // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Wasm-accelerated simulation tick complete.
                 return;
             }
         }
@@ -766,12 +820,12 @@ const Sim = {
         }
         // update HUD
         this.updateHUD();
-        // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - EXIT_TRACE: V8-based simulation tick complete. Iterations: ${iterations}.
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: V8-based simulation tick complete. Iterations: ${iterations}.
     },
 
     // [wasm] parity check
     /**
-     * [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - Telemetry taxonomy taxonomy correction for parity diagnostic module.
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Telemetry taxonomy taxonomy correction for parity diagnostic module.
      * @ARCH: DIAGNOSTIC_ORCHESTRATOR
      * @CONSTRAINT: ENGINE_PARITY
      * @INTENT: Perform a stress-test comparison between the V8 JS engine and the Wasm kernel to ensure state parity.
@@ -779,7 +833,7 @@ const Sim = {
     async runWasmParityCheck(iterations = 1000) {
         // check if WasmEngine is loaded
         if (!window.WasmEngine || !WasmEngine.ready) {
-            // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - EXIT_TRACE: Diagnostics aborted, Wasm Engine not linked.
+            // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Diagnostics aborted, Wasm Engine not linked.
             return this.toast('Wasm Engine not linked.', 'danger');
         }
         // show toast notification
@@ -798,7 +852,7 @@ const Sim = {
         const isPureNative = checkPure(this.nodes);
         // if not pure native, return toast
         if (!isPureNative) {
-            // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - EXIT_TRACE: Diagnostics aborted, mixed-mode netlist detected.
+            // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Diagnostics aborted, mixed-mode netlist detected.
             return this.toast('Parity check requires native logic components only.', 'warning');
         }
         // start console group
@@ -821,7 +875,7 @@ const Sim = {
         const snapshot = JSON.stringify(this.nodes.map(n => ({ id: n.id, val: n.val, state: n.state })));
         // for each iteration
         for (let i = 0; i < iterations; i++) {
-            // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - Inject async yield to prevent main-thread starvation and browser watchdog thermal trips.
+            // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Inject async yield to prevent main-thread starvation and browser watchdog thermal trips.
             if (i % 25 === 0) await new Promise(resolve => setTimeout(resolve, 0));
 
             // 1. Inject Randomized Entropy
@@ -950,7 +1004,7 @@ const Sim = {
         this.toast(passed ? 'Parity Suite: PASSED' : 'Parity Suite: FAILED (Check Console)', passed ? 'success' : 'danger');
         // update wire visuals
         this.updateWireVisuals();
-        // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - EXIT_TRACE: Parity diagnostics suite finalized. Result: ${passed ? 'PASSED' : 'FAILED'}.
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Parity diagnostics suite finalized. Result: ${passed ? 'PASSED' : 'FAILED'}.
     },
 
     // simulate internal circuit (sub-circuit simulation)
@@ -965,7 +1019,7 @@ const Sim = {
         let meta = typeof chipTypeOrMeta === 'string' ? this.library[chipTypeOrMeta] : chipTypeOrMeta.meta;
         // if meta not found, return
         if (!meta) {
-            // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - EXIT_TRACE: Sub-circuit simulation aborted, metadata missing for ${chipTypeOrMeta}.
+            // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Sub-circuit simulation aborted, metadata missing for ${chipTypeOrMeta}.
             return {};
         }
 
@@ -987,7 +1041,7 @@ const Sim = {
             // add to visited
             visited.add(netKey);
 
-            // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - Apply bidirectional topological net traversal for internal chip simulation.
+            // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Apply bidirectional topological net traversal for internal chip simulation.
             let wires = meta.wires.filter(w => 
                 (w.to.nodeId === nid && w.to.portId === pid) || 
                 (w.from.nodeId === nid && w.from.portId === pid)
@@ -1094,7 +1148,7 @@ const Sim = {
         const res = {};
         meta.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-')).forEach(out => res[out.id] = out.val === undefined ? 0 : out.val);
         if (this.debugToasts) console.debug(`[SimTrace] Sub-Circuit Result: ${typeof chipTypeOrMeta === 'string' ? chipTypeOrMeta : 'Custom'} | Outputs:`, res);
-        // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - EXIT_TRACE: Sub-simulation complete for ${typeof chipTypeOrMeta === 'string' ? chipTypeOrMeta : 'Custom'}.
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Sub-simulation complete for ${typeof chipTypeOrMeta === 'string' ? chipTypeOrMeta : 'Custom'}.
         return res;
     },
 
@@ -1115,7 +1169,7 @@ const Sim = {
         if (this.snapNodes) { x = Math.round(x / 20) * 20; y = Math.round(y / 20) * 20; }
         if (this.debugToasts) this.toast(`Added ${type} node`);
         const newNode = this._finalizeAddNode(type, x, y, label || type);
-        // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - EXIT_TRACE: Node added to workspace: ${newNode.id} (${type}).
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Node added to workspace: ${newNode.id} (${type}).
         return newNode;
     },
 
@@ -1135,7 +1189,7 @@ const Sim = {
         const NATIVE_TYPES = new Set(['NAND', 'CLOCK', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'JUNCTION', 'TRISTATE', 'DFF', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR']);
         if (this.library[type] && !NATIVE_TYPES.has(type)) { node.isCustom = true; }
         History.execute(new AddNodeCommand(node));
-        // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - EXIT_TRACE: Node command dispatched for ${node.id}.
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Node command dispatched for ${node.id}.
         return node;
     },
 
@@ -1150,7 +1204,7 @@ const Sim = {
             div.style.top = node.y + 'px';
             div.style.transform = 'none';
         }
-        // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - EXIT_TRACE: DOM position updated for node ${node.id}.
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: DOM position updated for node ${node.id}.
     },
 
     /**
@@ -1254,7 +1308,7 @@ const Sim = {
         }
 
         if (n._oscillating) el.classList.add('oscillating');
-        // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - EXIT_TRACE: Node visual state synchronized for ${n.id}.
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Node visual state synchronized for ${n.id}.
     },
 
     /**
@@ -1281,7 +1335,7 @@ const Sim = {
             x: (r.left - sr.left + r.width / 2) / View.scale,
             y: (r.top - sr.top + r.height / 2) / View.scale
         };
-        // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - EXIT_TRACE: Port coordinates resolved for ${nodeId}:${portId}.
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Port coordinates resolved for ${nodeId}:${portId}.
         return coords;
     },
 
@@ -1329,7 +1383,7 @@ const Sim = {
             this.clearSnapState();
             WireRenderer.drawWires();
         }
-        // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - EXIT_TRACE: Port interaction state machine cycle complete.
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Port interaction state machine cycle complete.
     },
 
     /**
@@ -1378,7 +1432,7 @@ const Sim = {
     },
 
     /**
-     * [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - Entry trace for driving signal resolution.
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for driving signal resolution.
      * @ARCH: SIGNAL_RESOLVER
      * @STATE: NETLIST_TRAVERSAL
      * @INTENT: Trace a net backwards to find the driving signal for a given input port.
@@ -1419,12 +1473,12 @@ const Sim = {
                 if (sig !== null) return sig;
             }
         }
-        // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - EXIT_TRACE: Driver resolution complete for ${nodeId}:${portId}. No driver found (Floating).
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Driver resolution complete for ${nodeId}:${portId}. No driver found (Floating).
         return null;
     },
 
     /**
-     * [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - Entry trace for full simulation reset.
+     * [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - Entry trace for full simulation reset.
      * @ARCH: SIMULATION_KERNEL
      * @STATE: SIMULATION_RESET
      * @INTENT: Reset transition histories and force a full-netlist propagation sweep.
@@ -1433,7 +1487,7 @@ const Sim = {
         this._transitions.clear(); 
         this.nodes.forEach(n => { n._oscillating = false; n._forcePropagate = true; }); 
         this.eventQueue = new Set(this.nodes); 
-        // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - EXIT_TRACE: Queue seeded for full propagation sweep.
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Queue seeded for full propagation sweep.
     },
     /**
      * @IO: UI_INTERACTION
@@ -1470,7 +1524,7 @@ const Sim = {
             this.updateNodeVisual(n);
         });
         this.seedQueue(); this.processQueue();
-        // [AUDIT: v1.23.71 | SEC_ARCH_LEAD] - EXIT_TRACE: Input bit(s) toggled and propagation triggered.
+        // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Input bit(s) toggled and propagation triggered.
     },
 
     /**
