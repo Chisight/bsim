@@ -108,6 +108,7 @@ nav span:hover { background: #252530; color: #fff; }
 }
 .gate.clock { border-style: solid; border-color: var(--wire-off); }
 .gate.selected { outline: 2px solid rgba(255,255,255,0.5); outline-offset: 4px; box-shadow: none; }
+.gate.dt-target-highlight { outline: 2px solid #00ffaa; outline-offset: 4px; box-shadow: 0 0 15px rgba(0, 255, 170, 0.6); z-index: 1000; transition: box-shadow 0.1s; }
 @keyframes pulse-red { from { opacity: 0.8; } to { opacity: 1; } }
 .gate.oscillating { border-color: var(--wire-off); animation: pulse-red 0.2s infinite alternate; border-style: dotted; }
 .gate.nand.active { border-color: var(--wire-on) !important; }
