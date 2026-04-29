@@ -1,4 +1,4 @@
-# Exit Trace Audit Log (v1.23.93)
+# Exit Trace Audit Log (v1.23.94)
 
 This document maps every logical exit point and function boundary instrumented with high-density `EXIT_TRACE` markers to isolate signal anomalies.
 
@@ -69,6 +69,9 @@ This document maps every logical exit point and function boundary instrumented w
 | `MigrationEngine.parseVer` | 14 | Early exit, version string empty. |
 | `MigrationEngine.parseVer` | 19 | Early exit, version format invalid. |
 | `MigrationEngine.migrate` | 32 | Migration aborted, data payload null. |
+| `MigrationEngine.migrate` | 108 | Migration complete. |
+| `exportProject` | 248 | Project serialization and export complete. |
+| `importProject` | 286 | Import process initiated via UI file picker. |
 
 ## 6. Synthesis UI (`js/modules/synth_ui.js`)
 | Function | Line | Intent |

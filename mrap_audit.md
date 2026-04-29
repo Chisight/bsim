@@ -1,4 +1,4 @@
-# MRAP Architectural Audit Log (v1.23.93)
+# MRAP Architectural Audit Log (v1.23.94)
 
 This document details the Modular Runtime Architectural Protocol (MRAP) taxonomy injection across the BrowserSim codebase. Every functional block has been tagged to enforce Zero Trust boundaries, traceability, and deterministic operation.
 
@@ -33,8 +33,8 @@ This document details the Modular Runtime Architectural Protocol (MRAP) taxonomy
 ## 3. Storage & Migration (`js/modules/persistence.js`)
 | Location | Tags | Intent |
 | :--- | :--- | :--- |
-| L6 | `@ARCH: MIGRATION_ENGINE`, `@CONSTRAINT: SCHEMA_PARITY` | Handle cross-version project data transformation and metadata injection. |
-| L231 | `@ARCH: PERSISTENCE_LAYER`, `@IO: FILE_SERIALIZATION` | Generate standard JSON payload for project export. |
+| L26 | `@ARCH: SCHEMA_MIGRATOR`, `@STATE: COMPATIBILITY_LAYER` | Handle cross-version project data transformation and metadata injection. |
+| L216 | `@ARCH: PERSISTENCE_LAYER`, `@IO: FILE_EXPORT` | Generate standard JSON payload for project export. |
 
 ## 4. UI Interaction & Synthesis (`js/modules/synth_ui.js`, `js/modules/debug_terminal.js`)
 | Location | Tags | Intent |
@@ -51,5 +51,5 @@ This document details the Modular Runtime Architectural Protocol (MRAP) taxonomy
 
 ---
 **Audit Status**: COMPLETED
-**Parity Verification**: v1.23.93 Standard Met.
+**Parity Verification**: v1.23.94 Standard Met.
 **Security Authorization**: SEC_ARCH_LEAD Approved.

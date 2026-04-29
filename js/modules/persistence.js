@@ -35,7 +35,8 @@ const ProjectManager = {
             const fileVer = this.parseVer(data.meta?.version || "1.0.0");
 
 
-            const currentVer = this.parseVer(window.EXPECTED_BSIM_VERSION || "1.23.93");
+            // [AUDIT: v1.23.94 | SEC_ARCH_LEAD] - Updated fallback runtime expectation string to enforce new migration baseline.
+            const currentVer = this.parseVer(window.EXPECTED_BSIM_VERSION || "1.23.94");
 
             if (fileVer < currentVer) console.log(`[Migration] Upgrading schema from ${data.meta?.version} to ${window.EXPECTED_BSIM_VERSION}`);
 
@@ -62,7 +63,8 @@ const ProjectManager = {
                                 }
                             } else {
                                 if (['NOT','AND','OR','NOR','XOR','XNOR','NAND'].includes(t)) {
-                                    if (ep.portId === 'out0' || ep.portId === 'out') ep.portId = 'q';
+                                    // [AUDIT: v1.23.94 | SEC_ARCH_LEAD] - Restored legacy combinational output mapping to resolve DOM binding failures.
+                                    if (ep.portId === 'out0' || ep.portId === 'q') ep.portId = 'out';
                                 } else if (['IN-1','OUT-1','PROBE-1','CLOCK'].includes(t)) {
                                     if (ep.portId === 'out') ep.portId = 'out0';
                                 }
@@ -102,7 +104,7 @@ const ProjectManager = {
             if (data.library) Object.values(data.library).forEach(chip => fixNetlist(chip.wires, chip.nodes));
 
             if (!data.meta) data.meta = {};
-            data.meta.version = (window.EXPECTED_BSIM_VERSION || "1.23.93") + "-Modular";
+            data.meta.version = (window.EXPECTED_BSIM_VERSION || "1.23.94") + "-Modular";
             // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Migration complete. Target version: ${data.meta.version}.
             return data;
         },
@@ -231,7 +233,7 @@ const ProjectManager = {
 
         const project = { 
             nodes: mainNodes, wires: mainWires, library: Sim.library,
-            meta: { version: "1.23.93-Modular", exportedAt: new Date().toISOString() }
+            meta: { version: "1.23.94-Modular", exportedAt: new Date().toISOString() }
         };
         
         const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
