@@ -92,10 +92,6 @@ const InteractionHandler = {
         const dragWires = Sim.wires.filter(w => selectedNodeIds.has(w.from.nodeId) && selectedNodeIds.has(w.to.nodeId) && (w.midX !== undefined || w.midY !== undefined))
                                    .map(w => ({ wire: w, ox: w.midX, oy: w.midY }));
                                    
-        // Isolate boundary wires (exactly ONE end is in the selection) that have custom routing
-        const boundaryWires = Sim.wires.filter(w => (selectedNodeIds.has(w.from.nodeId) ^ selectedNodeIds.has(w.to.nodeId)) && (w.midX !== undefined || w.midY !== undefined))
-                                       .map(w => ({ wire: w, ox: w.midX, oy: w.midY }));
-
         const onMove = (m) => {
             const dx = (m.clientX - startX) / View.scale;
             const dy = (m.clientY - startY) / View.scale;
@@ -123,12 +119,6 @@ const InteractionHandler = {
                 if (item.oy !== undefined) item.wire.midY = item.oy + snapDy;
             });
             
-            // Delete custom midpoints for boundary wires so the auto-router takes over cleanly
-            boundaryWires.forEach(item => {
-                delete item.wire.midX;
-                delete item.wire.midY;
-            });
-
             WireRenderer.drawWires();
         };
         const onUp = () => {
@@ -136,11 +126,10 @@ const InteractionHandler = {
             const moves = dragSet.filter(item => Math.abs(item.node.x - item.ox) > 1 || Math.abs(item.node.y - item.oy) > 1)
                                  .map(item => ({ id: item.node.id, ox: item.ox, oy: item.oy, nx: item.node.x, ny: item.node.y }));
             
+            // [AUDIT: v1.24.17 | SEC_ARCH_LEAD] - Preserved boundary wire midpoints during component drags to maintain custom routing.
             const wMoves = dragWires.map(item => ({ wire: item.wire, ox: item.ox, oy: item.oy, nx: item.wire.midX, ny: item.wire.midY }));
-            // Push boundary wire deletions to history (nx/ny = undefined) so CTRL-Z perfectly restores the routing corners
-            const boundaryMoves = boundaryWires.map(item => ({ wire: item.wire, ox: item.ox, oy: item.oy, nx: undefined, ny: undefined }));
 
-            if (moves.length > 0) History.execute(new MoveNodeCommand(moves, [...wMoves, ...boundaryMoves]));
+            if (moves.length > 0) History.execute(new MoveNodeCommand(moves, wMoves));
             // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node translation finalized. Commands dispatched: ${moves.length}.
         };
         document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp, { once: true });
