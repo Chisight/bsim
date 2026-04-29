@@ -4,7 +4,7 @@
  */
 const NodeRenderer = {
     /**
-     * [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Entry trace for node DOM instantiation.
+     * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for node DOM instantiation.
      * @ARCH: UI_RENDERING
      * @IO: DOM_FACTORY
      * @INTENT: Dynamically generate and inject the HTML/DOM representation for a specific logic node, including its ports and visual labels.
@@ -29,7 +29,7 @@ const NodeRenderer = {
             div.style.minWidth = '90px';
         }
         
-        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Inject parametric spatial overrides for custom macro layouts.
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Inject parametric spatial overrides for custom macro layouts.
         if (node.customWidth) { div.style.width = node.customWidth + 'px'; div.style.minWidth = node.customWidth + 'px'; }
         if (node.customHeight) { div.style.height = node.customHeight + 'px'; div.style.minHeight = node.customHeight + 'px'; }
         
@@ -40,24 +40,24 @@ const NodeRenderer = {
             for (let i = 0; i < bits; i++) {
                 const bIdx = bits - 1 - i; // TOP is MSB, BOTTOM is LSB
                 const topPct = bits === 1 ? 50 : ((i + 0.5) / bits) * 100;
-                // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - UI Scaling: Render single-digit pin indices for buses to prevent layout clipping.
+                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - UI Scaling: Render single-digit pin indices for buses to prevent layout clipping.
                 const labelText = (bits > 1) ? bIdx : '';
                 portsHtml += `<div class="port output" data-port="out${bIdx}" style="top:${topPct}%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${bIdx}')">
                     <div class="port-meta"><span class="port-label">${labelText}</span></div>
                 </div>`;
-                // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Isolated bit-dot indicators to opposite bounds to prevent port interaction overlap.
+                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Isolated bit-dot indicators to opposite bounds to prevent port interaction overlap.
                 portsHtml += `<div class="bit-dot" data-bit="${bIdx}" style="position:absolute; left:8px; top:calc(${topPct}% - 7px); margin:0;" onclick="event.stopPropagation(); Sim.toggleBit(event, '${node.id}', ${bIdx})"></div>`;
             }
         } else if (node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
             for (let i = 0; i < bits; i++) {
                 const bIdx = bits - 1 - i; // TOP is MSB, BOTTOM is LSB
                 const topPct = bits === 1 ? 50 : ((i + 0.5) / bits) * 100;
-                // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - UI Scaling: Render single-digit pin indices for buses to prevent layout clipping.
+                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - UI Scaling: Render single-digit pin indices for buses to prevent layout clipping.
                 const labelText = (bits > 1) ? bIdx : '';
                 portsHtml += `<div class="port input" data-port="in${bIdx}" style="top:${topPct}%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'in${bIdx}')">
                     <div class="port-meta"><span class="port-label">${labelText}</span></div>
                 </div>`;
-                // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Isolated bit-dot indicators to opposite bounds to prevent port interaction overlap.
+                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Isolated bit-dot indicators to opposite bounds to prevent port interaction overlap.
                 portsHtml += `<div class="bit-dot" data-bit="${bIdx}" style="position:absolute; right:8px; top:calc(${topPct}% - 7px); margin:0;"></div>`;
             }
         }
@@ -88,7 +88,7 @@ const NodeRenderer = {
             } else if (node.isCustom) {
                 const chipDef = Sim.library[node.type];
                 if (chipDef) {
-                    // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Apply secondary X-axis sorting to prevent creation-order drift for horizontal components.
+                    // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Apply secondary X-axis sorting to prevent creation-order drift for horizontal components.
                     const ins = chipDef.nodes.filter(n => n.type.startsWith('IN-')).sort((a, b) => (a.y - b.y) || (a.x - b.x));
                     const outs = chipDef.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-')).sort((a, b) => (a.y - b.y) || (a.x - b.x));
                     
@@ -102,7 +102,7 @@ const NodeRenderer = {
                         div.style.minHeight = (maxPorts * 20 + 20) + 'px';
                         div.style.height = (maxPorts * 20 + 20) + 'px';
                     }
-                    // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - Override default auto-height if custom geometry is defined.
+                    // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Override default auto-height if custom geometry is defined.
                     if (node.customHeight) { div.style.height = node.customHeight + 'px'; div.style.minHeight = node.customHeight + 'px'; }
                     if (node.customWidth) { div.style.width = node.customWidth + 'px'; div.style.minWidth = node.customWidth + 'px'; }
                     
@@ -112,7 +112,7 @@ const NodeRenderer = {
                         for (let i = 0; i < bits; i++) {
                             const bIdx = bits > 1 ? (bits - 1 - i) : 0;
                             const portId = `in${cIn}`;
-                            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - UI Scaling: Render single-digit pin indices for custom macro buses.
+                            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - UI Scaling: Render single-digit pin indices for custom macro buses.
                             const lbl = bits > 1 ? bIdx : p.label;
                             portsHtml += `<div class="port input" data-port="${portId}" style="top:${((cIn + 0.5) / totalIns) * 100}%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', '${portId}')"><span class="port-label">${lbl}</span></div>`;
                             cIn++;
@@ -125,7 +125,7 @@ const NodeRenderer = {
                         for (let i = 0; i < bits; i++) {
                             const bIdx = bits > 1 ? (bits - 1 - i) : 0;
                             const portId = `out${cOut}`;
-                            // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - UI Scaling: Render single-digit pin indices for custom macro buses.
+                            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - UI Scaling: Render single-digit pin indices for custom macro buses.
                             const lbl = bits > 1 ? bIdx : p.label;
                             portsHtml += `<div class="port output" data-port="${portId}" style="top:${((cOut + 0.5) / totalOuts) * 100}%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', '${portId}')"><span class="port-label">${lbl}</span></div>`;
                             cOut++;
@@ -156,7 +156,7 @@ const NodeRenderer = {
         document.getElementById('scene').appendChild(div);
         if (window.Sim && Sim._domCacheMap) Sim._domCacheMap.delete(node.id);
         Sim.updateNodeVisual(node);
-        // [AUDIT: v1.23.80 | SEC_ARCH_LEAD] - EXIT_TRACE: Node rendered and appended to DOM: ${node.id} (${node.type}).
+        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node rendered and appended to DOM: ${node.id} (${node.type}).
     }
 };
 

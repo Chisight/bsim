@@ -20,12 +20,12 @@ Every function exit point (including early returns and block terminators) MUST i
 **IMMUTABILITY RULE**: Historical audit markers and version strings within `[AUDIT: ...]` tags are strictly immutable. Automated patching, regex replacements, and agent-driven refactoring MUST NOT increment or modify historical version numbers. New logic receives new markers; old logic retains its original timestamp. Retroactive version bumping of these tags is a critical protocol violation.
 
 **Format**:
-`// [AUDIT: v<VERSION> | <ROLES>] - EXIT_TRACE: <Description> [Contextual Data]`
+`// [AUDIT: SEC_ARCH_LEAD] - EXIT_TRACE: <Description> [Contextual Data]`
 
 **Example**:
 ```javascript
 if (parityError) {
-    // [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - EXIT_TRACE: Parity drift detected at bit-index ${idx}.
+    // [AUDIT: SEC_ARCH_LEAD] - EXIT_TRACE: Parity drift detected at bit-index ${idx}.
     return false;
 }
 ```
