@@ -193,9 +193,62 @@ const DebugTerminal = {
             if (e.key === 'Enter') {
                 const cmd = this.inp.value.trim();
                 this.inp.value = '';
+                this.clearHighlight();
+                this._acState = null;
                 if (cmd) this.exec(cmd);
+            } else if (e.key === 'Tab') {
+                e.preventDefault();
+                this.handleTab();
+            } else if (e.key !== 'Shift' && e.key !== 'Control' && e.key !== 'Alt') {
+                this.clearHighlight();
+                this._acState = null;
             }
         };
+    },
+
+    /**
+     * @IO: AUTO_COMPLETE
+     * @INTENT: Handle tab-completion for commands and node IDs, with visual workspace highlighting.
+     */
+    handleTab() {
+        const val = this.inp.value;
+        if (!this._acState) {
+            const parts = val.split(' ');
+            const isCmd = parts.length === 1;
+            const prefix = parts[parts.length - 1].toLowerCase();
+            let matches = [];
+            
+            if (isCmd) {
+                const cmds = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace'];
+                matches = cmds.filter(c => c.startsWith(prefix));
+            } else {
+                matches = Sim.nodes.map(n => n.id).filter(id => id.toLowerCase().startsWith(prefix));
+            }
+            
+            if (matches.length === 0) return;
+            this._acState = { prefix, matches, idx: 0, parts };
+        } else {
+            this._acState.idx = (this._acState.idx + 1) % this._acState.matches.length;
+        }
+        
+        const match = this._acState.matches[this._acState.idx];
+        const parts = [...this._acState.parts];
+        parts[parts.length - 1] = match;
+        this.inp.value = parts.join(' ') + (this._acState.parts.length === 1 && this._acState.matches.length === 1 ? ' ' : '');
+        
+        if (this._acState.parts.length > 1) {
+            this.highlightNode(match);
+        }
+    },
+
+    highlightNode(id) {
+        this.clearHighlight();
+        const el = document.getElementById(id);
+        if (el) el.classList.add('dt-target-highlight');
+    },
+
+    clearHighlight() {
+        document.querySelectorAll('.dt-target-highlight').forEach(el => el.classList.remove('dt-target-highlight'));
     },
 
     /**
@@ -237,11 +290,11 @@ const DebugTerminal = {
      * @IO: TERMINAL_OUTPUT
      * @INTENT: Append a formatted message line to the terminal output display.
      */
-    // [AUDIT: v1.23.97 | SEC_ARCH_LEAD] - Removed forced prompt character to align with standard stdout aesthetics.
+    // [AUDIT: v1.23.98 | SEC_ARCH_LEAD] - Adjusted print handler to safely interpret HTML layout injections.
     print(msg, type = 'sys') {
         const line = document.createElement('div');
         line.className = `dt-msg dt-${type}`;
-        line.innerText = msg;
+        line.innerHTML = msg; // Upgraded to allow colored spans
         this.out.appendChild(line);
         this.out.scrollTop = this.out.scrollHeight;
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Message appended to terminal buffer.
@@ -252,18 +305,18 @@ const DebugTerminal = {
      * @IO: TERMINAL_INPUT
      * @INTENT: Parse and execute user-entered terminal commands for simulator control.
      */
-    // [AUDIT: v1.23.97 | SEC_ARCH_LEAD] - Expanded terminal CLI mapping for netlist manipulation and inspection.
+    // [AUDIT: v1.23.98 | SEC_ARCH_LEAD] - Upgraded terminal commands for verbose flags and bulk operations.
     exec(cmd) {
-        this.print(`bsim:~$ ${cmd}`, 'sys');
+        this.print(`<span style="color:#0f5">bsim:~$</span> ${cmd.replace(/</g, '&lt;')}`, 'sys');
         const args = cmd.trim().split(/\s+/);
         const c = args[0].toLowerCase();
 
         switch (c) {
             case 'help':
                 this.print("Commands: exit, clear, verbosity [0-3], synth [gate], trace [nodeId]");
-                this.print("  ls                  - List all nodes in workspace");
+                this.print("  ls [-l]             - List workspace nodes (-l for verbose layout)");
                 this.print("  spawn <type> [x y]  - Add a node (e.g., spawn NAND 100 100)");
-                this.print("  rm <nodeId>         - Delete a node");
+                this.print("  rm <id> [id2...]    - Delete nodes (or 'rm all')");
                 this.print("  set <nodeId> <val>  - Set input node value (e.g., set node-xyz 1)");
                 this.print("  wire <n1> <p1> <n2> <p2> - Connect two nodes");
                 this.print("  sim                 - Force a manual propagation tick");
@@ -277,11 +330,27 @@ const DebugTerminal = {
                 if (args[1]) { this.verbosity = parseInt(args[1]); this.print(`Verbosity -> ${this.verbosity}`); }
                 break;
             case 'ls':
+                const verbose = args.includes('-l') || args.includes('-v');
                 this.print(`--- NODE LIST (${Sim.nodes.length}) ---`, "warn");
-                Sim.nodes.forEach(n => {
-                    const out = `[${n.id}] ${n.type.padEnd(8)} @(${Math.round(n.x)},${Math.round(n.y)}) val:${n.val}`;
-                    this.print(out, "ok");
-                });
+                if (verbose) {
+                    Sim.nodes.forEach(n => {
+                        const out = `[<span style="color:#0af">${n.id}</span>] ${n.type.padEnd(8)} @(${Math.round(n.x)},${Math.round(n.y)}) val:${JSON.stringify(n.val)}`;
+                        this.print(out, "ok");
+                    });
+                } else {
+                    const groups = {};
+                    Sim.nodes.forEach(n => {
+                        if (!groups[n.type]) groups[n.type] = [];
+                        groups[n.type].push(n.id);
+                    });
+                    for (const [type, ids] of Object.entries(groups)) {
+                        const shortIds = ids.map(id => {
+                            const short = id.replace('node-', '');
+                            return `<span style="color:#0af" title="${id}">${short}</span>`;
+                        }).join(', ');
+                        this.print(`<b>${type.padEnd(8)}</b> (${ids.length}): ${shortIds}`, "sys");
+                    }
+                }
                 break;
             case 'spawn':
                 if (!args[1]) return this.print("Usage: spawn <type> [x] [y]", "err");
@@ -292,13 +361,23 @@ const DebugTerminal = {
                 this.print(`Spawned ${type} at ${x}, ${y}`, "ok");
                 break;
             case 'rm':
-                if (!args[1]) return this.print("Usage: rm <nodeId>", "err");
-                const targetNode = Sim.nodes.find(n => n.id === args[1]);
-                if (!targetNode) return this.print(`Node ${args[1]} not found.`, "err");
+                if (!args[1]) return this.print("Usage: rm <nodeId> [nodeId2...] or rm all", "err");
+                if (args[1] === 'all') {
+                    Sim.selection.clear();
+                    Sim.nodes.forEach(n => Sim.selection.add(n.id));
+                    Sim.deleteSelection();
+                    return this.print("Cleared entire workspace.", "ok");
+                }
+                let rmCount = 0;
                 Sim.selection.clear();
-                Sim.selection.add(targetNode.id);
-                Sim.deleteSelection();
-                this.print(`Deleted node ${args[1]}`, "ok");
+                for (let i = 1; i < args.length; i++) {
+                    const n = Sim.nodes.find(node => node.id === args[i] || node.id === `node-${args[i]}`);
+                    if (n) { Sim.selection.add(n.id); rmCount++; }
+                }
+                if (rmCount > 0) {
+                    Sim.deleteSelection();
+                    this.print(`Deleted ${rmCount} node(s).`, "ok");
+                } else this.print("No valid nodes found to delete.", "err");
                 break;
             case 'set':
                 if (args.length < 3) return this.print("Usage: set <nodeId> <value>", "err");
