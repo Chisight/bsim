@@ -262,6 +262,13 @@ footer {
     transition: transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
 }
 footer.auto-hidden { transform: translateY(100%); position: absolute; bottom: 0; width: 100%; box-sizing: border-box; }
+
+/* [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Polyfill styling for hierarchical library folders. */
+.lib-folder { display: flex; align-items: center; background: #1a1a23; border: 1px solid #334; border-radius: 6px; padding: 2px; }
+.folder-title { padding: 4px 8px; color: #aaa; cursor: pointer; font-size: 11px; font-weight: bold; user-select: none; white-space: nowrap; }
+.folder-title:hover { color: #fff; }
+.folder-contents { display: flex; gap: 8px; align-items: center; padding-left: 5px; border-left: 1px solid #334; overflow: hidden; transition: max-width 0.3s; max-width: 2000px; }
+.lib-folder.collapsed .folder-contents { max-width: 0; padding: 0; border: none; }
 footer::-webkit-scrollbar { height: 4px; }
 footer::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 .status-chip { flex-shrink: 0; }

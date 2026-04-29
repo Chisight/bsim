@@ -1761,44 +1761,62 @@ const Sim = {
             lib.appendChild(span);
         });
 
-        // 4. Inject Custom Library Chips
+        // 4. Inject Custom Library Chips (Hierarchical VFS Rendering)
+        const groups = { '': [] };
         Object.keys(this.library).forEach(name => {
-            const span = document.createElement('span');
-            span.className = 'status-chip custom';
-            span.innerText = name;
+            const folder = this.library[name].folder || '';
+            if (!groups[folder]) groups[folder] = [];
+            groups[folder].push(name);
+        });
 
-            // Recursion Guard
-            if (name === this.activeEditingChip) {
-                span.style.opacity = '0.3';
-                span.title = 'Cannot place a chip inside itself';
-                span.onclick = () => this.toast('Cannot place a chip inside itself', 'warning');
-                span.ondblclick = () => this.toast('Already editing this chip', 'warning');
-            } else {
-                span.onclick = () => this.addNode(name);
-                span.ondblclick = () => { if (typeof this.uiEditChip === 'function') this.uiEditChip(name); };
+        // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Dynamic collapsible folder instantiation for macro library.
+        Object.keys(groups).sort().forEach(folder => {
+            let container = lib;
+            if (folder !== '') {
+                const fDiv = document.createElement('div');
+                fDiv.className = 'lib-folder';
+                fDiv.innerHTML = `<span class="folder-title" onclick="this.parentElement.classList.toggle('collapsed')">📁 ${folder}</span><div class="folder-contents"></div>`;
+                lib.appendChild(fDiv);
+                container = fDiv.querySelector('.folder-contents');
             }
 
-            span.oncontextmenu = (e) => {
-                e.preventDefault();
-                menu.style.display = 'block';
+            groups[folder].sort().forEach(name => {
+                const span = document.createElement('span');
+                span.className = 'status-chip custom';
+                span.innerText = name;
 
-                // Bounds checking to prevent off-screen clipping
-                const menuH = 120;
-                const menuW = 150;
-                let top = e.clientY;
-                let left = e.clientX;
+                if (name === this.activeEditingChip) {
+                    span.style.opacity = '0.3';
+                    span.title = 'Cannot place a chip inside itself';
+                    span.onclick = () => this.toast('Cannot place a chip inside itself', 'warning');
+                    span.ondblclick = () => this.toast('Already editing this chip', 'warning');
+                } else {
+                    span.onclick = () => this.addNode(name);
+                    span.ondblclick = () => { if (typeof this.uiEditChip === 'function') this.uiEditChip(name); };
+                }
 
-                if (top + menuH > window.innerHeight) top -= menuH;
-                if (left + menuW > window.innerWidth) left -= menuW;
+                span.oncontextmenu = (e) => {
+                    e.preventDefault();
+                    menu.style.display = 'block';
 
-                menu.style.left = left + 'px';
-                menu.style.top = top + 'px';
+                    const menuH = 120;
+                    const menuW = 150;
+                    let top = e.clientY;
+                    let left = e.clientX;
 
-                menu.innerHTML = '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.uiEditChip(\'' + name + '\')">Edit Internals</div>' +
-                    '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.modal(\'Rename Chip\',\'New name:\',\'prompt\',nn=>{if(nn && !Sim.library[nn]){Sim.library[nn]=Sim.library[\'' + name + '\']; delete Sim.library[\'' + name + '\']; Sim.nodes.forEach(n=>{if(n.type===\'' + name + '\')n.type=nn;}); Sim.updateLibraryUI(); Sim.autoSave(); }},\'' + name + '\')">Rename</div>' +
-                    '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#ff4757; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#ff6b81\'" onmouseout="this.style.color=\'#ff4757\'" onclick="if(Sim.activeEditingChip===\'' + name + '\') Sim.uiExitChipEdit(); Sim.uiDeleteChip(\'' + name + '\')">Delete</div>';
-            };
-            lib.appendChild(span);
+                    if (top + menuH > window.innerHeight) top -= menuH;
+                    if (left + menuW > window.innerWidth) left -= menuW;
+
+                    menu.style.left = left + 'px';
+                    menu.style.top = top + 'px';
+
+                    menu.innerHTML = '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.uiEditChip(\'' + name + '\')">Edit Internals</div>' +
+                        '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.modal(\'Rename Chip\',\'New name:\',\'prompt\',nn=>{if(nn && !Sim.library[nn]){Sim.library[nn]=Sim.library[\'' + name + '\']; delete Sim.library[\'' + name + '\']; Sim.nodes.forEach(n=>{if(n.type===\'' + name + '\')n.type=nn;}); Sim.updateLibraryUI(); Sim.autoSave(); }},\'' + name + '\')">Rename</div>' +
+                        '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.modal(\'Move Chip\',\'New Folder Path:\',\'prompt\',f=>{if(f!==null){Sim.library[\'' + name + '\'].folder=f; Sim.updateLibraryUI(); Sim.autoSave(); }},\'' + (Sim.library[name].folder||'') + '\')">Move</div>' +
+                        '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#ff4757; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#ff6b81\'" onmouseout="this.style.color=\'#ff4757\'" onclick="if(Sim.activeEditingChip===\'' + name + '\') Sim.uiExitChipEdit(); Sim.uiDeleteChip(\'' + name + '\')">Delete</div>';
+                };
+                container.appendChild(span);
+            });
         });
     },
 
@@ -2203,20 +2221,28 @@ const Sim = {
      * @STATE: LIBRARY_PERSISTENCE
      * @INTENT: Snapshot the current workspace into a new custom chip definition and register it in the library.
      */
+    // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Hierarchical namespacing injection for macro library.
     uiSaveAsGate() {
-        this.modal('Save Custom Chip', 'Enter unique name for this logic:', 'prompt', (name) => {
-            if (name && name.trim()) {
-                const n = name.trim();
+        this.modal('Save Custom Chip', 'Enter name (e.g., FolderName/ChipName):', 'prompt', (input) => {
+            if (input && input.trim()) {
+                let n = input.trim();
+                let folder = '';
+                if (n.includes('/')) {
+                    const parts = n.split('/');
+                    n = parts.pop().trim();
+                    folder = parts.join('/').trim();
+                }
                 if (this.library[n]) {
                     this.toast('A chip with this name already exists!', 'warning');
                     return;
                 }
                 this.library[n] = {
+                    folder: folder,
                     nodes: JSON.parse(JSON.stringify(this.nodes)),
                     wires: JSON.parse(JSON.stringify(this.wires))
                 };
                 this.updateLibraryUI();
-                this.toast(`Chip "${n}" saved to library`, 'success');
+                this.toast(`Chip "${n}" saved to ${folder ? 'folder ' + folder : 'library'}`, 'success');
                 this.autoSave();
             }
         });
@@ -2678,9 +2704,10 @@ const Sim = {
      * @STATE: LIBRARY_SYNC
      * @INTENT: Save current chip logic to the library and return to the parent workspace context.
      */
-    // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Architecture augmentation for dual-pane editing layout.
+    // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Architecture augmentation for dual-pane editing layout with workspace clearing.
     uiSplitEditor(direction) {
         if (!this.activeEditingChip) return;
+        const targetChip = this.activeEditingChip;
         const tab = document.querySelector(`.tab[onclick*="${this.activeTabId}"]`);
         
         let splitFrame = document.getElementById('split-editor-frame');
@@ -2692,7 +2719,7 @@ const Sim = {
         const main = document.getElementById('main');
         main.classList.remove('workspace-split', 'split-left', 'split-right');
         
-        const chipUrl = `?chip=${encodeURIComponent(this.activeEditingChip)}`;
+        const chipUrl = `?chip=${encodeURIComponent(targetChip)}`;
 
         if (direction === 'popup') {
             popupWrap = document.createElement('div');
@@ -2701,7 +2728,7 @@ const Sim = {
             
             popupWrap.innerHTML = `
                 <div id="popup-editor-head" style="background: #111; padding: 6px 10px; color: #888; cursor: move; display: flex; justify-content: space-between; user-select: none; border-bottom: 1px solid #222; font-family: 'JetBrains Mono', monospace; font-size: 12px;">
-                    <div style="font-weight:bold; color:#ffca28;">CHIP EDITOR: ${this.activeEditingChip}</div>
+                    <div style="font-weight:bold; color:#ffca28;">CHIP EDITOR: ${targetChip}</div>
                     <span onclick="document.getElementById('popup-editor-wrap').remove(); document.querySelector('.tab.has-split')?.classList.remove('has-split');" style="cursor:pointer; font-weight:bold; color:#ff4757;">X</span>
                 </div>
                 <iframe src="${chipUrl}" style="flex:1; border:none; width:100%; height:100%; background:var(--bg);"></iframe>
@@ -2725,13 +2752,19 @@ const Sim = {
             document.addEventListener('mouseup', () => isDragging = false);
 
             if (tab) tab.classList.add('has-split');
-            this.toast(`Popup editor spawned for ${this.activeEditingChip}`, 'success');
+            this.toast(`Popup editor spawned for ${targetChip}`, 'success');
             
         } else {
-            splitFrame = document.createElement('iframe');
+            splitFrame = document.createElement('div');
             splitFrame.id = 'split-editor-frame';
-            splitFrame.src = chipUrl;
-            splitFrame.style.cssText = 'flex: 1; border: none; background: var(--bg); min-width: 0;';
+            splitFrame.style.cssText = 'flex: 1; display: flex; flex-direction: column; border: none; background: var(--bg); min-width: 0; z-index: 10; position: relative;';
+            splitFrame.innerHTML = `
+                <div style="background: #111; padding: 6px 10px; color: #888; display: flex; justify-content: space-between; border-bottom: 1px solid #222; font-family: 'JetBrains Mono', monospace; font-size: 12px;">
+                    <div style="font-weight:bold; color:#ffca28;">CHIP EDITOR: ${targetChip}</div>
+                    <span onclick="document.getElementById('split-editor-frame').remove(); document.getElementById('main').classList.remove('workspace-split', 'split-left', 'split-right'); document.querySelector('.tab.has-split')?.classList.remove('has-split');" style="cursor:pointer; font-weight:bold; color:#ff4757;">X</span>
+                </div>
+                <iframe src="${chipUrl}" style="flex:1; border:none; width:100%; height:100%; background:var(--bg);"></iframe>
+            `;
             
             main.classList.add('workspace-split');
             if (direction === 'left') {
@@ -2744,6 +2777,8 @@ const Sim = {
             if (tab) tab.classList.add('has-split');
             this.toast(`Split pane activated: ${direction.toUpperCase()}`, 'info');
         }
+        // Restore parent workspace in main view.
+        this.uiExitChipEdit();
     },
 
     uiExitChipEdit() {

@@ -4,6 +4,7 @@
 const DebugTerminal = {
     verbosity: 2,
     visible: false,
+    cwd: '/', // Virtual File System Root
     
     RECIPES: {
         'NOT': {
@@ -136,12 +137,12 @@ const DebugTerminal = {
         this.ui.id = 'dt-wrap';
         this.ui.innerHTML = `
             <div id="dt-head">
-                <div style="font-weight:bold; color:#888;">user@bsim: ~/workspace</div>
+                <div style="font-weight:bold; color:#888;">user@bsim: <span id="dt-header-cwd">/home/bsim/</span></div>
                 <div><span id="dt-min" style="cursor:pointer; margin-right:8px;">_</span><span id="dt-close" style="cursor:pointer;">X</span></div>
             </div>
             <div id="dt-out"></div>
             <div id="dt-in-row">
-                <span id="dt-prompt">bsim:~$</span>
+                <span id="dt-prompt">bsim:~<span id="dt-prompt-cwd">/</span>$</span>
                 <input id="dt-in" type="text" autocomplete="off" spellcheck="false" />
             </div>
         `;
@@ -314,7 +315,10 @@ const DebugTerminal = {
         switch (c) {
             case 'help':
                 this.print("Commands: exit, clear, verbosity [0-3], synth [gate], trace [nodeId]");
-                this.print("  ls [-l]             - List workspace nodes (-l for verbose layout)");
+                this.print("  pwd                 - Print Working Directory (VFS)");
+                this.print("  cd <path>           - Change Directory (VFS)");
+                this.print("  mv <chip> <folder>  - Move chip to a library folder");
+                this.print("  ls [-l]             - List workspace nodes or VFS contents");
                 this.print("  spawn <type> [x y]  - Add a node (e.g., spawn NAND 100 100)");
                 this.print("  rm <id> [id2...]    - Delete nodes (or 'rm all')");
                 this.print("  set <nodeId> <val>  - Set input node value (e.g., set node-xyz 1)");
@@ -324,6 +328,38 @@ const DebugTerminal = {
                 this.print("  synth <gate>        - Hierarchically compiles logic from NANDs.");
                 this.print("  trace [nodeId]      - Output topological connections and logic states.");
                 break;
+            case 'pwd':
+                this.print(`/home/bsim${this.cwd}`, 'sys');
+                break;
+            case 'cd':
+                if (!args[1] || args[1] === '~' || args[1] === '/') {
+                    this.cwd = '/';
+                } else if (args[1] === '..') {
+                    const parts = this.cwd.split('/').filter(p => p);
+                    parts.pop();
+                    this.cwd = '/' + parts.join('/');
+                    if (this.cwd === '//') this.cwd = '/';
+                } else {
+                    let next = this.cwd.endsWith('/') ? this.cwd + args[1] : this.cwd + '/' + args[1];
+                    this.cwd = next;
+                }
+                document.getElementById('dt-header-cwd').innerText = `/home/bsim${this.cwd}`;
+                document.getElementById('dt-prompt-cwd').innerText = this.cwd;
+                break;
+            case 'mv':
+                if (args.length < 3) return this.print("Usage: mv <chip> <folder>", "err");
+                const targetChip = args[1];
+                let destFolder = args[2];
+                if (destFolder === '/' || destFolder === '~') destFolder = '';
+                if (Sim.library[targetChip]) {
+                    Sim.library[targetChip].folder = destFolder;
+                    Sim.updateLibraryUI();
+                    Sim.autoSave();
+                    this.print(`Moved ${targetChip} to ${destFolder === '' ? 'root' : destFolder}`, "ok");
+                } else {
+                    this.print(`Chip '${targetChip}' not found in library.`, "err");
+                }
+                break;
             case 'exit': this.toggle(false); break;
             case 'clear': this.out.innerHTML = ''; break;
             case 'verbosity':
@@ -331,11 +367,34 @@ const DebugTerminal = {
                 break;
             case 'ls':
                 const verbose = args.includes('-l') || args.includes('-v');
-                this.print(`--- NODE LIST (${Sim.nodes.length}) ---`, "warn");
+                if (this.cwd !== '/') {
+                    // Virtual File System View
+                    const searchDir = this.cwd.startsWith('/') ? this.cwd.substring(1) : this.cwd;
+                    this.print(`--- DIRECTORY: /home/bsim${this.cwd} ---`, "warn");
+                    let found = 0;
+                    Object.keys(Sim.library).forEach(name => {
+                        const folder = Sim.library[name].folder || '';
+                        if (folder === searchDir || folder.startsWith(searchDir + '/')) {
+                            this.print(`[Macro] <span style="color:#0af">${name}</span>`, "ok");
+                            found++;
+                        }
+                    });
+                    if (found === 0) this.print("Directory empty.", "sys");
+                    return;
+                }
+
+                // Workspace/Root View
+                this.print(`--- WORKSPACE TABS (${Sim.tabs.length}) ---`, "warn");
+                Sim.tabs.forEach(t => {
+                    const tag = t.id === Sim.activeTabId ? '<span style="color:#ffca28">*</span>' : ' ';
+                    this.print(`${tag} [<span style="color:#0af">${t.id}</span>] ${t.name}`, "ok");
+                });
+
+                this.print(`--- ACTIVE BOARD (${Sim.nodes.length} nodes) ---`, "warn");
                 if (verbose) {
                     Sim.nodes.forEach(n => {
                         const out = `[<span style="color:#0af">${n.id}</span>] ${n.type.padEnd(8)} @(${Math.round(n.x)},${Math.round(n.y)}) val:${JSON.stringify(n.val)}`;
-                        this.print(out, "ok");
+                        this.print(out, "sys");
                     });
                 } else {
                     const groups = {};
