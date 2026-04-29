@@ -1309,7 +1309,7 @@ const Sim = {
         if (n.customWidth) el.style.width = n.customWidth + 'px';
         if (n.customHeight) el.style.height = n.customHeight + 'px';
         
-        // [AUDIT: v1.24.26 | SEC_ARCH_LEAD] - Apply localized label geometry bounding box limits.
+        // [AUDIT: v1.24.27 | SEC_ARCH_LEAD] - Apply localized label geometry bounding box limits and dynamic font scaling.
         const lblCont = el.querySelector('.gate-label');
         if (lblCont && (n.labelX !== undefined || n.labelW !== undefined)) {
             lblCont.style.position = 'absolute';
@@ -1317,7 +1317,11 @@ const Sim = {
             if (n.labelX !== undefined) lblCont.style.left = n.labelX + 'px';
             if (n.labelY !== undefined) lblCont.style.top = n.labelY + 'px';
             if (n.labelW !== undefined) lblCont.style.width = n.labelW + 'px';
-            if (n.labelH !== undefined) lblCont.style.height = n.labelH + 'px';
+            if (n.labelH !== undefined) {
+                lblCont.style.height = n.labelH + 'px';
+                lblCont.style.fontSize = Math.max(8, Math.min(n.labelH * 0.6, (n.customHeight || parseInt(el.style.height) || 64) * 0.5)) + 'px';
+                lblCont.style.lineHeight = (n.labelH - 8) + 'px';
+            }
         }
 
         const bits = parseInt(n.type.split('-')[1]) || 1;
@@ -2449,26 +2453,26 @@ const Sim = {
                     el.style.width = node.customWidth + 'px';
                     el.style.height = node.customHeight + 'px';
                     Sim.updateWireVisuals();
-                } else if (mode === 'pins' || mode === 'info') {
+                } else if (mode === 'pins' || mode === 'info' || mode === 'label') {
                     let cX = startPinX, cY = startPinY, cW = startPinW, cH = startPinH;
                     if (isResizing || m.shiftKey) { 
-                        // [AUDIT: SEC_ARCH_LEAD] - Generalized rigid boundary clamping for independent axis scaling to prevent chip escape.
+                        // [AUDIT: v1.24.27 | SEC_ARCH_LEAD] - Adjusted scaling constraints for label geometries to permit overhangs and font scaling.
                         if (rLeft) {
-                            const nextX = Math.max(0, startPinX + dx);
+                            const nextX = mode === 'label' ? startPinX + dx : Math.max(0, startPinX + dx);
                             const diffX = nextX - startPinX;
                             cX = nextX;
                             cW = Math.max(16, startPinW - diffX);
                         } else if (rRight) {
-                            cW = Math.max(16, Math.min(startNodeW - startPinX, startPinW + dx));
+                            cW = Math.max(16, mode === 'label' ? Math.min(startNodeW * 3, startPinW + dx) : Math.min(startNodeW - startPinX, startPinW + dx));
                         }
 
                         if (rTop) {
-                            const nextY = Math.max(0, startPinY + dy);
+                            const nextY = mode === 'label' ? startPinY + dy : Math.max(0, startPinY + dy);
                             const diffY = nextY - startPinY;
                             cY = nextY;
-                            cH = Math.max(16, startPinH - diffY);
+                            cH = Math.max(10, startPinH - diffY);
                         } else if (rBottom) {
-                            cH = Math.max(16, Math.min(startNodeH - startPinY, startPinH + dy));
+                            cH = Math.max(10, mode === 'label' ? Math.min(startNodeH, startPinH + dy) : Math.min(startNodeH - startPinY, startPinH + dy));
                         }
                     } else { 
                         // Move from Center
@@ -2476,8 +2480,8 @@ const Sim = {
                         const curH = startPinH || target.offsetHeight || 16;
                         const maxW = Math.max(0, startNodeW - curW);
                         const maxH = Math.max(0, startNodeH - curH);
-                        cX = Math.max(0, Math.min(maxW, startPinX + dx));
-                        cY = Math.max(0, Math.min(maxH, startPinY + dy));
+                        cX = mode === 'label' ? startPinX + dx : Math.max(0, Math.min(maxW, startPinX + dx));
+                        cY = mode === 'label' ? startPinY + dy : Math.max(0, Math.min(maxH, startPinY + dy));
                     }
                     
                     if (mode === 'info') {
