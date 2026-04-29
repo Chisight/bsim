@@ -394,6 +394,7 @@ const InteractionHandler = {
             }
 
             menu.innerHTML = `
+                <div class="menu-item" style="color:#8888aa; font-weight:bold; border-bottom:1px solid #334; margin-bottom:5px; padding-bottom:5px;" onclick="if(window.DebugTerminal) DebugTerminal.toggle(true); document.getElementById('context-menu').style.display='none';">> Open Terminal</div>
                 <div class="menu-item has-sub" style="color:var(--wire-on); font-weight:bold">
                     Spawn Input
                     <div class="sub-menu">
