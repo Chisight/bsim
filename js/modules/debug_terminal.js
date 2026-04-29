@@ -366,19 +366,29 @@ const DebugTerminal = {
             if (parts.length === 1) {
                 const cmds = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv'];
                 matches = cmds.filter(c => c.startsWith(prefix));
-            } else if (cmd === 'cd' || cmd === 'ls' || cmd === 'tree') {
-                // [AUDIT: v1.24.01 | SEC_ARCH_LEAD] - Dynamic VFS path autocomplete.
+            } else if (cmd === 'cd' || cmd === 'ls' || cmd === 'tree' || cmd === 'rm') {
+                // [AUDIT: v1.24.02 | SEC_ARCH_LEAD] - Dynamic VFS path autocomplete with trailing slash parsing.
                 let searchPath = prefix.includes('/') ? prefix.substring(0, prefix.lastIndexOf('/')) : '';
                 let searchPrefix = prefix.includes('/') ? prefix.substring(prefix.lastIndexOf('/') + 1) : prefix;
+                if (prefix.endsWith('/')) {
+                    searchPath = prefix.slice(0, -1);
+                    searchPrefix = '';
+                }
+                
                 let targetDir = this.resolvePath(searchPath || '.');
+                if (prefix.startsWith('/') && !searchPath) targetDir = '/';
                 
                 let opts = [];
                 const vfs = this.getVirtualDir(targetDir);
                 if (vfs) {
                     opts = vfs.dirs.map(d => `${d}/`);
+                    if (cmd === 'rm') opts = opts.concat(vfs.files.map(f => f.replace(/^\[.*?\]\s*/, '')));
                 }
                 
-                matches = opts.filter(d => d.startsWith(searchPrefix)).map(d => (searchPath ? searchPath + '/' : '') + d);
+                matches = opts.filter(d => d.startsWith(searchPrefix)).map(d => {
+                    if (prefix.startsWith('/') && !searchPath) return '/' + d;
+                    return (searchPath ? searchPath + '/' : '') + d;
+                });
             } else {
                 const cNodes = this.getNodesForCwd();
                 matches = cNodes.map(n => n.id).filter(id => id.toLowerCase().startsWith(prefix));
@@ -709,23 +719,65 @@ const DebugTerminal = {
                 this.print(`Spawned ${type} at ${x}, ${y}`, "ok");
                 break;
             case 'rm':
-                if (!args[1]) return this.print("Usage: rm <nodeId> [nodeId2...] or rm all", "err");
-                if (args[1] === 'all') {
+                // [AUDIT: v1.24.02 | SEC_ARCH_LEAD] - Integrated recursive file system deletion logic (rm -rf).
+                const isRf = args.includes('-rf') || args.includes('-r') || args.includes('-f');
+                const rmArgs = args.filter(a => a !== 'rm' && !a.startsWith('-'));
+                
+                if (rmArgs.length === 0) return this.print("Usage: rm [-rf] <id|path> [id2...]", "err");
+                
+                if (rmArgs[0] === 'all' && this.cwd.startsWith('/home/bsim')) {
                     Sim.selection.clear();
                     Sim.nodes.forEach(n => Sim.selection.add(n.id));
                     Sim.deleteSelection();
                     return this.print("Cleared entire workspace.", "ok");
                 }
+
                 let rmCount = 0;
+                let rmDirCount = 0;
                 Sim.selection.clear();
-                for (let i = 1; i < args.length; i++) {
-                    const n = Sim.nodes.find(node => node.id === args[i] || node.id === `node-${args[i]}`);
-                    if (n) { Sim.selection.add(n.id); rmCount++; }
+                
+                rmArgs.forEach(target => {
+                    if (target.includes('/') || this.cwd.startsWith('/etc/lib')) {
+                        let targetPath = this.resolvePath(target).replace(/\/$/, '');
+                        if (targetPath.startsWith('/etc/lib/custom')) {
+                            const searchDir = targetPath.replace('/etc/lib/custom', '').replace(/^\//, '');
+                            if (searchDir === '') return this.print("rm: cannot remove root custom directory", "err");
+                            
+                            if (Sim.library[searchDir]) {
+                                delete Sim.library[searchDir];
+                                rmCount++;
+                            } else if (isRf) {
+                                let deleted = false;
+                                Object.keys(Sim.library).forEach(name => {
+                                    const folder = Sim.library[name].folder || '';
+                                    if (folder === searchDir || folder.startsWith(searchDir + '/')) {
+                                        delete Sim.library[name];
+                                        rmCount++;
+                                        deleted = true;
+                                    }
+                                });
+                                if (deleted) rmDirCount++;
+                                else this.print(`rm: cannot remove '${target}': No such file or directory`, "err");
+                            } else {
+                                this.print(`rm: cannot remove '${target}': Is a directory (use -rf)`, "err");
+                            }
+                        } else {
+                            this.print(`rm: cannot remove '${target}': Permission denied`, "err");
+                        }
+                    } else {
+                        const n = Sim.nodes.find(node => node.id === target || node.id === `node-${target}`);
+                        if (n) { Sim.selection.add(n.id); rmCount++; }
+                    }
+                });
+                
+                if (Sim.selection.size > 0) Sim.deleteSelection();
+                if (rmCount > 0 || rmDirCount > 0) {
+                    if (rmDirCount > 0 || this.cwd.startsWith('/etc/lib')) Sim.updateLibraryUI();
+                    this.print(`Removed ${rmCount} item(s).`, "ok");
+                    Sim.autoSave();
+                } else if (Sim.selection.size === 0 && rmCount === 0 && rmDirCount === 0) {
+                    this.print("No valid items found to delete.", "err");
                 }
-                if (rmCount > 0) {
-                    Sim.deleteSelection();
-                    this.print(`Deleted ${rmCount} node(s).`, "ok");
-                } else this.print("No valid nodes found to delete.", "err");
                 break;
             case 'set':
                 if (args.length < 3) return this.print("Usage: set <nodeId> <value>", "err");
