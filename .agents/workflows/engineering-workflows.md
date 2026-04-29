@@ -31,4 +31,23 @@ description: These adapt standard hardware verification (EDA) practices to the d
 ### 05. HIERARCHY FLATTENING
 **Target Context:** `./workflows/05-hierarchy-flattening.md`
 **Trigger Conditions:** V8 JS stack recursion limits, dynamic Wasm sub-macro compilation thresholds.
---- END FILE ---
+
+### 06. STRICT LINEAR MEMORY LIFECYCLE
+**Target Context:** `./workflows/06-memory-lifecycle.md`
+**Trigger Conditions:** Wasm linear memory allocation, garbage collection, UI component instantiation and deletion.
+
+### 07. CLOCK DOMAIN ISOLATION (CDC)
+**Target Context:** `./workflows/07-clock-domain-crossing.md`
+**Trigger Conditions:** Asynchronous DOM events, keyboard/mouse inputs, Wasm discrete time step synchronization.
+
+### 08. PURE HARDWARE ENCAPSULATION
+**Target Context:** `./workflows/08-macro-encapsulation.md`
+**Trigger Conditions:** Custom macro synthesis, hidden state variable checks, combinatorial loop validation.
+
+### 09. HIERARCHICAL RECURSION LIMITS (HRL)
+**Target Context:** `./workflows/09-hierarchical-recursion-limits.md`
+**Trigger Conditions:** Deeply nested macro resolution, circular macro dependencies, V8 stack limit protection.
+
+### 10. STRICT BUS WIDTH ENFORCEMENT
+**Target Context:** `./workflows/10-strict-bus-widths.md`
+**Trigger Conditions:** Port-to-port edge connections, bit-width mismatch detection, Wasm memory boundary overflow prevention.
