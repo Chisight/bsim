@@ -95,7 +95,8 @@ const DebugTerminal = {
         this.buildUI();
         this.attachHooks();
         this.overrideConsole();
-        console.log("[TERM] V8/WASM Debugger Initialized. Press Ctrl+P.");
+        // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Updated terminal hotkey to avoid native print dialog collisions.
+        console.log("[TERM] V8/WASM Debugger Initialized. Press Ctrl+Alt+P.");
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Debug terminal subsystem operational.
     },
 
@@ -321,6 +322,7 @@ const DebugTerminal = {
         }
     },
 
+    // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Repaired object literal syntax and updated object references for clipboard context menu.
     showContextMenu(x, y) {
         let menu = document.getElementById('dt-ctx-menu');
         if (!menu) {
@@ -336,13 +338,13 @@ const DebugTerminal = {
             <div class="dt-menu-item" onclick="document.execCommand('cut')">Cut</div>
             <div style="height:1px; background:#334; margin:4px 0;"></div>
             <div class="dt-menu-item" onclick="window.open(window.location.href, '_blank')">New Tab</div>
-            <div class="dt-menu-item" onclick="Sim.dt.saveContents()">Save Contents</div>
-            <div class="dt-menu-item" onclick="Sim.dt.exec('clear')">Clear Terminal</div>
+            <div class="dt-menu-item" onclick="DebugTerminal.saveContents()">Save Contents</div>
+            <div class="dt-menu-item" onclick="DebugTerminal.exec('clear')">Clear Terminal</div>
         `;
         menu.style.left = x + 'px';
         menu.style.top = y + 'px';
         menu.style.display = 'flex';
-    }
+    },
 
     saveContents() {
         const text = this.out.innerText;
@@ -352,7 +354,7 @@ const DebugTerminal = {
         a.download = 'bsim_terminal_log.txt';
         a.click();
         this.print("Terminal contents saved.", "ok");
-    }
+    },
 
     highlightNode(id) {
         this.clearHighlight();
@@ -370,7 +372,7 @@ const DebugTerminal = {
      */
     attachHooks() {
         window.addEventListener('keydown', (e) => {
-            if (e.ctrlKey && e.key.toLowerCase() === 'p') {
+            if (e.ctrlKey && e.altKey && e.key.toLowerCase() === 'p') {
                 e.preventDefault();
                 this.toggle(!this.visible);
             }
