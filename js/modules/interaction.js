@@ -33,8 +33,9 @@ const InteractionHandler = {
 
             // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Context menu parity: expose component-specific parameterization and macro geometry endpoints on canvas instances.
             // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Node Prefs extension: spatial edit mode for I/O bounds and internal pin layout arrays.
+            // [AUDIT: v1.24.15 | SEC_ARCH_LEAD] - Fixed string interpolation collision and enforced DOM recalculation for I/O labels.
             const isNative = !node.isCustom;
-            const renameAction = `onclick="Sim.modal('Rename Component','Label:','prompt',v=>{if(v && v.trim()!==''){node.label=v.trim(); const l=document.getElementById('${node.id}').querySelector('.gate-label'); if(l)l.innerText=node.label; Sim.autoSave();}},'${node.label}'); document.getElementById('context-menu').style.display='none';"`;
+            const renameAction = `onclick="InteractionHandler.handleNodeDblClick(new Event('dblclick'), Sim.nodes.find(n=>n.id==='${node.id}'), document.getElementById('${node.id}')); document.getElementById('context-menu').style.display='none';"`;
             const editAction = isNative ? '' : `onclick="Sim.uiEditChip('${node.type}'); document.getElementById('context-menu').style.display='none';"`;
             const geomAction = isNative ? '' : `onclick="Sim.uiScaleChip('${node.type}'); document.getElementById('context-menu').style.display='none';"`;
             
@@ -60,6 +61,19 @@ const InteractionHandler = {
                 <div class="menu-item ${isNative ? 'disabled' : ''}" ${editAction}>Edit Internals</div>
                 <div class="menu-item danger" onclick="History.execute(new DeleteNodeCommand(Sim.nodes.find(n=>n.id==='${node.id}'))); document.getElementById('context-menu').style.display='none';">Delete</div>
             `;
+            
+            // [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Smart boundary collision detection for context menu positioning.
+            menu.classList.remove('open-left', 'open-up');
+            const rect = menu.getBoundingClientRect();
+            if (rect.right > window.innerWidth) {
+                menu.style.left = (window.innerWidth - rect.width - 5) + 'px';
+                menu.classList.add('open-left');
+            }
+            if (rect.bottom > window.innerHeight) {
+                menu.style.top = (window.innerHeight - rect.height - 5) + 'px';
+                menu.classList.add('open-up');
+            }
+            
             // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Context menu displayed for node ${node.id}.
             return; 
         }
@@ -78,10 +92,6 @@ const InteractionHandler = {
         const dragWires = Sim.wires.filter(w => selectedNodeIds.has(w.from.nodeId) && selectedNodeIds.has(w.to.nodeId) && (w.midX !== undefined || w.midY !== undefined))
                                    .map(w => ({ wire: w, ox: w.midX, oy: w.midY }));
                                    
-        // Isolate boundary wires (exactly ONE end is in the selection) that have custom routing
-        const boundaryWires = Sim.wires.filter(w => (selectedNodeIds.has(w.from.nodeId) ^ selectedNodeIds.has(w.to.nodeId)) && (w.midX !== undefined || w.midY !== undefined))
-                                       .map(w => ({ wire: w, ox: w.midX, oy: w.midY }));
-
         const onMove = (m) => {
             const dx = (m.clientX - startX) / View.scale;
             const dy = (m.clientY - startY) / View.scale;
@@ -109,12 +119,6 @@ const InteractionHandler = {
                 if (item.oy !== undefined) item.wire.midY = item.oy + snapDy;
             });
             
-            // Delete custom midpoints for boundary wires so the auto-router takes over cleanly
-            boundaryWires.forEach(item => {
-                delete item.wire.midX;
-                delete item.wire.midY;
-            });
-
             WireRenderer.drawWires();
         };
         const onUp = () => {
@@ -122,11 +126,10 @@ const InteractionHandler = {
             const moves = dragSet.filter(item => Math.abs(item.node.x - item.ox) > 1 || Math.abs(item.node.y - item.oy) > 1)
                                  .map(item => ({ id: item.node.id, ox: item.ox, oy: item.oy, nx: item.node.x, ny: item.node.y }));
             
+            // [AUDIT: v1.24.17 | SEC_ARCH_LEAD] - Preserved boundary wire midpoints during component drags to maintain custom routing.
             const wMoves = dragWires.map(item => ({ wire: item.wire, ox: item.ox, oy: item.oy, nx: item.wire.midX, ny: item.wire.midY }));
-            // Push boundary wire deletions to history (nx/ny = undefined) so CTRL-Z perfectly restores the routing corners
-            const boundaryMoves = boundaryWires.map(item => ({ wire: item.wire, ox: item.ox, oy: item.oy, nx: undefined, ny: undefined }));
 
-            if (moves.length > 0) History.execute(new MoveNodeCommand(moves, [...wMoves, ...boundaryMoves]));
+            if (moves.length > 0) History.execute(new MoveNodeCommand(moves, wMoves));
             // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node translation finalized. Commands dispatched: ${moves.length}.
         };
         document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp, { once: true });
@@ -196,21 +199,47 @@ const InteractionHandler = {
                     Sim.autoSave();
                 }
             }, node.freq);
-        } else if (node.type.startsWith('IN-') && node.type !== 'IN-1') {
-            Sim.uiEnterValue(node.id);
+        // [AUDIT: v1.24.25 | SEC_ARCH_LEAD] - Removed uiEnterValue popup intercept to allow inline renaming on multi-bit inputs.
         } else if (node.type !== 'JUNCTION') {
-            Sim.modal('Rename Component', 'Label:', 'prompt', (v) => {
-                if (v && v.trim() !== '') {
-                    node.label = v.trim();
-                    const lbl = div.querySelector('.gate-label');
-                    if (lbl) lbl.innerText = node.label;
-                    if (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
-                        if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(node);
-                        Sim.updateWireVisuals();
-                    }
-                    Sim.autoSave();
+            // [AUDIT: v1.24.24 | SEC_ARCH_LEAD] - Replaced modal prompt with inline DOM input injection for component relabeling.
+            const lbl = div.querySelector('.gate-label');
+            if (!lbl || lbl.querySelector('input')) return;
+
+            const ogText = node.label || '';
+            const input = document.createElement('input');
+            input.type = 'text';
+            input.value = ogText;
+            input.style.cssText = 'width: 100%; height: 100%; box-sizing: border-box; background: #222; color: #fff; border: 1px solid #00ffaa; font-family: "JetBrains Mono", monospace; font-size: inherit; text-align: center; outline: none; border-radius: 2px; pointer-events: auto;';
+
+            lbl.innerText = '';
+            lbl.appendChild(input);
+            lbl.style.pointerEvents = 'auto';
+
+            const commit = () => {
+                if (!lbl.contains(input)) return;
+                const val = input.value.trim();
+                node.label = val;
+                lbl.innerText = node.label;
+                lbl.style.pointerEvents = '';
+                if (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
+                    if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(node);
+                    Sim.updateWireVisuals();
                 }
-            }, node.label);
+                Sim.autoSave();
+            };
+
+            input.onblur = commit;
+            input.onkeydown = (ev) => {
+                if (ev.key === 'Enter') { ev.preventDefault(); input.blur(); }
+                if (ev.key === 'Escape') { 
+                    lbl.innerHTML = ''; 
+                    lbl.innerText = ogText; 
+                    lbl.style.pointerEvents = '';
+                }
+            };
+            
+            input.focus();
+            input.select();
         }
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Modal configuration triggered for ${node.id}.
     },
@@ -271,6 +300,18 @@ const InteractionHandler = {
                 <div class="menu-item" onclick="InteractionHandler._splitWire(${wire.from.nodeId ? `'${wire.from.nodeId}'` : null}, '${wire.from.portId}', ${wire.to.nodeId ? `'${wire.to.nodeId}'` : null}, '${wire.to.portId}', ${clickX}, ${clickY}); document.getElementById('context-menu').style.display='none';">Add Node Here</div>
                 <div class="menu-item danger" onclick="History.execute(new DeleteWireCommand(Sim.wires.find(w => w.from.nodeId === '${wire.from.nodeId}' && w.to.nodeId === '${wire.to.nodeId}'))); document.getElementById('context-menu').style.display='none';">Delete Wire</div>
             `;
+            
+            // [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Smart boundary collision detection for wire context menus.
+            menu.classList.remove('open-left', 'open-up');
+            const rect = menu.getBoundingClientRect();
+            if (rect.right > window.innerWidth) {
+                menu.style.left = (window.innerWidth - rect.width - 5) + 'px';
+                menu.classList.add('open-left');
+            }
+            if (rect.bottom > window.innerHeight) {
+                menu.style.top = (window.innerHeight - rect.height - 5) + 'px';
+                menu.classList.add('open-up');
+            }
             return;
         }
 
@@ -330,6 +371,7 @@ const InteractionHandler = {
         }
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire interaction handled for ${wire.id}.
     },
+
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for marquee selection initialization.
@@ -394,6 +436,7 @@ const InteractionHandler = {
             }
 
             menu.innerHTML = `
+                <div class="menu-item" style="color:#8888aa; font-weight:bold; border-bottom:1px solid #334; margin-bottom:5px; padding-bottom:5px;" onclick="if(window.DebugTerminal) DebugTerminal.toggle(true); document.getElementById('context-menu').style.display='none';">> Open Terminal</div>
                 <div class="menu-item has-sub" style="color:var(--wire-on); font-weight:bold">
                     Spawn Input
                     <div class="sub-menu">
@@ -414,6 +457,18 @@ const InteractionHandler = {
                 <div class="menu-item" style="color:#fff; font-weight:bold" onclick="Sim.addNode('NAND', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">Spawn NAND</div>
                 ${customChipsHtml}
             `;
+            
+            // [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Smart boundary collision detection for canvas context menus.
+            menu.classList.remove('open-left', 'open-up');
+            const rect = menu.getBoundingClientRect();
+            if (rect.right > window.innerWidth) {
+                menu.style.left = (window.innerWidth - rect.width - 5) + 'px';
+                menu.classList.add('open-left');
+            }
+            if (rect.bottom > window.innerHeight) {
+                menu.style.top = (window.innerHeight - rect.height - 5) + 'px';
+                menu.classList.add('open-up');
+            }
         };
 
         // Keyboard Handling (Parity with v1.20.6 Escape and Del logic)

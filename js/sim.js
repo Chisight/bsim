@@ -9,10 +9,37 @@ const Sim = {
     workspaceStack: [],
     activeEditingChip: null,
     activeSplitChip: null,
-    tabs: [{ id: 'tab-1', name: 'Main', nodes: [], wires: [], historyStack: [], historyIndex: -1 }],
+    tabs: [{ id: 'tab-1', name: 'Main', nodes: [], wires: [], historyStack: [], historyIndex: -1, activeSplitChip: null, splitDirection: 'right' }],
     activeTabId: 'tab-1',
     wireMap: new Map(),
     _netlistDirty: true, // [wasm] flag to indicate that the netlist needs to be recompiled
+
+    // [AUDIT: v1.24.09 | SEC_ARCH_LEAD] - Centralized state sanitization methods to prevent reference crashes.
+    _cleanNode(n) {
+        if (!n || !n.id) return null;
+        try {
+            return JSON.parse(JSON.stringify({
+                id: n.id, type: n.type, x: n.x, y: n.y, label: n.label,
+                val: n.val, state: n.state, outputs: n.outputs, isCustom: n.isCustom,
+                freq: n.freq, interval: n.interval, lastTick: n.lastTick, meta: n.meta,
+                customWidth: n.customWidth, customHeight: n.customHeight,
+                pinX: n.pinX, pinY: n.pinY, pinW: n.pinW, pinH: n.pinH,
+                infoX: n.infoX, infoY: n.infoY, infoW: n.infoW, infoH: n.infoH,
+                _lastX: n._lastX, _lastY: n._lastY
+            }));
+        } catch (e) { console.error("Data sanitization fault on node:", e); return null; }
+    },
+
+    _cleanWire(w) {
+        if (!w || !w.from || !w.to) return null;
+        try {
+            return JSON.parse(JSON.stringify({
+                from: { nodeId: w.from.nodeId, portId: w.from.portId },
+                to: { nodeId: w.to.nodeId, portId: w.to.portId },
+                midX: w.midX, midY: w.midY, orthoDir: w.orthoDir
+            }));
+        } catch (e) { console.error("Data sanitization fault on wire:", e); return null; }
+    },
     showToasts: true,
     debugToasts: false,
     useWasm: true,
@@ -94,6 +121,18 @@ const Sim = {
         this.wakeQueue();
 
         window.addEventListener('mousemove', (e) => {
+            // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Capture viewport-relative board coordinates for HUD telemetry.
+            const hc = document.getElementById('hud-coords');
+            if (hc && window.View) {
+                const scene = document.getElementById('scene');
+                if (scene) {
+                    const sr = scene.getBoundingClientRect();
+                    const bx = Math.round((e.clientX - sr.left) / View.scale);
+                    const by = Math.round((e.clientY - sr.top) / View.scale);
+                    hc.innerText = `${bx}, ${by}`;
+                }
+            }
+
             if (!this.wiring.active) return;
             const SNAP_R = 60;
             let nearest = null, nearestDist = SNAP_R;
@@ -229,28 +268,12 @@ const Sim = {
         if (this._autoSaveTimer) clearTimeout(this._autoSaveTimer);
         this._autoSaveTimer = setTimeout(() => {
             try {
-                const cleanNode = (n) => {
-                    if (!n) return null;
-                    return {
-                        id: n.id, type: n.type, x: n.x, y: n.y, label: n.label,
-                        val: n.val, state: n.state, outputs: n.outputs, isCustom: n.isCustom,
-                        freq: n.freq, interval: n.interval, lastTick: n.lastTick, meta: n.meta
-                    };
-                };
-                const cleanWire = (w) => {
-                    if (!w || !w.from || !w.to) return null;
-                    return {
-                        from: { nodeId: w.from.nodeId, portId: w.from.portId },
-                        to: { nodeId: w.to.nodeId, portId: w.to.portId },
-                        midX: w.midX, midY: w.midY, orthoDir: w.orthoDir
-                    };
-                };
+                const cNodes = this.nodes.map(n => this._cleanNode(n)).filter(n => n !== null);
+                const cWires = this.wires.map(w => this._cleanWire(w)).filter(w => w !== null);
                 
-                const cNodes = this.nodes.map(cleanNode).filter(n => n !== null);
-                const cWires = this.wires.map(cleanWire).filter(w => w !== null);
                 const wsStack = (this.workspaceStack || []).map(ws => ({ 
-                    nodes: (ws.nodes || []).map(cleanNode).filter(n => n !== null), 
-                    wires: (ws.wires || []).map(cleanWire).filter(w => w !== null) 
+                    nodes: (ws.nodes || []).map(n => this._cleanNode(n)).filter(n => n !== null), 
+                    wires: (ws.wires || []).map(w => this._cleanWire(w)).filter(w => w !== null) 
                 }));
                 
                 if (this.activeEditingChip && wsStack.length > 0) {
@@ -261,8 +284,9 @@ const Sim = {
                 Object.keys(this.library).forEach(k => {
                     if (this.library[k]) {
                         safeLib[k] = {
-                            nodes: (this.library[k].nodes || []).map(cleanNode).filter(n => n !== null),
-                            wires: (this.library[k].wires || []).map(cleanWire).filter(w => w !== null)
+                            nodes: (this.library[k].nodes || []).map(n => this._cleanNode(n)).filter(n => n !== null),
+                            wires: (this.library[k].wires || []).map(w => this._cleanWire(w)).filter(w => w !== null),
+                            folder: this.library[k].folder || ''
                         };
                     }
                 });
@@ -280,15 +304,17 @@ const Sim = {
 
                 const safeTabs = this.tabs.map(t => ({
                     id: t.id, name: t.name,
-                    nodes: (t.id === this.activeTabId && this.workspaceStack.length === 0) ? cNodes : (t.nodes || []).map(cleanNode).filter(n => n !== null),
-                    wires: (t.id === this.activeTabId && this.workspaceStack.length === 0) ? cWires : (t.wires || []).map(cleanWire).filter(w => w !== null),
-                    historyStack: t.historyStack || [], historyIndex: t.historyIndex !== undefined ? t.historyIndex : -1
+                    nodes: (t.id === this.activeTabId && this.workspaceStack.length === 0) ? cNodes : (t.nodes || []).map(n => this._cleanNode(n)).filter(n => n !== null),
+                    wires: (t.id === this.activeTabId && this.workspaceStack.length === 0) ? cWires : (t.wires || []).map(w => this._cleanWire(w)).filter(w => w !== null),
+                    historyStack: t.historyStack || [], historyIndex: t.historyIndex !== undefined ? t.historyIndex : -1,
+                    activeSplitChip: t.id === this.activeTabId ? this.activeSplitChip : t.activeSplitChip,
+                    splitDirection: t.id === this.activeTabId ? (document.getElementById('main')?.classList.contains('split-left') ? 'left' : (document.getElementById('main')?.classList.contains('split-right') ? 'right' : (this.activeSplitChip ? 'popup' : null))) : t.splitDirection
                 }));
 
                 const project = { 
                     nodes: wsStack.length > 0 ? wsStack[0].nodes : cNodes, 
                     wires: wsStack.length > 0 ? wsStack[0].wires : cWires, 
-                    library: safeLib, workspaceStack: wsStack, activeEditingChip: this.activeEditingChip,
+                    library: safeLib, directories: this.directories || [], workspaceStack: wsStack, activeEditingChip: this.activeEditingChip,
                     tabs: safeTabs, activeTabId: this.activeTabId,
                     // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - Append toast positioning to auto-save preferences payload.
                     prefs: { snapNodes: this.snapNodes, snapWires: this.snapWires, confirmDelete: this.confirmDelete, showStats: this.showStats, showTooltips: this.showTooltips, tutorialMode: this.tutorialMode, hudPos: this.hudPos, toastPos: this.toastPos } 
@@ -317,6 +343,7 @@ const Sim = {
                 
                 this.workspaceStack = parsed.workspaceStack || [];
                 this.activeEditingChip = parsed.activeEditingChip || null;
+                this.directories = parsed.directories || [];
                 
                 // [AUDIT: v1.23.99 | SEC_ARCH_LEAD] - Hydrate multi-tab states from persistence blob.
                 if (parsed.tabs && parsed.tabs.length > 0) {
@@ -335,8 +362,13 @@ const Sim = {
                     if (t) {
                         activeNodes = t.nodes; activeWires = t.wires;
                         if (window.History) {
-                            History.stack = t.historyStack || [];
+                            History.stack = t.historyStack ? [...t.historyStack] : [];
                             History.index = t.historyIndex !== undefined ? t.historyIndex : -1;
+                        }
+                        if (t.activeSplitChip) {
+                            setTimeout(() => {
+                                this.uiSplitEditor(t.splitDirection || 'right', t.activeSplitChip, true);
+                            }, 100);
                         }
                     }
                 }
@@ -353,11 +385,13 @@ const Sim = {
                     this.workspaceStack = [];
                 }
 
+                // [AUDIT: v1.24.09 | SEC_ARCH_LEAD] - Hydrate nodes using unified centralized sanitization.
                 if (Array.isArray(activeNodes)) {
                     activeNodes.forEach(n => { 
-                        if (n && n.id) {
-                            this.nodes.push(n); 
-                            if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(n); 
+                        const c = this._cleanNode(n);
+                        if (c) {
+                            this.nodes.push(c); 
+                            if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(c); 
                         }
                     });
                 }
@@ -394,7 +428,7 @@ const Sim = {
                     });
                 }
 
-                this.wires = Array.isArray(activeWires) ? activeWires : [];
+                this.wires = Array.isArray(activeWires) ? JSON.parse(JSON.stringify(activeWires)) : [];
                 this.updateWireVisuals();
                 this.seedQueue();
                 this.processQueue();
@@ -1385,6 +1419,16 @@ const Sim = {
         });
 
         if (n._oscillating) el.classList.add('oscillating');
+        
+        // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Emit state transitions to terminal watchers.
+        if (window.DebugTerminal && DebugTerminal._watchers && DebugTerminal._watchers.has(n.id)) {
+            const currentStr = JSON.stringify(n.val);
+            if (n._lastWatchVal !== currentStr) {
+                DebugTerminal.print(`[WATCH] <span style="color:#0af">${n.id}</span> transitioned to <span style="color:#0f5">${currentStr}</span>`, 'sys');
+                n._lastWatchVal = currentStr;
+            }
+        }
+        
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node visual state synchronized for ${n.id}.
     },
 
@@ -1525,6 +1569,12 @@ const Sim = {
      */
     getDrivingSignal(nodeId, portId, visited = new Set()) {
         const netKey = `${nodeId}:${portId}`;
+        
+        // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Intercept net evaluation for CLI forced signal overriding.
+        if (this._forcedNets && this._forcedNets[netKey] !== undefined) {
+            return this._forcedNets[netKey];
+        }
+
         if (visited.has(netKey)) return null;
         visited.add(netKey);
 
@@ -1667,7 +1717,7 @@ const Sim = {
             engineStatus = '<span style="color:#ffaa00">V8 JAVASCRIPT</span>';
         }
         
-        hud.innerHTML = `GATES: ${this.nodes.length} | WIRES: ${this.wires.length}<br>CHIP : ${this.activeEditingChip || 'MAIN'}<br>ENGINE: ${engineStatus}`;
+        hud.innerHTML = `GATES: ${this.nodes.length} | WIRES: ${this.wires.length}<br>CHIP : ${this.activeEditingChip || 'MAIN'}<br>ENGINE: ${engineStatus}<br>POS  : <span id="hud-coords" style="color:#0f5">0, 0</span>`;
     },
 
     /**
@@ -1800,21 +1850,19 @@ const Sim = {
                     e.preventDefault();
                     menu.style.display = 'block';
 
-                    const menuH = 120;
-                    const menuW = 150;
-                    let top = e.clientY;
-                    let left = e.clientX;
-
-                    if (top + menuH > window.innerHeight) top -= menuH;
-                    if (left + menuW > window.innerWidth) left -= menuW;
-
-                    menu.style.left = left + 'px';
-                    menu.style.top = top + 'px';
+                    menu.style.left = e.clientX + 'px';
+                    menu.style.top = e.clientY + 'px';
 
                     menu.innerHTML = '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.uiEditChip(\'' + name + '\')">Edit Internals</div>' +
                         '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.modal(\'Rename Chip\',\'New name:\',\'prompt\',nn=>{if(nn && !Sim.library[nn]){Sim.library[nn]=Sim.library[\'' + name + '\']; delete Sim.library[\'' + name + '\']; Sim.nodes.forEach(n=>{if(n.type===\'' + name + '\')n.type=nn;}); Sim.updateLibraryUI(); Sim.autoSave(); }},\'' + name + '\')">Rename</div>' +
                         '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.modal(\'Move Chip\',\'New Folder Path:\',\'prompt\',f=>{if(f!==null){Sim.library[\'' + name + '\'].folder=f; Sim.updateLibraryUI(); Sim.autoSave(); }},\'' + (Sim.library[name].folder||'') + '\')">Move</div>' +
                         '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#ff4757; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#ff6b81\'" onmouseout="this.style.color=\'#ff4757\'" onclick="if(Sim.activeEditingChip===\'' + name + '\') Sim.uiExitChipEdit(); Sim.uiDeleteChip(\'' + name + '\')">Delete</div>';
+                        
+                    // [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Smart boundary collision detection for library items.
+                    menu.classList.remove('open-left', 'open-up');
+                    const rect = menu.getBoundingClientRect();
+                    if (rect.right > window.innerWidth) { menu.style.left = (window.innerWidth - rect.width - 5) + 'px'; menu.classList.add('open-left'); }
+                    if (rect.bottom > window.innerHeight) { menu.style.top = (window.innerHeight - rect.height - 5) + 'px'; menu.classList.add('open-up'); }
                 };
                 container.appendChild(span);
             });
@@ -1844,19 +1892,23 @@ const Sim = {
             return;
         }
         console.warn('[DEBUG] uiEditChip triggered for library chip:', name);
+        // [AUDIT: v1.24.09 | SEC_ARCH_LEAD] - Apply central sanitization to chip editor context generation.
         this.workspaceStack.push({
-            nodes: JSON.parse(JSON.stringify(this.nodes)),
-            wires: JSON.parse(JSON.stringify(this.wires)),
+            nodes: this.nodes.map(n => this._cleanNode(n)).filter(n => n !== null),
+            wires: this.wires.map(w => this._cleanWire(w)).filter(w => w !== null),
             wireMap: new Map(this.wireMap),
-            historyStack: window.History ? History.stack : [],
+            historyStack: window.History ? [...History.stack] : [],
             historyIndex: window.History ? History.index : -1
         });
 
         // Clear workspace
+        this.nodes.forEach(n => { const el = document.getElementById(n.id); if (el) el.remove(); });
+        document.querySelectorAll('.gate').forEach(el => el.remove());
         this.nodes = [];
         this.wires = [];
         this.wireMap.clear();
-        document.getElementById('scene').innerHTML = '';
+        const scene = document.getElementById('scene');
+        if (scene) scene.innerHTML = '';
 
         // Load chip internals
         const chip = this.library[name];
@@ -2131,10 +2183,11 @@ const Sim = {
     uiNewTab() {
         if (this.activeEditingChip) return this.toast('Cannot create tabs while editing a chip.', 'warning');
         const newId = 'tab-' + Math.random().toString(36).substr(2, 5);
-        this.tabs.push({ id: newId, name: `Board ${this.tabs.length + 1}`, nodes: [], wires: [], historyStack: [], historyIndex: -1 });
+        this.tabs.push({ id: newId, name: `Board ${this.tabs.length + 1}`, nodes: [], wires: [], historyStack: [], historyIndex: -1, activeSplitChip: null, splitDirection: 'right' });
         this.uiSwitchTab(newId);
     },
 
+    // [AUDIT: v1.24.09 | SEC_ARCH_LEAD] - Refactored tab switching to use centralized fault-tolerant clean methods.
     uiSwitchTab(id) {
         if (this.activeEditingChip) return this.toast('Exit chip editor before switching tabs.', 'warning');
         if (this.activeTabId === id) return;
@@ -2142,31 +2195,54 @@ const Sim = {
         // 1. Save current state to old tab
         const oldTab = this.tabs.find(t => t.id === this.activeTabId);
         if (oldTab) {
-            oldTab.nodes = JSON.parse(JSON.stringify(this.nodes));
-            oldTab.wires = JSON.parse(JSON.stringify(this.wires));
+            oldTab.nodes = this.nodes.map(n => this._cleanNode(n)).filter(n => n !== null);
+            oldTab.wires = this.wires.map(w => this._cleanWire(w)).filter(w => w !== null);
             if (window.History) {
-                oldTab.historyStack = History.stack;
+                oldTab.historyStack = [...History.stack];
                 oldTab.historyIndex = History.index;
             }
+            oldTab.activeSplitChip = this.activeSplitChip;
+            const mainEl = document.getElementById('main');
+            oldTab.splitDirection = mainEl?.classList.contains('split-left') ? 'left' : (mainEl?.classList.contains('split-right') ? 'right' : (this.activeSplitChip ? 'popup' : null));
         }
 
+        // Close split pane if active
+        const splitFrame = document.getElementById('split-editor-frame');
+        if (splitFrame) splitFrame.remove();
+        const popupWrap = document.getElementById('popup-editor-wrap');
+        if (popupWrap) popupWrap.remove();
+        const main = document.getElementById('main');
+        if (main) main.classList.remove('workspace-split', 'split-left', 'split-right');
+        this.activeSplitChip = null;
+
         // 2. Clear current workspace
+        this.nodes.forEach(n => { const el = document.getElementById(n.id); if (el) el.remove(); });
+        document.querySelectorAll('.gate').forEach(el => el.remove());
         this.nodes = []; this.wires = []; this.wireMap.clear();
-        document.getElementById('scene').innerHTML = '';
+        const scene = document.getElementById('scene');
+        if (scene) scene.innerHTML = '';
 
         // 3. Load new state
         this.activeTabId = id;
         const newTab = this.tabs.find(t => t.id === id);
         if (newTab) {
-            newTab.nodes.forEach(n => {
-                this.nodes.push(n);
-                if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(n);
+            (newTab.nodes || []).forEach(n => {
+                const c = this._cleanNode(n);
+                if (c) {
+                    this.nodes.push(c);
+                    if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(c);
+                }
             });
-            this.wires = newTab.wires;
+            this.wires = (newTab.wires || []).map(w => this._cleanWire(w)).filter(w => w !== null);
             if (window.History) {
-                History.stack = newTab.historyStack || [];
+                History.stack = newTab.historyStack ? [...newTab.historyStack] : [];
                 History.index = newTab.historyIndex !== undefined ? newTab.historyIndex : -1;
                 History.updateButtons();
+            }
+            
+            // [AUDIT: v1.24.11 | SEC_ARCH_LEAD] - Restore persisted split-pane editor context on tab switch.
+            if (newTab.activeSplitChip) {
+                this.uiSplitEditor(newTab.splitDirection || 'right', newTab.activeSplitChip, true);
             }
         }
 
@@ -2239,8 +2315,8 @@ const Sim = {
                 }
                 this.library[n] = {
                     folder: folder,
-                    nodes: JSON.parse(JSON.stringify(this.nodes)),
-                    wires: JSON.parse(JSON.stringify(this.wires))
+                    nodes: this.nodes.map(n => this._cleanNode(n)).filter(n => n !== null),
+                    wires: this.wires.map(w => this._cleanWire(w)).filter(w => w !== null)
                 };
                 this.updateLibraryUI();
                 this.toast(`Chip "${n}" saved to ${folder ? 'folder ' + folder : 'library'}`, 'success');
@@ -2561,59 +2637,7 @@ const Sim = {
         input.select();
     },
 
-    uiEnterValue(id, format = 'D') {
-        const n = this.nodes.find(node => node.id === id);
-        if (!n || !n.type.startsWith('IN-')) return;
-        const bits = parseInt(n.type.split('-')[1]) || 1;
-        
-        let currentNum = 0;
-        if (bits === 1) {
-            currentNum = n.val;
-        } else {
-            for (let i = 0; i < bits; i++) currentNum |= (n.state[i] ? 1 : 0) << i;
-        }
-        
-        let prefill = currentNum.toString(10);
-        let promptType = 'Decimal';
-        
-        if (format === 'H') {
-            prefill = currentNum.toString(16).toUpperCase().padStart(Math.ceil(bits / 4), '0');
-            promptType = 'Hex';
-        } else if (format === 'B') {
-            prefill = currentNum.toString(2).padStart(bits, '0');
-            promptType = 'Binary';
-        }
-        
-        this.modal(`Set ${bits}-Bit Value`, `Enter value (${promptType} default, or override with 0x/0b):`, 'prompt', (val) => {
-            if (val === null || val === '') return;
-            const cleanVal = val.trim();
-            let num;
-            
-            if (cleanVal.toLowerCase().startsWith('0x')) {
-                num = parseInt(cleanVal, 16);
-            } else if (cleanVal.toLowerCase().startsWith('0b')) {
-                num = parseInt(cleanVal.substring(2), 2);
-            } else {
-                if (format === 'H') num = parseInt(cleanVal, 16);
-                else if (format === 'B') num = parseInt(cleanVal, 2);
-                else num = parseInt(cleanVal, 10);
-            }
-
-            if (isNaN(num)) return this.toast('Invalid number format', 'danger');
-            
-            const maxVal = (1 << bits) - 1;
-            num = Math.max(0, Math.min(maxVal, num));
-            
-            if (bits === 1) {
-                n.state = num > 0 ? 1 : 0;
-                n.val = n.state;
-            } else {
-                for (let i = 0; i < bits; i++) n.state[i] = (num & (1 << i)) ? 1 : 0;
-                n.val = [...n.state];
-            }
-            this.updateNodeVisual(n); this.seedQueue(); this.processQueue();
-        }, prefill);
-    },
+    // [AUDIT: v1.24.25 | SEC_ARCH_LEAD] - Purged legacy uiEnterValue popup logic in favor of inline editing.
 
 
     /**
@@ -2623,9 +2647,12 @@ const Sim = {
     uiNewChip() {
         this.modal('New Chip', 'Clear workspace? Your saved library will be kept.', 'confirm', (ok) => {
             if (ok) {
+                this.nodes.forEach(n => { const el = document.getElementById(n.id); if (el) el.remove(); });
+                document.querySelectorAll('.gate').forEach(el => el.remove());
                 this.nodes = []; this.wires = []; this.wireMap.clear();
-                History.stack = []; History.index = -1; History.updateButtons();
-                document.getElementById('scene').innerHTML = '';
+                if (window.History) { History.stack = []; History.index = -1; History.updateButtons(); }
+                const scene = document.getElementById('scene');
+                if (scene) scene.innerHTML = '';
                 this.updateWireVisuals(); this.seedQueue();
             }
         });
@@ -2705,10 +2732,10 @@ const Sim = {
      * @STATE: LIBRARY_SYNC
      * @INTENT: Save current chip logic to the library and return to the parent workspace context.
      */
-    // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Architecture augmentation for dual-pane editing layout with workspace clearing.
-    uiSplitEditor(direction) {
-        if (!this.activeEditingChip) return;
-        const targetChip = this.activeEditingChip;
+    // [AUDIT: v1.24.11 | SEC_ARCH_LEAD] - Architecture augmentation for dual-pane editing layout with workspace clearing and state restoration.
+    uiSplitEditor(direction, overrideChip = null, isRestore = false) {
+        const targetChip = overrideChip || this.activeEditingChip;
+        if (!targetChip) return;
         const tab = document.querySelector(`.tab[onclick*="${this.activeTabId}"]`);
         
         let splitFrame = document.getElementById('split-editor-frame');
@@ -2736,6 +2763,7 @@ const Sim = {
             `;
             document.body.appendChild(popupWrap);
             
+            // [AUDIT: v1.24.16 | SEC_ARCH_LEAD] - Hardened popup editor drag state against iframe input swallowing.
             let isDragging = false, startX, startY, initX, initY;
             const head = popupWrap.querySelector('#popup-editor-head');
             head.onmousedown = (e) => {
@@ -2744,13 +2772,22 @@ const Sim = {
                 startX = e.clientX; startY = e.clientY;
                 const rect = popupWrap.getBoundingClientRect();
                 initX = rect.left; initY = rect.top;
+                popupWrap.style.left = initX + 'px';
+                popupWrap.style.top = initY + 'px';
+                popupWrap.style.right = 'auto'; popupWrap.style.bottom = 'auto';
+                document.querySelectorAll('iframe').forEach(ifr => ifr.style.pointerEvents = 'none');
             };
             document.addEventListener('mousemove', (e) => {
                 if (!isDragging) return;
                 popupWrap.style.left = (initX + (e.clientX - startX)) + 'px';
                 popupWrap.style.top = (initY + (e.clientY - startY)) + 'px';
             });
-            document.addEventListener('mouseup', () => isDragging = false);
+            document.addEventListener('mouseup', () => {
+                if (isDragging) {
+                    isDragging = false;
+                    document.querySelectorAll('iframe').forEach(ifr => ifr.style.pointerEvents = 'auto');
+                }
+            });
 
             if (tab) tab.classList.add('has-split');
             this.toast(`Popup editor spawned for ${targetChip}`, 'success');
@@ -2776,24 +2813,28 @@ const Sim = {
                 main.appendChild(splitFrame);
             }
             if (tab) tab.classList.add('has-split');
-            this.toast(`Split pane activated: ${direction.toUpperCase()}`, 'info');
+            if (!isRestore) this.toast(`Split pane activated: ${direction.toUpperCase()}`, 'info');
         }
         this.activeSplitChip = targetChip;
         // Restore parent workspace in main view.
-        this.uiExitChipEdit();
+        if (!isRestore) this.uiExitChipEdit();
     },
 
+    // [AUDIT: v1.24.09 | SEC_ARCH_LEAD] - Ensure context exit captures logic strictly.
     uiExitChipEdit() {
         if (this.workspaceStack.length === 0 || !this.activeEditingChip) return;
 
         this.library[this.activeEditingChip] = {
-            nodes: JSON.parse(JSON.stringify(this.nodes)),
-            wires: JSON.parse(JSON.stringify(this.wires))
+            nodes: this.nodes.map(n => this._cleanNode(n)).filter(n => n !== null),
+            wires: this.wires.map(w => this._cleanWire(w)).filter(w => w !== null)
         };
 
         const parent = this.workspaceStack.pop();
+        this.nodes.forEach(n => { const el = document.getElementById(n.id); if (el) el.remove(); });
+        document.querySelectorAll('.gate').forEach(el => el.remove());
         this.nodes = []; this.wires = []; this.wireMap.clear();
-        document.getElementById('scene').innerHTML = '';
+        const scene = document.getElementById('scene');
+        if (scene) scene.innerHTML = '';
 
         parent.nodes.forEach(n => {
             if (n.isCustom && n.type === this.activeEditingChip) {

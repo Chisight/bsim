@@ -6,15 +6,15 @@
     <title>bSim</title>
     <link rel="icon" type="image/svg+xml" href="assets/bSim-logo-f-c-32.svg">
     <link rel="stylesheet" href="css/style.css">
-    <script>window.EXPECTED_BSIM_VERSION = "1.24.00";</script>
+    <script>window.EXPECTED_BSIM_VERSION = "1.24.25";</script>
 </head>
 
 <body oncontextmenu="return false;">
     <div id="top-reveal" class="edge-reveal top">▼</div>
     <nav id="top-nav">
         <div class="nav-brand" style="display: flex; align-items: center;">
-            <img src="assets/bSim-logo-f-c.svg" alt="bSim Logo" style="height: 44px; margin-right: 8px;">
-            <span style="font-size:10px; color:var(--wire-on); padding-top: 4px;">v1.24.00</span>
+            <img src="assets/bSim-logo-big.svg" alt="bSim Logo" style="height: 31.25px; margin-right: 8px; transition: transform 0.2s ease;">
+            <span style="font-size:10px; color:var(--wire-on); padding-top: 4px;">v1.24.25</span>
         </div>
 
         <div class="menu-item has-sub">File
@@ -22,8 +22,20 @@
                 <div class="menu-item" onclick="Sim.uiNewProject()">New Workspace</div>
                 <div class="menu-item" onclick="Sim.uiNewChip()">Clear Board</div>
                 <div class="menu-item" onclick="ProjectManager.importProject()">Load .bsim</div>
-                <div class="menu-item" onclick="ProjectManager.exportProject('bSim_Project')">Export .bsim</div>
-                <div class="menu-item" onclick="ProjectManager.exportImage('bSim_Diagram')">Export PNG</div>
+                <div class="menu-item" onclick="toggleSubMenu(this, event)">Export .bsim
+                    <div class="sub-menu" style="padding: 8px; width: 150px; cursor: default;" onclick="event.stopPropagation()">
+                        <div style="font-size: 10px; color: #888; margin-bottom: 4px; text-transform: uppercase; font-weight: bold;">Filename:</div>
+                        <input type="text" id="export-bsim-name" value="bSim_Project" style="width: 100%; box-sizing: border-box; background: #111; color: #0f5; border: 1px solid #334; padding: 6px; font-size: 11px; margin-bottom: 6px; outline: none; border-radius: 4px; font-family: 'JetBrains Mono', monospace;" onkeydown="if(event.key === 'Enter') { ProjectManager.exportProject(this.value); this.parentElement.style.display='none'; }">
+                        <div class="menu-item" style="text-align: center; background: #252530; border-radius: 4px; padding: 6px; color: #fff; font-weight: bold;" onclick="ProjectManager.exportProject(document.getElementById('export-bsim-name').value); this.parentElement.style.display='none';">Save .bsim</div>
+                    </div>
+                </div>
+                <div class="menu-item" onclick="toggleSubMenu(this, event)">Export PNG
+                    <div class="sub-menu" style="padding: 8px; width: 150px; cursor: default;" onclick="event.stopPropagation()">
+                        <div style="font-size: 10px; color: #888; margin-bottom: 4px; text-transform: uppercase; font-weight: bold;">Filename:</div>
+                        <input type="text" id="export-png-name" value="bSim_Diagram" style="width: 100%; box-sizing: border-box; background: #111; color: #0f5; border: 1px solid #334; padding: 6px; font-size: 11px; margin-bottom: 6px; outline: none; border-radius: 4px; font-family: 'JetBrains Mono', monospace;" onkeydown="if(event.key === 'Enter') { ProjectManager.exportImage(this.value); this.parentElement.style.display='none'; }">
+                        <div class="menu-item" style="text-align: center; background: #252530; border-radius: 4px; padding: 6px; color: #fff; font-weight: bold;" onclick="ProjectManager.exportImage(document.getElementById('export-png-name').value); this.parentElement.style.display='none';">Save PNG</div>
+                    </div>
+                </div>
             </div>
         </div>
 
@@ -133,6 +145,19 @@
     <script src="js/synthesizer.js"></script>
     <script src="js/sim.js"></script>
     <script src="js/app.js"></script>
+
+    <script>
+        // [AUDIT: v1.24.23 | SEC_ARCH_LEAD] - Updated sub-menu toggle logic to use flex display and prevent inline style lock on siblings.
+        function toggleSubMenu(el, e) {
+            const sm = el.querySelector('.sub-menu');
+            const isVisible = sm.style.display === 'block' || sm.style.display === 'flex';
+            document.querySelectorAll('.sub-menu').forEach(s => {
+                if (s !== sm && !s.contains(sm)) s.style.display = '';
+            });
+            sm.style.display = isVisible ? 'none' : 'flex';
+            if (e) e.stopPropagation();
+        }
+    </script>
 </body>
 
 </html>

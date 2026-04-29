@@ -228,7 +228,20 @@ const ProjectManager = {
      * @INTENT: Serialize the current workspace and library into a .bsim project file.
      */
     exportProject(name) {
-        if (!name || typeof name !== 'string' || name instanceof Event || name.trim() === '') name = 'Project';
+        if (name instanceof Event || typeof name !== 'string' || name.trim() === '') {
+            if (window.Sim && typeof Sim.modal === 'function') {
+                Sim.modal('Export Project', 'Enter project name:', 'prompt', (val) => {
+                    if (val !== null) this._executeExport(val.trim() || 'Project');
+                }, 'Project');
+                return;
+            }
+            name = 'Project';
+        }
+        this._executeExport(name);
+    },
+
+    // [AUDIT: v1.24.17 | SEC_ARCH_LEAD] - Refactored project export to support asynchronous user naming prompts.
+    _executeExport(name) {
         const safeName = name.replace(/[^a-zA-Z0-9_-]/g, '_').replace(/\.bsim$/, '');
         const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
         const rand = Math.random().toString(16).substr(2, 4).toUpperCase();

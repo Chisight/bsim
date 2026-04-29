@@ -91,6 +91,10 @@ const DebugTerminal = {
      * @INTENT: Initialize the debug terminal subsystem, including UI construction and console interception.
      */
     init() {
+        // [AUDIT: v1.24.18 | SEC_ARCH_LEAD] - Prevent duplicate initialization from concurrent lifecycle hooks causing DOM ghosts.
+        if (this._initialized) return;
+        this._initialized = true;
+
         this.injectCSS();
         this.buildUI();
         this.attachHooks();
@@ -166,27 +170,40 @@ const DebugTerminal = {
             }
         });
 
-        // Dragging Logic
+        // [AUDIT: v1.24.18 | SEC_ARCH_LEAD] - Hardened terminal header drag logic with isolated window controls.
         let isDragging = false, startX, startY, initX, initY;
         const head = document.getElementById('dt-head');
         head.onmousedown = (e) => {
-            if (e.target.tagName === 'SPAN') return;
+            if (e.target.closest && e.target.closest('#dt-min, #dt-close')) return;
             isDragging = true;
             startX = e.clientX; startY = e.clientY;
             const rect = this.ui.getBoundingClientRect();
             initX = rect.left; initY = rect.top;
+            this.ui.style.left = initX + 'px';
+            this.ui.style.top = initY + 'px';
             this.ui.style.right = 'auto'; this.ui.style.bottom = 'auto';
+            document.querySelectorAll('iframe').forEach(ifr => ifr.style.pointerEvents = 'none');
         };
         document.addEventListener('mousemove', (e) => {
             if (!isDragging) return;
             this.ui.style.left = (initX + (e.clientX - startX)) + 'px';
             this.ui.style.top = (initY + (e.clientY - startY)) + 'px';
         });
-        document.addEventListener('mouseup', () => isDragging = false);
+        document.addEventListener('mouseup', () => {
+            if (isDragging) {
+                isDragging = false;
+                document.querySelectorAll('iframe').forEach(ifr => ifr.style.pointerEvents = 'auto');
+            }
+        });
 
         // Window Controls
-        document.getElementById('dt-close').onclick = () => this.toggle(false);
-        document.getElementById('dt-min').onclick = () => {
+        const btnClose = document.getElementById('dt-close');
+        btnClose.onmousedown = (e) => e.stopPropagation();
+        btnClose.onclick = () => this.toggle(false);
+
+        const btnMin = document.getElementById('dt-min');
+        btnMin.onmousedown = (e) => e.stopPropagation();
+        btnMin.onclick = () => {
             const isMin = this.ui.style.height === '30px';
             this.ui.style.height = isMin ? '400px' : '30px';
             document.getElementById('dt-in-row').style.display = isMin ? 'flex' : 'none';
@@ -262,6 +279,17 @@ const DebugTerminal = {
         else if (path.startsWith('/etc/lib/custom')) {
             const searchDir = path.replace('/etc/lib/custom', '').replace(/^\//, '');
             const subdirs = new Set();
+            
+            if (Sim.directories) {
+                Sim.directories.forEach(d => {
+                    if (d === searchDir) return;
+                    if (searchDir === '' || d.startsWith(searchDir + '/')) {
+                        const sub = d.substring(searchDir ? searchDir.length + 1 : 0).split('/')[0];
+                        if (sub) subdirs.add(sub);
+                    }
+                });
+            }
+
             Object.keys(Sim.library).forEach(name => {
                 const folder = Sim.library[name].folder || '';
                 if (folder === searchDir) files.push(`[Macro] ${name}`);
@@ -330,28 +358,37 @@ const DebugTerminal = {
         });
     },
 
-    getNodesForCwd() {
+    // [AUDIT: v1.24.06 | SEC_ARCH_LEAD] - Unified contextual environment resolver for split-pane and virtual workspaces.
+    getContext() {
+        const defaultCtx = { nodes: Sim.nodes, wires: Sim.wires, simObj: Sim };
+        if (this.cwd === '/') return { nodes: [], wires: [], simObj: null };
+        
         const tMatch = this.cwd.match(/^\/home\/bsim\/(tab-\d+|[^/]+)(?:\/(editor))?$/);
-        if (!tMatch) return [];
+        if (!tMatch) return defaultCtx;
+        
         const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === tMatch[1] || t.id === tMatch[1]);
-        if (!tab) return [];
+        if (!tab) return defaultCtx;
+        
         if (tMatch[2] === 'editor') {
             if (Sim.activeTabId === tab.id) {
-                if (Sim.activeEditingChip) return Sim.nodes;
+                if (Sim.activeEditingChip) return defaultCtx;
                 if (Sim.activeSplitChip) {
                     const sf = document.querySelector('#split-editor-frame iframe') || document.querySelector('#popup-editor-wrap iframe');
-                    if (sf && sf.contentWindow && sf.contentWindow.Sim) return sf.contentWindow.Sim.nodes;
+                    if (sf && sf.contentWindow && sf.contentWindow.Sim) {
+                        return { nodes: sf.contentWindow.Sim.nodes, wires: sf.contentWindow.Sim.wires, simObj: sf.contentWindow.Sim };
+                    }
                 }
             }
         } else {
             if (Sim.activeTabId === tab.id) {
-                if (Sim.activeEditingChip && Sim.workspaceStack.length > 0) return Sim.workspaceStack[0].nodes;
-                if (!Sim.activeEditingChip && Sim.activeSplitChip) return Sim.nodes;
-                return Sim.nodes;
+                if (Sim.activeEditingChip && Sim.workspaceStack.length > 0) {
+                    return { nodes: Sim.workspaceStack[0].nodes, wires: Sim.workspaceStack[0].wires, simObj: Sim };
+                }
+                return defaultCtx;
             }
-            return tab.nodes;
+            return { nodes: tab.nodes || [], wires: tab.wires || [], simObj: null };
         }
-        return [];
+        return { nodes: [], wires: [], simObj: null };
     },
 
     // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Context-aware autocomplete via VFS integration.
@@ -364,23 +401,34 @@ const DebugTerminal = {
             let matches = [];
             
             if (parts.length === 1) {
-                const cmds = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv'];
+                // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Expand autocomplete index for new kernel CLI toolkit.
+                const cmds = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv', 'mkdir', 'tick', 'clock', 'force', 'unforce', 'watch', 'dump', 'cp', 'touch', 'find', 'bom', 'path'];
                 matches = cmds.filter(c => c.startsWith(prefix));
-            } else if (cmd === 'cd' || cmd === 'ls' || cmd === 'tree') {
-                // [AUDIT: v1.24.01 | SEC_ARCH_LEAD] - Dynamic VFS path autocomplete.
+            } else if (cmd === 'cd' || cmd === 'ls' || cmd === 'tree' || cmd === 'rm' || cmd === 'mkdir') {
+                // [AUDIT: v1.24.03 | SEC_ARCH_LEAD] - Dynamic VFS path autocomplete with trailing slash parsing.
                 let searchPath = prefix.includes('/') ? prefix.substring(0, prefix.lastIndexOf('/')) : '';
                 let searchPrefix = prefix.includes('/') ? prefix.substring(prefix.lastIndexOf('/') + 1) : prefix;
+                if (prefix.endsWith('/')) {
+                    searchPath = prefix.slice(0, -1);
+                    searchPrefix = '';
+                }
+                
                 let targetDir = this.resolvePath(searchPath || '.');
+                if (prefix.startsWith('/') && !searchPath) targetDir = '/';
                 
                 let opts = [];
                 const vfs = this.getVirtualDir(targetDir);
                 if (vfs) {
                     opts = vfs.dirs.map(d => `${d}/`);
+                    if (cmd === 'rm') opts = opts.concat(vfs.files.map(f => f.replace(/^\[.*?\]\s*/, '')));
                 }
                 
-                matches = opts.filter(d => d.startsWith(searchPrefix)).map(d => (searchPath ? searchPath + '/' : '') + d);
+                matches = opts.filter(d => d.startsWith(searchPrefix)).map(d => {
+                    if (prefix.startsWith('/') && !searchPath) return '/' + d;
+                    return (searchPath ? searchPath + '/' : '') + d;
+                });
             } else {
-                const cNodes = this.getNodesForCwd();
+                const cNodes = this.getContext().nodes;
                 matches = cNodes.map(n => n.id).filter(id => id.toLowerCase().startsWith(prefix));
                 const shortMatches = cNodes.map(n => n.id.replace('node-', '')).filter(id => id.toLowerCase().startsWith(prefix));
                 matches = [...new Set([...matches, ...shortMatches])];
@@ -425,6 +473,11 @@ const DebugTerminal = {
         menu.style.left = x + 'px';
         menu.style.top = y + 'px';
         menu.style.display = 'flex';
+        
+        // [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Smart boundary collision detection for terminal context menu.
+        const rect = menu.getBoundingClientRect();
+        if (rect.right > window.innerWidth) menu.style.left = (window.innerWidth - rect.width - 5) + 'px';
+        if (rect.bottom > window.innerHeight) menu.style.top = (window.innerHeight - rect.height - 5) + 'px';
     },
 
     saveContents() {
@@ -437,14 +490,25 @@ const DebugTerminal = {
         this.print("Terminal contents saved.", "ok");
     },
 
+    // [AUDIT: v1.24.06 | SEC_ARCH_LEAD] - Polyfilled node highlighting to transcend iframe boundaries.
     highlightNode(id) {
         this.clearHighlight();
-        const el = document.getElementById(id);
+        let el = document.getElementById(id);
+        if (!el) {
+            const sf = document.querySelector('#split-editor-frame iframe') || document.querySelector('#popup-editor-wrap iframe');
+            if (sf && sf.contentWindow && sf.contentWindow.document) {
+                el = sf.contentWindow.document.getElementById(id);
+            }
+        }
         if (el) el.classList.add('dt-target-highlight');
     },
 
     clearHighlight() {
         document.querySelectorAll('.dt-target-highlight').forEach(el => el.classList.remove('dt-target-highlight'));
+        const sf = document.querySelector('#split-editor-frame iframe') || document.querySelector('#popup-editor-wrap iframe');
+        if (sf && sf.contentWindow && sf.contentWindow.document) {
+            sf.contentWindow.document.querySelectorAll('.dt-target-highlight').forEach(el => el.classList.remove('dt-target-highlight'));
+        }
     },
 
     /**
@@ -509,13 +573,28 @@ const DebugTerminal = {
 
         switch (c) {
             case 'help':
+                // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Expanded help index for kernel telemetry commands.
                 this.print("Commands: exit, clear, verbosity [0-3], synth [gate], trace [nodeId]");
                 this.print("  pwd                 - Print Working Directory (VFS)");
                 this.print("  cd <path>           - Change Directory (VFS)");
+                this.print("  mkdir [-p] <dir>    - Create VFS directory");
                 this.print("  mv <chip> <folder>  - Move chip to a library folder");
+                this.print("  cp <src> <dest>     - Clone a macro in the library");
+                this.print("  touch <macro>       - Instantiate an empty macro");
                 this.print("  ls [-l] [path]      - List workspace nodes or VFS contents");
                 this.print("  tree [path]         - Display directory structure recursively");
+                this.print("  find <pattern>      - Regex search across VFS and nodes");
                 this.print("  spawn <type> [x y]  - Add a node (e.g., spawn NAND 100 100)");
+                this.print("  rm [-rf] <id>       - Delete nodes or directories");
+                this.print("  set <nodeId> <val>  - Set input node value (e.g., set node-xyz 1)");
+                this.print("  force <n> <p> <v>   - Override a pin signal (e.g., force n1 in0 1)");
+                this.print("  unforce <n> <p>     - Release an overridden pin");
+                this.print("  tick [N]            - Advance simulation clock N cycles");
+                this.print("  clock <id> <freq>   - Set oscillator frequency (Hz)");
+                this.print("  watch <nodeId>      - Subscribe to state transitions");
+                this.print("  dump <nodeId>       - Dump raw JSON state array");
+                this.print("  bom [macro]         - Generate Bill of Materials");
+                this.print("  path <n1> <n2>      - Trace topological electrical path");
                 this.print("  rm <id> [id2...]    - Delete nodes (or 'rm all')");
                 this.print("  set <nodeId> <val>  - Set input node value (e.g., set node-xyz 1)");
                 this.print("  wire <n1> <p1> <n2> <p2> - Connect two nodes");
@@ -547,23 +626,25 @@ const DebugTerminal = {
                 if (promptDir === '') promptDir = '/';
                 document.getElementById('dt-prompt-cwd').innerText = promptDir;
                 break;
-            case 'mv':
+            case 'mv': {
+                // [AUDIT: v1.24.05 | SEC_ARCH_LEAD] - Enforced block scope for case statement to resolve lexical declaration collisions.
                 if (args.length < 3) return this.print("Usage: mv <chip> <folder>", "err");
                 const targetChip = args[1];
-                let destFolder = args[2];
+                let mvFolder = args[2];
                 
-                if (destFolder.startsWith('/etc/lib/custom/')) destFolder = destFolder.replace('/etc/lib/custom/', '');
-                else if (destFolder === '/etc/lib/custom') destFolder = '';
+                if (mvFolder.startsWith('/etc/lib/custom/')) mvFolder = mvFolder.replace('/etc/lib/custom/', '');
+                else if (mvFolder === '/etc/lib/custom') mvFolder = '';
                 
                 if (Sim.library[targetChip]) {
-                    Sim.library[targetChip].folder = destFolder;
+                    Sim.library[targetChip].folder = mvFolder;
                     Sim.updateLibraryUI();
                     Sim.autoSave();
-                    this.print(`Moved ${targetChip} to /etc/lib/custom/${destFolder}`, "ok");
+                    this.print(`Moved ${targetChip} to /etc/lib/custom/${mvFolder}`, "ok");
                 } else {
                     this.print(`Chip '${targetChip}' not found in library.`, "err");
                 }
                 break;
+            }
             case 'exit': this.toggle(false); break;
             case 'clear': this.out.innerHTML = ''; break;
             case 'verbosity':
@@ -613,6 +694,17 @@ const DebugTerminal = {
                     this.print(`--- MACRO LIBRARY: Custom/${searchDir} ---`, "warn");
                     let found = 0;
                     const subdirs = new Set();
+                    
+                    if (Sim.directories) {
+                        Sim.directories.forEach(d => {
+                            if (d === searchDir) return;
+                            if (searchDir === '' || d.startsWith(searchDir + '/')) {
+                                const sub = d.substring(searchDir ? searchDir.length + 1 : 0).split('/')[0];
+                                if (sub) subdirs.add(sub);
+                            }
+                        });
+                    }
+
                     Object.keys(Sim.library).forEach(name => {
                         const folder = Sim.library[name].folder || '';
                         if (folder === searchDir) {
@@ -708,37 +800,137 @@ const DebugTerminal = {
                 Sim.addNode(type, x, y);
                 this.print(`Spawned ${type} at ${x}, ${y}`, "ok");
                 break;
-            case 'rm':
-                if (!args[1]) return this.print("Usage: rm <nodeId> [nodeId2...] or rm all", "err");
-                if (args[1] === 'all') {
-                    Sim.selection.clear();
-                    Sim.nodes.forEach(n => Sim.selection.add(n.id));
-                    Sim.deleteSelection();
-                    return this.print("Cleared entire workspace.", "ok");
-                }
-                let rmCount = 0;
-                Sim.selection.clear();
-                for (let i = 1; i < args.length; i++) {
-                    const n = Sim.nodes.find(node => node.id === args[i] || node.id === `node-${args[i]}`);
-                    if (n) { Sim.selection.add(n.id); rmCount++; }
-                }
-                if (rmCount > 0) {
-                    Sim.deleteSelection();
-                    this.print(`Deleted ${rmCount} node(s).`, "ok");
-                } else this.print("No valid nodes found to delete.", "err");
+            case 'mkdir':
+                // [AUDIT: v1.24.03 | SEC_ARCH_LEAD] - VFS directory allocation.
+                let pFlag = args.includes('-p');
+                let dirArgs = args.filter(a => a !== 'mkdir' && !a.startsWith('-'));
+                if (dirArgs.length === 0) return this.print("Usage: mkdir [-p] <dir>", "err");
+
+                if (!Sim.directories) Sim.directories = [];
+
+                dirArgs.forEach(d => {
+                    let targetPath = this.resolvePath(d).replace(/\/$/, '');
+                    if (!targetPath.startsWith('/etc/lib/custom')) {
+                        return this.print(`mkdir: cannot create directory '${d}': Permission denied`, "err");
+                    }
+                    const customPath = targetPath.replace('/etc/lib/custom', '').replace(/^\//, '');
+                    if (customPath === '') return this.print(`mkdir: cannot create directory '${d}': File exists`, "err");
+
+                    if (!pFlag) {
+                        const parts = customPath.split('/');
+                        if (parts.length > 1) {
+                            const parent = parts.slice(0, -1).join('/');
+                            let parentExists = Sim.directories.includes(parent);
+                            if (!parentExists) {
+                                Object.keys(Sim.library).forEach(k => {
+                                    if ((Sim.library[k].folder||'') === parent || (Sim.library[k].folder||'').startsWith(parent + '/')) parentExists = true;
+                                });
+                            }
+                            if (!parentExists) return this.print(`mkdir: cannot create directory '${d}': No such file or directory`, "err");
+                        }
+                    }
+
+                    const pathParts = customPath.split('/');
+                    let currentPath = '';
+                    pathParts.forEach(part => {
+                        currentPath = currentPath ? currentPath + '/' + part : part;
+                        if (!Sim.directories.includes(currentPath)) {
+                            Sim.directories.push(currentPath);
+                        }
+                    });
+                    this.print(`Created directory: ${targetPath}`, "ok");
+                });
+                Sim.autoSave();
                 break;
-            case 'set':
+            case 'rm': {
+                // [AUDIT: v1.24.02 | SEC_ARCH_LEAD] - Integrated recursive file system deletion logic (rm -rf).
+                const isRf = args.includes('-rf') || args.includes('-r') || args.includes('-f');
+                const rmArgs = args.filter(a => a !== 'rm' && !a.startsWith('-'));
+                
+                if (rmArgs.length === 0) return this.print("Usage: rm [-rf] <id|path> [id2...]", "err");
+                
+                const ctx = this.getContext();
+                
+                if (rmArgs[0] === 'all' && this.cwd.startsWith('/home/bsim')) {
+                    if (ctx.simObj) {
+                        ctx.simObj.selection.clear();
+                        ctx.nodes.forEach(n => ctx.simObj.selection.add(n.id));
+                        ctx.simObj.deleteSelection();
+                        return this.print("Cleared entire active workspace.", "ok");
+                    }
+                    return this.print("Cannot clear inactive workspace.", "err");
+                }
+
+                let rmCount = 0;
+                let rmDirCount = 0;
+                if (ctx.simObj) ctx.simObj.selection.clear();
+                
+                rmArgs.forEach(target => {
+                    if (target.includes('/') || this.cwd.startsWith('/etc/lib')) {
+                        let targetPath = this.resolvePath(target).replace(/\/$/, '');
+                        if (targetPath.startsWith('/etc/lib/custom')) {
+                            const searchDir = targetPath.replace('/etc/lib/custom', '').replace(/^\//, '');
+                            if (searchDir === '') return this.print("rm: cannot remove root custom directory", "err");
+                            
+                            if (Sim.library[searchDir]) {
+                                delete Sim.library[searchDir];
+                                rmCount++;
+                            } else if (isRf) {
+                                let deleted = false;
+                                Object.keys(Sim.library).forEach(name => {
+                                    const folder = Sim.library[name].folder || '';
+                                    if (folder === searchDir || folder.startsWith(searchDir + '/')) {
+                                        delete Sim.library[name];
+                                        rmCount++;
+                                        deleted = true;
+                                    }
+                                });
+                                if (Sim.directories) {
+                                    const initLen = Sim.directories.length;
+                                    Sim.directories = Sim.directories.filter(d => d !== searchDir && !d.startsWith(searchDir + '/'));
+                                    if (Sim.directories.length < initLen) deleted = true;
+                                }
+                                if (deleted) rmDirCount++;
+                                else this.print(`rm: cannot remove '${target}': No such file or directory`, "err");
+                            } else {
+                                this.print(`rm: cannot remove '${target}': Is a directory (use -rf)`, "err");
+                            }
+                        } else {
+                            this.print(`rm: cannot remove '${target}': Permission denied`, "err");
+                        }
+                    } else {
+                        const n = ctx.nodes.find(node => node.id === target || node.id === `node-${target}`);
+                        if (n && ctx.simObj) { ctx.simObj.selection.add(n.id); rmCount++; }
+                    }
+                });
+                
+                if (ctx.simObj && ctx.simObj.selection.size > 0) ctx.simObj.deleteSelection();
+                
+                if (rmCount > 0 || rmDirCount > 0) {
+                    if (rmDirCount > 0 || this.cwd.startsWith('/etc/lib')) Sim.updateLibraryUI();
+                    this.print(`Removed ${rmCount} item(s).`, "ok");
+                    Sim.autoSave();
+                } else if ((!ctx.simObj || ctx.simObj.selection.size === 0) && rmCount === 0 && rmDirCount === 0) {
+                    this.print("No valid items found to delete.", "err");
+                }
+                break;
+            }
+            case 'set': {
                 if (args.length < 3) return this.print("Usage: set <nodeId> <value>", "err");
-                const sn = Sim.nodes.find(n => n.id === args[1]);
+                const ctx = this.getContext();
+                const sn = ctx.nodes.find(n => n.id === args[1] || n.id === `node-${args[1]}`);
                 if (!sn) return this.print(`Node ${args[1]} not found.`, "err");
                 const val = parseInt(args[2]);
                 if (isNaN(val)) return this.print("Value must be a number.", "err");
                 sn.val = val;
                 sn.state = val;
-                Sim.updateNodeVisual(sn);
-                Sim.seedQueue(); Sim.processQueue();
-                this.print(`Set ${args[1]} to ${val}`, "ok");
+                if (ctx.simObj) {
+                    ctx.simObj.updateNodeVisual(sn);
+                    ctx.simObj.seedQueue(); ctx.simObj.processQueue();
+                }
+                this.print(`Set ${sn.id} to ${val}`, "ok");
                 break;
+            }
             case 'wire':
                 if (args.length < 5) return this.print("Usage: wire <node1> <port1> <node2> <port2>", "err");
                 Sim.wires.push({
@@ -752,6 +944,133 @@ const DebugTerminal = {
             case 'sim':
                 Sim.seedQueue(); Sim.processQueue();
                 this.print("Propagation tick queued.", "ok");
+                break;
+            case 'tick':
+                // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Programmatic cycle advancement.
+                let ticks = parseInt(args[1]) || 1;
+                for(let i=0; i<ticks; i++) { Sim.seedQueue(); Sim.processQueue(); }
+                this.print(`Advanced ${ticks} clock cycle(s).`, "ok");
+                break;
+            case 'clock':
+                if (args.length < 3) return this.print("Usage: clock <nodeId> <freq>", "err");
+                let cNode = Sim.nodes.find(n => n.id === args[1] && n.type === 'CLOCK');
+                if (!cNode) return this.print("Clock node not found in active workspace.", "err");
+                cNode.freq = parseFloat(args[2]);
+                cNode.interval = cNode.freq > 0 ? 1000 / cNode.freq : 0;
+                this.print(`Clock ${cNode.id} set to ${cNode.freq}Hz`, "ok");
+                break;
+            case 'force':
+                if (args.length < 4) return this.print("Usage: force <nodeId> <portId> <0|1|Z>", "err");
+                if (!Sim._forcedNets) Sim._forcedNets = {};
+                let forceVal = args[3] === 'Z' ? 'Z' : parseInt(args[3]);
+                Sim._forcedNets[`${args[1]}:${args[2]}`] = forceVal;
+                this.print(`Forced ${args[1]}:${args[2]} to ${forceVal}`, "ok");
+                Sim.seedQueue(); Sim.processQueue();
+                break;
+            case 'unforce':
+                if (args.length < 3) return this.print("Usage: unforce <nodeId> <portId>", "err");
+                if (Sim._forcedNets) delete Sim._forcedNets[`${args[1]}:${args[2]}`];
+                this.print(`Unforced ${args[1]}:${args[2]}`, "ok");
+                Sim.seedQueue(); Sim.processQueue();
+                break;
+            case 'watch':
+                if (!args[1]) return this.print("Usage: watch <nodeId>", "err");
+                if (!this._watchers) this._watchers = new Set();
+                if (this._watchers.has(args[1])) {
+                    this._watchers.delete(args[1]);
+                    this.print(`Unwatched ${args[1]}`, "ok");
+                } else {
+                    this._watchers.add(args[1]);
+                    this.print(`Watching ${args[1]} for state changes...`, "ok");
+                }
+                break;
+            case 'dump': {
+                if (!args[1]) return this.print("Usage: dump <nodeId|macro>", "err");
+                const ctx = this.getContext();
+                let dNode = ctx.nodes.find(n => n.id === args[1] || n.id === `node-${args[1]}`);
+                if (!dNode) dNode = Sim.library[args[1]];
+                if (!dNode) return this.print("Node/Macro not found.", "err");
+                this.print(`<pre style="margin:0; font-size:10px; line-height:1.2;">${JSON.stringify(dNode, null, 2)}</pre>`, "sys");
+                break;
+            }
+            case 'cp': {
+                // [AUDIT: v1.24.05 | SEC_ARCH_LEAD] - Enforced block scope to prevent let/const hoisting conflicts across switch cases.
+                if (args.length < 3) return this.print("Usage: cp <src> <dest>", "err");
+                if (!Sim.library[args[1]]) return this.print(`Source ${args[1]} not found in library.`, "err");
+                if (Sim.library[args[2]]) return this.print(`Dest ${args[2]} already exists.`, "err");
+                Sim.library[args[2]] = JSON.parse(JSON.stringify(Sim.library[args[1]]));
+                let cpFolder = this.cwd.startsWith('/etc/lib/custom') ? this.cwd.replace(/^\/etc\/lib\/custom\/?/, '') : '';
+                Sim.library[args[2]].folder = cpFolder;
+                Sim.updateLibraryUI();
+                Sim.autoSave();
+                this.print(`Copied ${args[1]} to ${args[2]}`, "ok");
+                break;
+            }
+            case 'touch':
+                if (!args[1]) return this.print("Usage: touch <macroName>", "err");
+                if (Sim.library[args[1]]) return this.print(`Macro ${args[1]} already exists.`, "err");
+                let tFolder = this.cwd.startsWith('/etc/lib/custom') ? this.cwd.replace(/^\/etc\/lib\/custom\/?/, '') : '';
+                Sim.library[args[1]] = { nodes: [], wires: [], folder: tFolder };
+                Sim.updateLibraryUI();
+                Sim.autoSave();
+                this.print(`Created empty macro ${args[1]}`, "ok");
+                break;
+            case 'find':
+                if (!args[1]) return this.print("Usage: find <regex>", "err");
+                try {
+                    let regex = new RegExp(args[1], 'i');
+                    let foundAny = false;
+                    Sim.nodes.forEach(n => {
+                        if (regex.test(n.id) || regex.test(n.type) || regex.test(n.label)) {
+                            this.print(`[Workspace] <span style="color:#0f5">${n.id}</span> (${n.type})`, "ok");
+                            foundAny = true;
+                        }
+                    });
+                    Object.keys(Sim.library).forEach(k => {
+                        if (regex.test(k)) {
+                            this.print(`[Library] <span style="color:#0af">${k}</span>`, "ok");
+                            foundAny = true;
+                        }
+                    });
+                    if (!foundAny) this.print("No matches found.", "sys");
+                } catch(e) { this.print("Invalid Regex.", "err"); }
+                break;
+            case 'bom':
+                let targetBOM = args[1] ? Sim.library[args[1]] : { nodes: Sim.nodes };
+                if (!targetBOM) return this.print("Macro not found.", "err");
+                let counts = {};
+                const traverseBOM = (nodes) => {
+                    nodes.forEach(n => {
+                        if (n.isCustom && Sim.library[n.type]) traverseBOM(Sim.library[n.type].nodes);
+                        else counts[n.type] = (counts[n.type] || 0) + 1;
+                    });
+                };
+                traverseBOM(targetBOM.nodes);
+                this.print(`--- BILL OF MATERIALS ---`, "warn");
+                Object.entries(counts).sort((a,b) => b[1]-a[1]).forEach(([k, v]) => {
+                    this.print(`${k.padEnd(12)}: ${v}`, "sys");
+                });
+                break;
+            case 'path':
+                if (args.length < 3) return this.print("Usage: path <nodeA> <nodeB>", "err");
+                const visitedPath = new Set();
+                const queue = [{ id: args[1], path: [args[1]] }];
+                let foundPath = false;
+                while(queue.length > 0) {
+                    const curr = queue.shift();
+                    if (curr.id === args[2]) {
+                        this.print(`Path found: ${curr.path.map(id => `<span style="color:#0f5">${id}</span>`).join(' -> ')}`, "ok");
+                        foundPath = true;
+                        break;
+                    }
+                    if (visitedPath.has(curr.id)) continue;
+                    visitedPath.add(curr.id);
+                    Sim.wires.forEach(w => {
+                        if (w.from.nodeId === curr.id && !visitedPath.has(w.to.nodeId)) queue.push({ id: w.to.nodeId, path: [...curr.path, w.to.nodeId] });
+                        if (w.to.nodeId === curr.id && !visitedPath.has(w.from.nodeId)) queue.push({ id: w.from.nodeId, path: [...curr.path, w.from.nodeId] });
+                    });
+                }
+                if (!foundPath) this.print("No electrical path exists.", "err");
                 break;
             case 'status':
                 this.print(`--- SIMULATOR STATUS ---`, "warn");
@@ -821,29 +1140,37 @@ const DebugTerminal = {
      * @IO: TERMINAL_OUTPUT
      * @INTENT: Map and display the connectivity and signal state of a specific node or the current selection.
      */
+    // [AUDIT: v1.24.06 | SEC_ARCH_LEAD] - Context-aware topological tracing for nested workspace resolution.
     traceNode(nodeId) {
         if (!window.Sim) return this.print("Simulator context offline.", "err");
         
+        const ctx = this.getContext();
+        
         let targetId = nodeId;
         if (!targetId) {
-            if (Sim.selection.size === 1) targetId = Array.from(Sim.selection)[0];
+            if (ctx.simObj && ctx.simObj.selection && ctx.simObj.selection.size === 1) targetId = Array.from(ctx.simObj.selection)[0];
             else return this.print("Specify a nodeId or select exactly one node. Ex: trace node-123", "err");
         }
         
-        const node = Sim.nodes.find(n => n.id === targetId);
+        const node = ctx.nodes.find(n => n.id === targetId || n.id === `node-${targetId}`);
         if (!node) return this.print(`Node not found: ${targetId}`, "err");
+        
+        targetId = node.id;
 
         this.print(`=== TRACE: ${node.id} (${node.type}) ===`, "sys");
-        this.print(`Label: ${node.label} | Val: ${JSON.stringify(node.val)} | State: ${JSON.stringify(node.state)}`, "sys");
+        this.print(`Label: ${node.label || 'None'} | Val: ${JSON.stringify(node.val)} | State: ${JSON.stringify(node.state)}`, "sys");
 
-        const upstream = Sim.wires.filter(w => w.to.nodeId === targetId);
-        const downstream = Sim.wires.filter(w => w.from.nodeId === targetId);
+        const upstream = ctx.wires.filter(w => w.to.nodeId === targetId);
+        const downstream = ctx.wires.filter(w => w.from.nodeId === targetId);
 
         this.print(`--- UPSTREAM (Inputs) ---`, "warn");
         if (upstream.length === 0) this.print("  (None)", "sys");
         upstream.forEach(w => {
-            const src = Sim.nodes.find(n => n.id === w.from.nodeId);
-            const sig = Sim.getSignal(w.from.nodeId, w.from.portId);
+            const src = ctx.nodes.find(n => n.id === w.from.nodeId);
+            let sig = 0;
+            if (ctx.simObj && typeof ctx.simObj.getSignal === 'function') {
+                sig = ctx.simObj.getSignal(w.from.nodeId, w.from.portId);
+            }
             const srcType = src ? src.type : "UNKNOWN";
             this.print(`  [${w.to.portId}] <- ${w.from.nodeId}[${w.from.portId}] (${srcType}) = ${JSON.stringify(sig)}`, "ok");
         });
@@ -851,7 +1178,7 @@ const DebugTerminal = {
         this.print(`--- DOWNSTREAM (Outputs) ---`, "warn");
         if (downstream.length === 0) this.print("  (None)", "sys");
         downstream.forEach(w => {
-            const dst = Sim.nodes.find(n => n.id === w.to.nodeId);
+            const dst = ctx.nodes.find(n => n.id === w.to.nodeId);
             const dstType = dst ? dst.type : "UNKNOWN";
             this.print(`  [${w.from.portId}] -> ${w.to.nodeId}[${w.to.portId}] (${dstType})`, "ok");
         });
@@ -865,6 +1192,9 @@ const DebugTerminal = {
     }
 };
 
+// [AUDIT: v1.24.14 | SEC_ARCH_LEAD] - Resolved cross-module initialization race condition for Sim context binding.
 window.DebugTerminal = DebugTerminal;
-Sim.dt = DebugTerminal;
-window.addEventListener('DOMContentLoaded', () => DebugTerminal.init());
+window.addEventListener('DOMContentLoaded', () => {
+    if (typeof window.Sim !== 'undefined') window.Sim.dt = DebugTerminal;
+    DebugTerminal.init();
+});
