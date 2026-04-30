@@ -820,12 +820,12 @@ const DebugTerminal = {
                     }
                 }
                 break;
-            // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Upgraded spawn command to parse inline hash comments as deterministic target IDs.
             case 'spawn': {
+                // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Deterministic node spawning via shell inline comments.
                 if (!args[1]) return this.print("Usage: spawn <type> [x] [y] [# id]", "err");
                 const type = args[1].toUpperCase();
-                const x = parseFloat(args[2]) || parseInt(window.View ? View.x : 0) + 100 || 0;
-                const y = parseFloat(args[3]) || parseInt(window.View ? View.y : 0) + 100 || 0;
+                const x = parseFloat(args[2]) || (window.View ? parseInt(View.x) + 100 : 0) || 0;
+                const y = parseFloat(args[3]) || (window.View ? parseInt(View.y) + 100 : 0) || 0;
                 let prefId = null;
                 const hashIdx = args.indexOf('#');
                 if (hashIdx !== -1 && args[hashIdx + 1]) prefId = args[hashIdx + 1];
@@ -948,8 +948,8 @@ const DebugTerminal = {
                 }
                 break;
             }
-            // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Modified lookup behavior to safely map generic aliases to nodes to support scripted automation paths.
             case 'set': {
+                // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Alias-aware node resolution for automated scripting.
                 if (args.length < 3) return this.print("Usage: set <nodeId> <value>", "err");
                 const ctx = this.getContext();
                 let sn = ctx.nodes.find(n => n.id === args[1] || n.id === `node-${args[1]}`);

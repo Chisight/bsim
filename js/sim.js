@@ -1248,7 +1248,6 @@ const Sim = {
      * @IO: UI_MUTATION
      * @INTENT: Add a new node to the workspace with optional coordinate snapping and collision detection.
      */
-    // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Added deterministic preferredId propagation to component factory for script bindings.
     addNode(type, x = null, y = null, label = null, preferredId = null) {
         if (x === null) {
             const scene = document.getElementById('scene');
@@ -1260,6 +1259,7 @@ const Sim = {
         }
         if (this.snapNodes) { x = Math.round(x / 20) * 20; y = Math.round(y / 20) * 20; }
         if (this.debugToasts) this.toast(`Added ${type} node`);
+        // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Support deterministic ID injection.
         const newNode = this._finalizeAddNode(type, x, y, label || type, preferredId);
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node added to workspace: ${newNode.id} (${type}).
         return newNode;
@@ -1270,8 +1270,8 @@ const Sim = {
      * @STATE: NODE_INITIALIZATION
      * @INTENT: Construct the internal node object representation and trigger the AddNodeCommand.
      */
-    // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Injected deterministic ID parameterization for deterministic terminal commands.
     _finalizeAddNode(type, x, y, label, preferredId = null) {
+        // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Deterministic node instantiation.
         const id = (preferredId && !this.nodes.some(n => n.id === preferredId)) 
             ? preferredId 
             : 'node-' + Math.random().toString(36).substr(2, 9);
