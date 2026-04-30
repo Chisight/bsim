@@ -228,6 +228,13 @@ nav .sub-menu .menu-item::after { display: none; }
 .port::after {
     content: ''; position: absolute; top: 50%; left: 50%; width: 19px; height: 19px; transform: translate(-50%, -50%); background: transparent; cursor: inherit; z-index: 1;
 }
+
+/* [AUDIT: v1.24.54 | SEC_ARCH_LEAD] - Injected CSS :focus-within pseudo-classes to rigidly persist hierarchical menu visibility during text input focus events. */
+.menu-item:focus-within > .sub-menu {
+    display: flex !important;
+    opacity: 1 !important;
+    pointer-events: auto !important;
+}
 .port:hover { background: radial-gradient(circle at center, var(--accent) var(--port-size, 40%), transparent calc(var(--port-size, 40%) + 1%)); }
 .port.input { left: -5px; }
 .port.output { right: -5px; }
