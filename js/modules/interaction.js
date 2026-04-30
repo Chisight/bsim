@@ -44,11 +44,11 @@ const InteractionHandler = {
             if (node.type === 'CLOCK') {
                 configOption = `<div class="menu-item" onclick="Sim.handleNodeDblClick(new Event('dblclick'), Sim.nodes.find(n=>n.id==='${node.id}'), document.getElementById('${node.id}')); document.getElementById('context-menu').style.display='none';">Configure Frequency</div>`;
             // [AUDIT: SEC_ARCH_LEAD] - Added info readout layout mutation to preferences.
-            } else if (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.isCustom) {
+            } else if (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.isCustom || node.type === 'ROM' || node.type === 'RAM') {
                 // [AUDIT: v1.24.34 | SEC_ARCH_LEAD] - Replaced monolithic pin layout with granular dot/label mutators.
                 nodePrefs = `
                     <div class="menu-item" style="color:var(--accent); font-weight:bold; cursor:default;">Node Prefs:</div>
-                    ${(node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.isCustom) ? `
+                    ${(node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.isCustom || node.type === 'ROM' || node.type === 'RAM') ? `
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-leds'); document.getElementById('context-menu').style.display='none';">↳ Edit Pin LEDs</div>
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-labels'); document.getElementById('context-menu').style.display='none';">↳ Edit Pin Labels</div>
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-both'); document.getElementById('context-menu').style.display='none';">↳ Edit Both (Sync)</div>

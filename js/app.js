@@ -161,7 +161,8 @@ window.onload = () => {
     // [AUDIT: v1.24.61 | SEC_ARCH_LEAD] - Enabled right-click dynamic UI editing for ROM components to match macro behavior.
     // [AUDIT: v1.24.62 | SEC_ARCH_LEAD] - Version increment for ROM UI persistence and label customization support.
     // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Integrated RAM 8-Bit primitive with Synchronous Write path and Wasm store8 support.
-    window.LOADED_BSIM_VERSION = "1.24.63";
+    // [AUDIT: v1.24.64 | SEC_ARCH_LEAD] - Enabled interactive icon scaling and parametric RAM R/W pin rendering.
+    window.LOADED_BSIM_VERSION = "1.24.64";
 
     // [AUDIT: SEC_ARCH_LEAD] - JIT Patch: Dynamically extend capabilities via global scope interceptors to prevent core module desync.
     setTimeout(() => {
@@ -206,9 +207,9 @@ window.onload = () => {
             const gate = e.target.closest('.gate');
             if (!gate) return;
             const node = Sim.nodes.find(n => n.id === gate.id);
-            // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Unified double-click configuration for both static ROM and volatile RAM modules.
+            // [AUDIT: v1.24.64 | SEC_ARCH_LEAD] - Unified configuration entry for both volatile RAM and static ROM payloads.
             if (node && (node.type === 'ROM' || node.type === 'RAM')) {
-                Sim.modal('Configure ROM Data', 'Enter URL to fetch raw binary data:', 'prompt', async (url) => {
+                Sim.modal(`Configure ${node.type} Data`, `Enter URL to fetch raw binary data:`, 'prompt', async (url) => {
                     if (url) {
                         node.dataUrl = url;
                         try {
