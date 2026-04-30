@@ -317,8 +317,8 @@ const Sim = {
                     wires: wsStack.length > 0 ? wsStack[0].wires : cWires, 
                     library: safeLib, directories: this.directories || [], workspaceStack: wsStack, activeEditingChip: this.activeEditingChip,
                     tabs: safeTabs, activeTabId: this.activeTabId,
-                    // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - Append toast positioning to auto-save preferences payload.
-                    prefs: { snapNodes: this.snapNodes, snapWires: this.snapWires, confirmDelete: this.confirmDelete, showStats: this.showStats, showTooltips: this.showTooltips, tutorialMode: this.tutorialMode, hudPos: this.hudPos, toastPos: this.toastPos } 
+                    // [AUDIT: v1.24.37 | SEC_ARCH_LEAD] - Append extended UI preferences payload including animation overrides.
+                    prefs: { snapNodes: this.snapNodes, snapWires: this.snapWires, confirmDelete: this.confirmDelete, showStats: this.showStats, showTooltips: this.showTooltips, tutorialMode: this.tutorialMode, hudPos: this.hudPos, toastPos: this.toastPos, disableAnimations: this.disableAnimations, portSize: this.portSize, dotSize: this.dotSize } 
                 };
                 localStorage.setItem('bsim_autosave', JSON.stringify(project));
                 // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: AutoSave operation finalized.
@@ -2141,56 +2141,61 @@ const Sim = {
      * @STATE: PREFERENCES
      * @INTENT: Display the global simulator preferences modal and synchronize user adjustments.
      */
+    /**
+     * @IO: UI_MODAL
+     * @STATE: PREFERENCES
+     * @INTENT: Display the global simulator preferences modal and synchronize user adjustments.
+     */
+    // [AUDIT: v1.24.37 | SEC_ARCH_LEAD] - Shifted from modal to independent non-blocking window for uninterrupted workspace tuning.
     showPrefs() {
-        this.modal('Simulator Preferences', `
-            <div style="display:flex; flex-direction:column; gap:12px;">
-                <label style="display:flex; justify-content:space-between; align-items:center;">
-                    <span>Grid Snapping</span>
-                    <input type="checkbox" ${this.snapNodes ? 'checked' : ''} onchange="Sim.snapNodes = this.checked">
-                </label>
-                <label style="display:flex; justify-content:space-between; align-items:center;">
-                    <span>Bulk Delete Confirmation</span>
-                    <input type="checkbox" ${this.confirmDelete ? 'checked' : ''} onchange="Sim.confirmDelete = this.checked">
-                </label>
-                <label style="display:flex; justify-content:space-between; align-items:center;">
-                    <span>Show Notifications</span>
-                    <input type="checkbox" ${this.showToasts ? 'checked' : ''} onchange="Sim.showToasts = this.checked">
-                </label>
-                <label style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="color:var(--wire-on)">Debug Notifications</span>
-                    <input type="checkbox" ${this.debugToasts ? 'checked' : ''} onchange="Sim.debugToasts = this.checked">
-                </label>
-                <div style="margin-top:5px; font-size:11px; color:#aaa;">HUD Position:
-                    <select onchange="Sim.hudPos=this.value; Sim.updateHUD();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px;">
-                        <option value="top-right" ${this.hudPos === 'top-right' ? 'selected' : ''}>Top-Right</option>
-                        <option value="top-left" ${this.hudPos === 'top-left' ? 'selected' : ''}>Top-Left</option>
-                        <option value="bottom-left" ${this.hudPos === 'bottom-left' ? 'selected' : ''}>Bottom-Left</option>
-                    </select>
+        let w = document.getElementById('prefs-window');
+        if (w) { w.style.display = 'flex'; return; }
+        w = document.createElement('div');
+        w.id = 'prefs-window';
+        w.style.cssText = 'position:fixed; top:80px; right:40px; width:360px; max-height:80vh; background:rgba(15,15,20,0.95); border:1px solid #334; border-radius:8px; z-index:9500; display:flex; flex-direction:column; box-shadow:0 15px 40px rgba(0,0,0,0.8); backdrop-filter:blur(10px); resize:both; overflow:hidden;';
+        
+        w.innerHTML = `
+            <div id="prefs-head" style="background:#111; padding:8px 12px; color:#888; cursor:move; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #222; font-family:'JetBrains Mono', monospace; font-size:12px; flex-shrink:0;">
+                <div style="font-weight:bold; color:#00ffaa; pointer-events:none;">PREFERENCES</div>
+                <div style="display:flex; gap:12px; align-items:center;">
+                    <span onclick="const w=document.getElementById('prefs-window'); if(w.dataset.minimized==='true')return; w.dataset.h=w.style.height||w.offsetHeight+'px'; w.style.height='31px'; w.dataset.minimized='true';" style="cursor:pointer; color:#00ffaa; font-weight:bold; transform:translateY(-4px);">_</span>
+                    <span onclick="const w=document.getElementById('prefs-window'); if(w.dataset.minimized!=='true')return; w.style.height=w.dataset.h; w.dataset.minimized='false';" style="cursor:pointer; color:#00ffaa; font-weight:bold; font-size:16px; transform:translateY(-1px);">□</span>
+                    <span onclick="document.getElementById('prefs-window').style.display='none';" style="cursor:pointer; color:#ff4757; font-weight:bold;">X</span>
                 </div>
-                <div style="margin-top:5px; font-size:11px; color:#aaa;">Port Size:
-                    <select onchange="Sim.portSize=this.value; Sim.applyStyles();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px;">
-                        <option value="small" ${this.portSize === 'small' ? 'selected' : ''}>Small</option>
-                        <option value="medium" ${this.portSize === 'medium' || !this.portSize ? 'selected' : ''}>Medium</option>
-                        <option value="large" ${this.portSize === 'large' ? 'selected' : ''}>Large</option>
-                    </select>
-                </div>
-                <div style="margin-top:5px; font-size:11px; color:#aaa;">Indicator Dot Size:
-                    <select onchange="Sim.dotSize=this.value; Sim.applyStyles();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px;">
-                        <option value="small" ${this.dotSize === 'small' ? 'selected' : ''}>Small (8px)</option>
-                        <option value="medium" ${this.dotSize === 'medium' || !this.dotSize ? 'selected' : ''}>Medium (12px)</option>
-                        <option value="large" ${this.dotSize === 'large' ? 'selected' : ''}>Large (16px)</option>
-                    </select>
-                </div>
-                <div style="height:1px; background:#333; margin: 8px 0 4px 0;"></div>
-                <label style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
-                    <span style="font-weight:bold; color:var(--wire-on);">Execution Engine:</span>
-                    <select onchange="Sim.setEngine(this.value);" style="background:#111; color:#fff; border:1px solid #444; padding:4px 8px; border-radius:4px; outline:none; cursor:pointer; font-family:'JetBrains Mono', monospace; font-size: 11px;">
-                        <option value="wasm" ${this.useWasm ? 'selected' : ''}>WASM (High Performance)</option>
-                        <option value="v8" ${!this.useWasm ? 'selected' : ''}>V8 JavaScript (Fallback)</option>
-                    </select>
-                </label>
             </div>
-        `, 'confirm');
+            <div style="padding:15px; display:flex; flex-direction:column; gap:12px; overflow-y:auto; flex-grow:1; font-size:13px;">
+                <label style="display:flex; justify-content:space-between; align-items:center;"><span>Grid Snapping</span><input type="checkbox" ${this.snapNodes ? 'checked' : ''} onchange="Sim.snapNodes=this.checked; Sim.autoSave();"></label>
+                <label style="display:flex; justify-content:space-between; align-items:center;"><span>Bulk Delete Confirmation</span><input type="checkbox" ${this.confirmDelete ? 'checked' : ''} onchange="Sim.confirmDelete=this.checked; Sim.autoSave();"></label>
+                <label style="display:flex; justify-content:space-between; align-items:center;"><span>Show Notifications</span><input type="checkbox" ${this.showToasts ? 'checked' : ''} onchange="Sim.showToasts=this.checked; Sim.autoSave();"></label>
+                <label style="display:flex; justify-content:space-between; align-items:center;"><span style="color:var(--wire-on)">Debug Notifications</span><input type="checkbox" ${this.debugToasts ? 'checked' : ''} onchange="Sim.debugToasts=this.checked; Sim.autoSave();"></label>
+                <label style="display:flex; justify-content:space-between; align-items:center;"><span style="color:#ffca28">Disable UI Animations</span><input type="checkbox" ${this.disableAnimations ? 'checked' : ''} onchange="Sim.disableAnimations=this.checked; Sim.applyStyles(); Sim.autoSave();"></label>
+                <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">HUD Position: <select onchange="Sim.hudPos=this.value; Sim.updateHUD(); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px; padding:2px;"><option value="top-right" ${this.hudPos==='top-right'?'selected':''}>Top-Right</option><option value="top-left" ${this.hudPos==='top-left'?'selected':''}>Top-Left</option><option value="bottom-left" ${this.hudPos==='bottom-left'?'selected':''}>Bottom-Left</option></select></div>
+                <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">Port Size: <select onchange="Sim.portSize=this.value; Sim.applyStyles(); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px; padding:2px;"><option value="small" ${this.portSize==='small'?'selected':''}>Small</option><option value="medium" ${this.portSize==='medium'||!this.portSize?'selected':''}>Medium</option><option value="large" ${this.portSize==='large'?'selected':''}>Large</option></select></div>
+                <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">Indicator LED Size: <select onchange="Sim.dotSize=this.value; Sim.applyStyles(); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px; padding:2px;"><option value="small" ${this.dotSize==='small'?'selected':''}>Small (8px)</option><option value="medium" ${this.dotSize==='medium'||!this.dotSize?'selected':''}>Medium (12px)</option><option value="large" ${this.dotSize==='large'?'selected':''}>Large (16px)</option></select></div>
+                <div style="height:1px; background:#333; margin:8px 0 4px 0;"></div>
+                <label style="display:flex; align-items:center; justify-content:space-between; gap:10px;"><span style="font-weight:bold; color:var(--wire-on);">Execution Engine:</span><select onchange="Sim.setEngine(this.value); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #444; padding:4px 8px; border-radius:4px; outline:none; cursor:pointer; font-family:'JetBrains Mono', monospace; font-size:11px;"><option value="wasm" ${this.useWasm?'selected':''}>WASM (High Performance)</option><option value="v8" ${!this.useWasm?'selected':''}>V8 JavaScript (Fallback)</option></select></label>
+            </div>
+        `;
+        document.body.appendChild(w);
+
+        let isDragging = false, startX, startY, initX, initY;
+        const head = w.querySelector('#prefs-head');
+        head.onmousedown = (e) => {
+            if (e.target.tagName === 'SPAN') return;
+            isDragging = true;
+            startX = e.clientX; startY = e.clientY;
+            const rect = w.getBoundingClientRect();
+            initX = rect.left; initY = rect.top;
+            w.style.left = initX + 'px'; w.style.top = initY + 'px'; w.style.right = 'auto'; w.style.bottom = 'auto';
+        };
+        const onMove = (e) => {
+            if (!isDragging) return;
+            w.style.left = (initX + (e.clientX - startX)) + 'px';
+            w.style.top = (initY + (e.clientY - startY)) + 'px';
+        };
+        const onUp = () => { isDragging = false; };
+        document.addEventListener('mousemove', onMove);
+        document.addEventListener('mouseup', onUp);
     },
 
     /**
@@ -2319,12 +2324,14 @@ const Sim = {
      * @INTENT: Synchronize dynamic CSS variables (e.g., port size) with current application preferences.
      */
     applyStyles() {
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Added dynamic scaling mapping for logic state indicators.
+        // [AUDIT: v1.24.37 | SEC_ARCH_LEAD] - Extended style injection to support global animation muting.
         const sizeMap = { 'small': '15%', 'medium': '25%', 'large': '35%' };
         document.documentElement.style.setProperty('--port-size', sizeMap[this.portSize || 'medium']);
         
         const dotMap = { 'small': '8px', 'medium': '12px', 'large': '16px' };
         document.documentElement.style.setProperty('--dot-size', dotMap[this.dotSize || 'medium']);
+        
+        document.body.classList.toggle('no-animations', !!this.disableAnimations);
     },
     /**
      * @ARCH: NETLIST_FACTORY
@@ -2364,7 +2371,9 @@ const Sim = {
      * @STATE: LAYOUT_MUTATION
      * @INTENT: Enable bounded spatial editing for internal pin indicators and node geometry via click-drag isolation.
      */
+    // [AUDIT: v1.24.43 | SEC_ARCH_LEAD] - Injected nomenclature translation layer to intercept legacy pin-dots dispatches.
     enterNodeEditMode(nodeId, mode) {
+        if (mode === 'pin-dots') mode = 'pin-leds';
         const node = this.nodes.find(n => n.id === nodeId);
         const el = document.getElementById(nodeId);
         if (!node || !el) return;
@@ -2379,7 +2388,8 @@ const Sim = {
         const pinCont = el.querySelector('.pin-container');
         const infoCont = el.querySelector('.visual-extra');
         const lblCont = el.querySelector('.gate-label');
-        let target = (mode === 'pins' || mode === 'pin-dots') ? pinCont : (mode === 'info' ? infoCont : (mode === 'label' ? lblCont : el));
+        // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Renamed pin-dots to pin-leds to fix nomenclature as instructed.
+        let target = (mode === 'pins' || mode === 'pin-leds') ? pinCont : (mode === 'info' ? infoCont : (mode === 'label' ? lblCont : el));
         
         // [AUDIT: v1.24.34 | SEC_ARCH_LEAD] - Dynamic proxy generation for port geometry mutations.
         if (mode === 'pin-labels' || mode === 'pin-both') {
@@ -2403,7 +2413,8 @@ const Sim = {
         if (!target) return;
         
         // [AUDIT: v1.24.26 | SEC_ARCH_LEAD] - Injected edit mode dispatch handling for gate label components.
-        if (mode === 'pins' || mode === 'pin-dots' || mode === 'info' || mode === 'label' || mode === 'pin-labels' || mode === 'pin-both') {
+        // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Adapted edit mode dispatch handling for pin-leds components.
+        if (mode === 'pins' || mode === 'pin-leds' || mode === 'info' || mode === 'label' || mode === 'pin-labels' || mode === 'pin-both') {
             if (mode === 'info' && node.infoX === undefined) {
                 // [AUDIT: SEC_ARCH_LEAD] - Initialize default offset coordinates if previously relative
                 node.infoX = target.offsetLeft;
@@ -2469,7 +2480,8 @@ const Sim = {
             const rTop = clickY < thY;
             const rBottom = clickY > target.offsetHeight - thY;
             // [AUDIT: v1.24.38 | SEC_ARCH_LEAD] - Unified translation and scaling boolean logic to prevent dead zones on proxy.
-            const isResizing = (mode === 'pin-labels' || mode === 'pin-both') ? (rLeft || rRight || rTop || rBottom) : ((mode === 'pins' || mode === 'pin-dots' || mode === 'info' || mode === 'label') && (rLeft || rRight || rTop || rBottom));
+            // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Adapted scaling hitboxes for renamed pin-leds target.
+            const isResizing = (mode === 'pin-labels' || mode === 'pin-both') ? (rLeft || rRight || rTop || rBottom) : ((mode === 'pins' || mode === 'pin-leds' || mode === 'info' || mode === 'label') && (rLeft || rRight || rTop || rBottom));
             
             const startX = e.clientX;
             const startY = e.clientY;
@@ -2496,7 +2508,8 @@ const Sim = {
                     el.style.width = node.customWidth + 'px';
                     el.style.height = node.customHeight + 'px';
                     Sim.updateWireVisuals();
-                } else if (mode === 'pins' || mode === 'info' || mode === 'label' || mode === 'pin-labels' || mode === 'pin-both') {
+                // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Restored missing target condition for pin-leds scaling and translation propagation to fix regression.
+                } else if (mode === 'pins' || mode === 'pin-leds' || mode === 'info' || mode === 'label' || mode === 'pin-labels' || mode === 'pin-both') {
                     let cX = startPinX, cY = startPinY, cW = startPinW, cH = startPinH;
                     if (isResizing || m.shiftKey) { 
                         // [AUDIT: v1.24.27 | SEC_ARCH_LEAD] - Adjusted scaling constraints for label geometries to permit overhangs and font scaling.
@@ -2589,7 +2602,8 @@ const Sim = {
         const pinCont = el?.querySelector('.pin-container');
         const infoCont = el?.querySelector('.visual-extra');
         const lblCont = el?.querySelector('.gate-label');
-        let target = state.mode === 'pins' || state.mode === 'pin-dots' ? pinCont : (state.mode === 'info' ? infoCont : (state.mode === 'label' ? lblCont : el));
+        // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Updated node edit exit hook for LED nomenclature sync.
+        let target = state.mode === 'pins' || state.mode === 'pin-leds' ? pinCont : (state.mode === 'info' ? infoCont : (state.mode === 'label' ? lblCont : el));
         if (state.mode === 'pin-labels' || state.mode === 'pin-both') target = el?.querySelector('.port-edit-proxy');
         
         if (target && this._editModeDown) {

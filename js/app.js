@@ -149,8 +149,10 @@ window.onload = () => {
      * @STATE: BSIM_METADATA
      * @INTENT: Define the application semantic versioning for runtime compatibility checks.
      */
-    // [AUDIT: v1.24.40 | SEC_ARCH_LEAD] - Version increment for popup editor window controls and robust edge resizers.
-    window.LOADED_BSIM_VERSION = "1.24.40";
+    // [AUDIT: v1.24.41 | SEC_ARCH_LEAD] - Version increment for polished toast mechanics, dynamic preferences window, and terminal scripting.
+    // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Version increment for LED edit mode regression patch and forced UI nomenclature adjustment.
+    // [AUDIT: v1.24.43 | SEC_ARCH_LEAD] - Version increment for legacy edit mode dispatch interception.
+    window.LOADED_BSIM_VERSION = "1.24.43";
 
     // [AUDIT: SEC_ARCH_LEAD] - Injected passive workspace boundary validation to catch upgrade mismatches.
     window.addEventListener('load', () => {
