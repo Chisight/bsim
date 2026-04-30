@@ -120,6 +120,8 @@
                       local.get $p i32.const 1 i32.add local.set $p br $rom_a_loop
                     ))
                   )
+                  ;; [AUDIT: v1.24.81 | SEC_ARCH_LEAD] - ROM Address Boundary Clamp enforcement to prevent linear memory host traps.
+                  i32.const 1 local.get $num_pins i32.shl i32.const 1 i32.sub local.get $addr i32.and local.set $addr
                   global.get $REGION_C_BASE global.get $MEM_OFFSET i32.add local.get $addr i32.add i32.load8_u local.set $data
                   i32.const 1 local.set $p
                   (loop $rom_o_loop
@@ -148,8 +150,11 @@
                           local.get $p i32.const 1 i32.add local.set $p br $ram_a_loop
                         ))
                       )
+                      ;; [AUDIT: v1.24.81 | SEC_ARCH_LEAD] - RAM Address Boundary Clamp enforcement to prevent linear memory host traps.
+                      i32.const 1 local.get $num_pins i32.shl i32.const 1 i32.sub local.get $addr i32.and local.set $addr
                       local.get $raw_b i32.const 0xFFFFFF i32.and local.set $in_base
-                      local.get $raw_b i32.const 24 i32.shr_u i32.const 4 i32.mul i32.load i32.const 1 i32.eq
+                      ;; [AUDIT: v1.24.83 | SEC_ARCH_LEAD] - Re-aligned WE evaluation to contiguous +8 memory offset to bypass 32-bit shift truncation.
+                      local.get $in_base i32.const 8 i32.add i32.const 4 i32.mul i32.load i32.const 1 i32.eq
                       (if (then
                         i32.const 0 local.set $data i32.const 0 local.set $p
                         (loop $ram_d_loop
@@ -179,11 +184,19 @@
                       (if (result i32)
                         (then local.get $val_a)
                         (else 
-                          local.get $opcode i32.const 8 i32.eq
+                          local.get $opcode i32.const 3 i32.eq
                           (if (result i32)
-                            (then local.get $val_a global.set $MEM_OFFSET i32.const 0)
+                            (then
+                              ;; [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - OP 3: Native TRISTATE Evaluation. (If Enable == 1, pass Input, else High-Z).
+                              local.get $val_b i32.const 1 i32.eq
+                              (if (result i32) (then local.get $val_a) (else i32.const 2))
+                            )
                             (else 
-                              local.get $opcode i32.const 11 i32.eq
+                              local.get $opcode i32.const 8 i32.eq
+                              (if (result i32)
+                                (then local.get $val_a global.set $MEM_OFFSET i32.const 0)
+                                (else 
+                                  local.get $opcode i32.const 11 i32.eq
                               (if (result i32)
                                 (then
                                   local.get $val_a i32.const 1 i32.eq
@@ -197,7 +210,47 @@
                                     )
                                   )
                                 )
-                                (else local.get $target_addr i32.load)
+                                (else 
+                                  local.get $opcode i32.const 1 i32.eq
+                                  (if (result i32)
+                                    (then
+                                      ;; [AUDIT: v1.24.86 | SEC_ARCH_LEAD] - OP 1: Native Edge-Triggered DFF Evaluation.
+                                      local.get $target_addr i32.const 4 i32.add i32.load i32.const 0 i32.eq
+                                      local.get $val_b i32.const 1 i32.eq i32.and
+                                      (if (result i32)
+                                        (then local.get $val_a)
+                                        (else local.get $target_addr i32.load)
+                                      )
+                                      local.set $data
+                                      local.get $target_addr i32.const 4 i32.add local.get $val_b i32.store
+                                      local.get $data
+                                    )
+                                    (else 
+                                      local.get $opcode i32.const 4 i32.eq
+                                      (if (result i32)
+                                        (then
+                                          ;; [AUDIT: v1.24.86 | SEC_ARCH_LEAD] - OP 4: Native Edge-Triggered TFF Evaluation.
+                                          local.get $target_addr i32.const 4 i32.add i32.load i32.const 0 i32.eq
+                                          local.get $val_b i32.const 1 i32.eq i32.and
+                                          (if (result i32)
+                                            (then 
+                                              local.get $val_a i32.const 1 i32.eq
+                                              (if (result i32)
+                                                (then local.get $target_addr i32.load i32.const 1 i32.xor)
+                                                (else local.get $target_addr i32.load)
+                                              )
+                                            )
+                                            (else local.get $target_addr i32.load)
+                                          )
+                                          local.set $data
+                                          local.get $target_addr i32.const 4 i32.add local.get $val_b i32.store
+                                          local.get $data
+                                        )
+                                        (else local.get $target_addr i32.load)
+                                      )
+                                    )
+                                  )
+                                )
                               )
                             )
                           )
@@ -209,7 +262,9 @@
               )
             )
           )
-          i32.store
+        )
+      )
+      i32.store
           local.get $i i32.const 1 i32.add local.set $i
           br $eval_loop
         )

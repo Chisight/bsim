@@ -145,7 +145,28 @@ window.onload = () => {
     // [AUDIT: v1.24.76 | SEC_ARCH_LEAD] - Polyfilled bounding boxes for marquee scaling and hardened serialization for memory buffers.
     // [AUDIT: v1.24.77 | SEC_ARCH_LEAD] - Atomic wire splitting via unified history stack, and paste midpoint coordinate preservation.
     // [AUDIT: v1.24.78 | SEC_ARCH_LEAD] - Algorithmic reduction of netlist resolution from O(N^2*W) to O(N+W) via map indexing and stack popping.
-    window.LOADED_BSIM_VERSION = "1.24.78";
+    // [AUDIT: v1.24.79 | SEC_ARCH_LEAD] - Polyfilled instance memory for V8 hierarchical state retention, eradicating O(N) tick penalties and enforcing engine parity.
+    // [AUDIT: v1.24.80 | SEC_ARCH_LEAD] - V8 bus resolution architecture updated to match Wasm TTL logic (1 > 0 > Z) and missing memory drivers whitelisted.
+    // [AUDIT: v1.24.81 | SEC_ARCH_LEAD] - Injected strict physical boundary masks for Wasm linear memory lookups to prevent OOB traps.
+    // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - Synthesized native Wasm TRISTATE parity, orphaned wire cascading purges, and rigid undo heap limits.
+    // [AUDIT: v1.24.83 | SEC_ARCH_LEAD] - Eradicated 24-bit pointer truncation in RAM Write-Enable packing and secured Region C memory block boundaries.
+    // [AUDIT: v1.24.84 | SEC_ARCH_LEAD] - Repaired Wasm kernel parenthesis syntax error in nested opcode dispatch block.
+    // [AUDIT: v1.24.85 | SEC_ARCH_LEAD] - Resolved missing closing s-expression blocks in Wasm execution cascade.
+    // [AUDIT: v1.24.86 | SEC_ARCH_LEAD] - Synthesized native Wasm sequential logic (DFF/TFF) and resolved mapped array pointer corruption.
+    // [AUDIT: v1.24.87 | SEC_ARCH_LEAD] - Finalized Wasm kernel AST parenthesis alignment to resolve unexpected EOF compilation trap.
+    window.LOADED_BSIM_VERSION = "1.24.87";
+
+    // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Enforce ring-buffer limits on the History stack to prevent V8 heap exhaustion during macro execution.
+    if (window.History) {
+        const _origPush = History.execute.bind(History);
+        History.execute = function(cmd) {
+            _origPush(cmd);
+            if (History.stack && History.stack.length > 250) {
+                History.stack.shift();
+                History.index--;
+            }
+        };
+    }
 
     // [AUDIT: v1.24.76 | SEC_ARCH_LEAD] - JIT interceptor to prevent aggressive serialization filters from destroying RAM/ROM parametric data and UI dimensions.
     if (window.Sim && typeof Sim._cleanNode === 'function') {

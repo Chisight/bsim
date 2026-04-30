@@ -110,28 +110,32 @@ class AddNodeCommand {
 class DeleteNodeCommand {
     constructor(node) {
         this.node = node;
-        this.wires = Sim.wires.filter(w => w.from.nodeId === node.id || w.to.nodeId === node.id);
+        // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - Captured adjacent topological edges to prevent mathematically orphaned wires post-deletion.
+        this.attachedWires = [];
     }
     do() {
-        console.warn('[DEBUG] DeleteNodeCommand.do triggered. Deleting Node ID:', this.node?.id, 'Type:', this.node?.type);
+        if (this.attachedWires.length === 0) {
+            this.attachedWires = Sim.wires.filter(w => w.from.nodeId === this.node.id || w.to.nodeId === this.node.id);
+        }
         Sim.nodes = Sim.nodes.filter(n => n.id !== this.node.id);
-        Sim.wires = Sim.wires.filter(w => w.from.nodeId !== this.node.id && w.to.nodeId !== this.node.id);
         const el = document.getElementById(this.node.id);
         if (el) el.remove();
+        
+        Sim.wires = Sim.wires.filter(w => !this.attachedWires.includes(w));
         Sim.updateWireVisuals();
+        Sim.updateHUD();
+        Sim.seedQueue(); Sim.processQueue();
     }
     undo() {
         Sim.nodes.push(this.node);
-        NodeRenderer.renderNode(this.node);
-        this.wires.forEach(w => {
-            if (!Sim.wires.find(x => x.from.nodeId === w.from.nodeId && x.to.nodeId === w.to.nodeId && x.from.portId === w.from.portId && x.to.portId === w.to.portId)) {
-                Sim.wires.push(w);
-            }
+        if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(this.node);
+        
+        this.attachedWires.forEach(w => {
+            if (!Sim.wires.includes(w)) Sim.wires.push(w);
         });
         Sim.updateWireVisuals();
         Sim.updateHUD();
-        Sim.eventQueue.add(this.node);
-        Sim.wakeQueue();
+        Sim.seedQueue(); Sim.processQueue();
     }
 }
 
