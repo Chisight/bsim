@@ -160,7 +160,8 @@ window.onload = () => {
     // [AUDIT: v1.24.60 | SEC_ARCH_LEAD] - Synthesized Wasm Kernel extensions for native memory addressing and execution parity.
     // [AUDIT: v1.24.61 | SEC_ARCH_LEAD] - Enabled right-click dynamic UI editing for ROM components to match macro behavior.
     // [AUDIT: v1.24.62 | SEC_ARCH_LEAD] - Version increment for ROM UI persistence and label customization support.
-    window.LOADED_BSIM_VERSION = "1.24.62";
+    // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Integrated RAM 8-Bit primitive with Synchronous Write path and Wasm store8 support.
+    window.LOADED_BSIM_VERSION = "1.24.63";
 
     // [AUDIT: SEC_ARCH_LEAD] - JIT Patch: Dynamically extend capabilities via global scope interceptors to prevent core module desync.
     setTimeout(() => {
@@ -205,7 +206,8 @@ window.onload = () => {
             const gate = e.target.closest('.gate');
             if (!gate) return;
             const node = Sim.nodes.find(n => n.id === gate.id);
-            if (node && node.type === 'ROM') {
+            // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Unified double-click configuration for both static ROM and volatile RAM modules.
+            if (node && (node.type === 'ROM' || node.type === 'RAM')) {
                 Sim.modal('Configure ROM Data', 'Enter URL to fetch raw binary data:', 'prompt', async (url) => {
                     if (url) {
                         node.dataUrl = url;
@@ -243,36 +245,37 @@ window.onload = () => {
         if (window.NodeRenderer && typeof NodeRenderer.renderNode === 'function') {
             const origRender = NodeRenderer.renderNode.bind(NodeRenderer);
             NodeRenderer.renderNode = function(node) {
-                if (node.type === 'ROM') {
+                // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Injected RAM pin-out generation including Data-In bus and Write-Enable control.
+                if (node.type === 'ROM' || node.type === 'RAM') {
                     const tmpType = node.type;
                     node.isCustom = true; 
-                    // [AUDIT: v1.24.59 | SEC_ARCH_LEAD] - Re-routed dynamic pin generation through Sim.library mock to satisfy NodeRenderer layout expectations.
-                    Sim.library['ROM'] = {
+                    Sim.library[tmpType] = {
                         nodes: [
                             ...Array.from({length: node.addressPins || 4}).map((_, i) => ({ type: 'IN-1', id: `in${i}` })),
+                            ...(tmpType === 'RAM' ? [
+                                ...Array.from({length: 8}).map((_, i) => ({ type: 'IN-1', id: `din${i}` })),
+                                { type: 'IN-1', id: 'we' }
+                            ] : []),
                             ...Array.from({length: 8}).map((_, i) => ({ type: 'OUT-1', id: `out${i}` }))
                         ]
                     };
                     origRender(node);
                     node.type = tmpType;
                     node.isCustom = false;
-                    delete Sim.library['ROM'];
-                    
                     const el = document.getElementById(node.id);
                     if (el) {
                         const lbl = el.querySelector('.gate-label');
                         if (lbl) {
-                            // [AUDIT: v1.24.62 | SEC_ARCH_LEAD] - Allowed manual node renaming for ROM modules while maintaining status-text fallback.
-                            if (!node.label || node.label === 'ROM') {
-                                lbl.innerText = 'ROM (' + (node.addressPins || 4) + 'x8)';
+                            if (!node.label || node.label === 'ROM' || node.label === 'RAM') {
+                                lbl.innerText = `${tmpType} (${node.addressPins || 4}x8)`;
                             } else {
                                 lbl.innerText = node.label;
                             }
-                            // [AUDIT: v1.24.57 | SEC_ARCH_LEAD] - Applied primitive typography classification to ROM label.
                             lbl.style.color = '#fff';
                         }
-                        el.style.backgroundColor = '#2c1e4a';
+                        el.style.backgroundColor = tmpType === 'RAM' ? '#1e4a2c' : '#2c1e4a';
                     }
+                    delete Sim.library[tmpType];
                     return;
                 }
                 return origRender(node);

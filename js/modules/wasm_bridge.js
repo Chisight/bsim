@@ -154,7 +154,7 @@ const WasmEngine = {
         // [AUDIT: v1.24.60 | SEC_ARCH_LEAD] - Dynamic Region C allocation injected for linear Wasm payload bridging.
         let romPayloadSize = 0;
         this.flatNodes.forEach(n => {
-            if (n.type === 'ROM') romPayloadSize += (n.memoryData ? n.memoryData.length : 0);
+            if (n.type === 'ROM' || n.type === 'RAM') romPayloadSize += (n.memoryData ? n.memoryData.length : 0);
         });
         const requiredBytes = 2097152 + (this.flatNodes.length * 256) + romPayloadSize;
         const requiredPages = Math.ceil(requiredBytes / 65536);
@@ -176,7 +176,7 @@ const WasmEngine = {
                 this.idMap.set(n.id, indices);
             } else if (n.type === 'DFF' || n.type === 'TFF') {
                 this.idMap.set(n.id, [slot++, slot++]);
-            } else if (n.type === 'ROM') {
+            } else if (n.type === 'ROM' || n.type === 'RAM') {
                 let indices = [];
                 for (let i = 0; i < 8; i++) indices.push(slot++);
                 this.idMap.set(n.id, indices);
@@ -206,6 +206,9 @@ const WasmEngine = {
         // 4. Build the linear execution array
         const OP_NAND = 0; const OP_DFF = 1; const OP_CLOCK = 2; const OP_TRISTATE = 3; const OP_TFF = 4;
         const OP_ROM = 5; const OP_BUFFER = 6;
+        // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Assigned Opcode 7 for native Wasm Synchronous RAM execution.
+        const OP_RAM = 7;
+        const OP_SET_OFFSET = 8;
         const OP_BUS_RESOLVE = 11;
 
         let virtualNodeCount = slot + 10;
@@ -502,23 +505,33 @@ const WasmEngine = {
                 emitNAND(v3, b, v1);
                 emitNAND(v4, v2, v3);
                 emitNAND(mapped, v4, v4);
-            } else if (t === 'ROM') {
+            } else if (t === 'ROM' || t === 'RAM') {
                 const pins = n.addressPins || 4;
-                const inBase = virtualNodeCount;
+                const addrBase = virtualNodeCount;
                 virtualNodeCount += pins;
                 for (let i = 0; i < pins; i++) {
-                    const driver = buildBusTree(resolveAllDriverIndices(n.id, `in${i}`));
-                    emitOP(inBase + i, driver, 0, OP_BUFFER);
+                    emitOP(addrBase + i, buildBusTree(resolveAllDriverIndices(n.id, `in${i}`)), 0, OP_BUFFER);
                 }
                 
+                let dataPacking = 0;
+                if (t === 'RAM') {
+                    const dinBase = virtualNodeCount;
+                    virtualNodeCount += 8;
+                    for (let i = 0; i < 8; i++) {
+                        emitOP(dinBase + i, buildBusTree(resolveAllDriverIndices(n.id, `din${i}`)), 0, OP_BUFFER);
+                    }
+                    const weIdx = buildBusTree(resolveAllDriverIndices(n.id, 'we'));
+                    dataPacking = dinBase | (weIdx << 24);
+                }
+
                 if (n.memoryData) {
                     const view = new Uint8Array(this.memory.buffer, 2097152 + currentRomOffset, n.memoryData.length);
                     view.set(n.memoryData);
                 }
                 
-                const rawA = inBase | (pins << 24);
-                const rawB = currentRomOffset;
-                emitOP(mapped[0], rawA, rawB, OP_ROM);
+                const addrPacking = addrBase | (pins << 24);
+                emitOP(0, currentRomOffset, 0, OP_SET_OFFSET);
+                emitOP(mapped[0], addrPacking, dataPacking, t === 'RAM' ? OP_RAM : OP_ROM);
                 
                 currentRomOffset += (n.memoryData ? n.memoryData.length : 0);
             } else if (t === 'DFF' || t === 'CLOCK' || t === 'TRISTATE' || t === 'TFF') {
