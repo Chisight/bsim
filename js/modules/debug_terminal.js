@@ -358,6 +358,14 @@ const DebugTerminal = {
         });
     },
 
+    // [AUDIT: v1.24.70 | SEC_ARCH_LEAD] - Integrated terminal label-aware resolution helper.
+    resolveNode(ctx, target) {
+        let n = ctx.nodes.find(node => node.id === target);
+        if (!n) n = ctx.nodes.find(node => node.id === `node-${target}`);
+        if (!n) n = ctx.nodes.find(node => node.label === target);
+        return n;
+    },
+
     // [AUDIT: v1.24.06 | SEC_ARCH_LEAD] - Unified contextual environment resolver for split-pane and virtual workspaces.
     getContext() {
         const defaultCtx = { nodes: Sim.nodes, wires: Sim.wires, simObj: Sim };
@@ -962,12 +970,10 @@ const DebugTerminal = {
                 break;
             }
             case 'set': {
-                // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Alias-aware node resolution for automated scripting.
                 if (args.length < 3) return this.print("Usage: set <nodeId> <value>", "err");
                 const ctx = this.getContext();
-                let sn = ctx.nodes.find(n => n.id === args[1] || n.id === `node-${args[1]}`);
-                if (!sn) sn = ctx.nodes.find(node => node.label === args[1]);
-                if (!sn) return this.print(`Node ${args[1]} not found.`, "err");
+                const sn = this.resolveNode(ctx, args[1]);
+                if (!sn) return this.print(`set: '${args[1]}' not found.`, "err");
                 const val = parseInt(args[2]);
                 if (isNaN(val)) return this.print("Value must be a number.", "err");
                 sn.val = val;
@@ -1004,8 +1010,7 @@ const DebugTerminal = {
                 // [AUDIT: v1.24.69 | SEC_ARCH_LEAD] - Hardened Assert primitive with multi-bit Bus-Value aggregation and Wasm linear-memory probing.
                 if (args.length < 4) return this.print("Usage: assert <nodeId> <portId> <value>", "err");
                 const ctx = this.getContext();
-                let sn = ctx.nodes.find(n => n.id === args[1] || n.id === `node-${args[1]}`);
-                if (!sn) sn = ctx.nodes.find(node => node.label === args[1]);
+                let sn = this.resolveNode(ctx, args[1]);
                 if (!sn) return this.print(`Assert failed: Node ${args[1]} not found.`, "err");
                 
                 const expVal = parseInt(args[3]);
@@ -1044,8 +1049,7 @@ const DebugTerminal = {
                 // [AUDIT: v1.24.56 | SEC_ARCH_LEAD] - Memory introspection.
                 if (args.length < 3) return this.print("Usage: peek <nodeId> <address>", "err");
                 const ctx = this.getContext();
-                let sn = ctx.nodes.find(n => n.id === args[1] || n.id === `node-${args[1]}`);
-                if (!sn) sn = ctx.nodes.find(node => node.label === args[1]);
+                let sn = this.resolveNode(ctx, args[1]);
                 if (!sn || sn.type !== 'ROM') return this.print("Target must be a ROM module.", "err");
                 const addr = args[2].startsWith('0x') ? parseInt(args[2], 16) : parseInt(args[2]);
                 const data = (sn.memoryData && sn.memoryData.length > addr) ? sn.memoryData[addr] : 0;
@@ -1056,8 +1060,7 @@ const DebugTerminal = {
                 // [AUDIT: v1.24.56 | SEC_ARCH_LEAD] - Dynamic firmware flashing.
                 if (args.length < 4) return this.print("Usage: poke <nodeId> <address> <value>", "err");
                 const ctx = this.getContext();
-                let sn = ctx.nodes.find(n => n.id === args[1] || n.id === `node-${args[1]}`);
-                if (!sn) sn = ctx.nodes.find(node => node.label === args[1]);
+                let sn = this.resolveNode(ctx, args[1]);
                 if (!sn || sn.type !== 'ROM') return this.print("Target must be a ROM module.", "err");
                 const addr = args[2].startsWith('0x') ? parseInt(args[2], 16) : parseInt(args[2]);
                 const val = args[3].startsWith('0x') ? parseInt(args[3], 16) : parseInt(args[3]);
