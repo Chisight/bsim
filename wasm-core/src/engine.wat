@@ -120,6 +120,8 @@
                       local.get $p i32.const 1 i32.add local.set $p br $rom_a_loop
                     ))
                   )
+                  ;; [AUDIT: v1.24.81 | SEC_ARCH_LEAD] - ROM Address Boundary Clamp enforcement to prevent linear memory host traps.
+                  i32.const 1 local.get $num_pins i32.shl i32.const 1 i32.sub local.get $addr i32.and local.set $addr
                   global.get $REGION_C_BASE global.get $MEM_OFFSET i32.add local.get $addr i32.add i32.load8_u local.set $data
                   i32.const 1 local.set $p
                   (loop $rom_o_loop
@@ -148,6 +150,8 @@
                           local.get $p i32.const 1 i32.add local.set $p br $ram_a_loop
                         ))
                       )
+                      ;; [AUDIT: v1.24.81 | SEC_ARCH_LEAD] - RAM Address Boundary Clamp enforcement to prevent linear memory host traps.
+                      i32.const 1 local.get $num_pins i32.shl i32.const 1 i32.sub local.get $addr i32.and local.set $addr
                       local.get $raw_b i32.const 0xFFFFFF i32.and local.set $in_base
                       local.get $raw_b i32.const 24 i32.shr_u i32.const 4 i32.mul i32.load i32.const 1 i32.eq
                       (if (then
