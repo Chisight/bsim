@@ -822,10 +822,13 @@ const DebugTerminal = {
                 break;
             case 'spawn': {
                 // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Deterministic node spawning via shell inline comments.
+                // [AUDIT: v1.24.48 | SEC_ARCH_LEAD] - Resolved zero-coordinate falsy evaluation bug causing spawn offset drift.
                 if (!args[1]) return this.print("Usage: spawn <type> [x] [y] [# id]", "err");
                 const type = args[1].toUpperCase();
-                const x = parseFloat(args[2]) || (window.View ? parseInt(View.x) + 100 : 0) || 0;
-                const y = parseFloat(args[3]) || (window.View ? parseInt(View.y) + 100 : 0) || 0;
+                const parsedX = parseFloat(args[2]);
+                const parsedY = parseFloat(args[3]);
+                const x = !isNaN(parsedX) ? parsedX : ((window.View ? parseInt(View.x) : 0) + 100);
+                const y = !isNaN(parsedY) ? parsedY : ((window.View ? parseInt(View.y) : 0) + 100);
                 let prefId = null;
                 const hashIdx = args.indexOf('#');
                 if (hashIdx !== -1 && args[hashIdx + 1]) prefId = args[hashIdx + 1];

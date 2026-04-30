@@ -151,7 +151,8 @@ window.onload = () => {
      */
     // [AUDIT: v1.24.41 | SEC_ARCH_LEAD] - Version increment for polished toast mechanics, dynamic preferences window, and terminal scripting.
     // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Version increment for deterministic script ID propagation, interaction hitboxes, and wire deletion patches.
-    window.LOADED_BSIM_VERSION = "1.24.47";
+    // [AUDIT: v1.24.48 | SEC_ARCH_LEAD] - Version increment for zero-coordinate falsy evaluation patch in CLI parser.
+    window.LOADED_BSIM_VERSION = "1.24.48";
 
     // [AUDIT: SEC_ARCH_LEAD] - Injected passive workspace boundary validation to catch upgrade mismatches.
     window.addEventListener('load', () => {
