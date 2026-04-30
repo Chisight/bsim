@@ -302,9 +302,10 @@ const InteractionHandler = {
             const clickX = (e.clientX - sr.left) / View.scale;
             const clickY = (e.clientY - sr.top) / View.scale;
 
+            // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Hardened topological wire resolution logic for deletion paths mapped to multi-bit I/O buffers.
             menu.innerHTML = `
                 <div class="menu-item" onclick="InteractionHandler._splitWire(${wire.from.nodeId ? `'${wire.from.nodeId}'` : null}, '${wire.from.portId}', ${wire.to.nodeId ? `'${wire.to.nodeId}'` : null}, '${wire.to.portId}', ${clickX}, ${clickY}); document.getElementById('context-menu').style.display='none';">Add Node Here</div>
-                <div class="menu-item danger" onclick="History.execute(new DeleteWireCommand(Sim.wires.find(w => w.from.nodeId === '${wire.from.nodeId}' && w.to.nodeId === '${wire.to.nodeId}'))); document.getElementById('context-menu').style.display='none';">Delete Wire</div>
+                <div class="menu-item danger" onclick="History.execute(new DeleteWireCommand(Sim.wires.find(w => w.from.nodeId === '${wire.from.nodeId}' && w.to.nodeId === '${wire.to.nodeId}' && w.from.portId === '${wire.from.portId}' && w.to.portId === '${wire.to.portId}'))); document.getElementById('context-menu').style.display='none';">Delete Wire</div>
             `;
             
             // [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Smart boundary collision detection for wire context menus.

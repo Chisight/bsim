@@ -47,7 +47,7 @@ window.onload = () => {
                 if (e.clientY > 30) topRev.classList.remove('active');
             }
         }
-        
+
         if (botNav?.classList.contains('auto-hidden')) {
             if (e.clientY > window.innerHeight - 5) {
                 clearTimeout(hoverBotTimer);
@@ -59,7 +59,7 @@ window.onload = () => {
             }
         }
     });
-    
+
     document.getElementById('top-reveal')?.addEventListener('click', () => {
         document.getElementById('top-nav').classList.remove('auto-hidden');
         document.getElementById('top-reveal').classList.remove('active');
@@ -79,7 +79,7 @@ window.onload = () => {
     if (window.DebugTerminal) DebugTerminal.init();
     InteractionHandler.initMarquee();
     InteractionHandler.initClipboardListeners();
-    
+
     // Wire Preview Mouse Tracking
     window.addEventListener('mousemove', (e) => {
         if (Sim.wiring.active) {
@@ -89,7 +89,7 @@ window.onload = () => {
             WireRenderer.drawWires();
         }
     });
-    
+
     // Global Error Handling
     window.onerror = (msg, url, line) => {
         console.error(`[ModularSim Error] ${msg} at ${url}:${line}`);
@@ -100,7 +100,7 @@ window.onload = () => {
         if (Sim.activeEditingChip) {
             let menu = document.getElementById('context-menu');
             if (!menu) return;
-            
+
             setTimeout(() => {
                 if (!menu.innerHTML.includes('Split Editor')) {
                     menu.innerHTML += `
@@ -132,7 +132,7 @@ window.onload = () => {
     window.addEventListener('keydown', (e) => {
         // Prevent interfering with modal inputs or text fields
         if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
-        
+
         if (e.ctrlKey || e.metaKey) {
             if (e.key.toLowerCase() === 'z') {
                 if (e.shiftKey) History.redo();
@@ -144,7 +144,7 @@ window.onload = () => {
             }
         }
     });
-    
+
     /**
      * @STATE: BSIM_METADATA
      * @INTENT: Define the application semantic versioning for runtime compatibility checks.
@@ -154,18 +154,20 @@ window.onload = () => {
     // [AUDIT: v1.24.43 | SEC_ARCH_LEAD] - Version increment for legacy edit mode dispatch interception.
     // [AUDIT: v1.24.44 | SEC_ARCH_LEAD] - Version increment for context menu nomenclature synchronization (Dots -> LEDs).
     // [AUDIT: v1.24.45 | SEC_ARCH_LEAD] - Version increment for script shorthand extension support (.bsims).
-    window.LOADED_BSIM_VERSION = "1.24.45";
+    // [AUDIT: v1.24.46 | SEC_ARCH_LEAD] - Version increment for deletion logic encapsulation (Sim.deleteSelection).
+    // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Version increment for deterministic IDs, label-based terminal lookup, and hitbox expansions.
+    window.LOADED_BSIM_VERSION = "1.24.47";
 
     // [AUDIT: SEC_ARCH_LEAD] - Injected passive workspace boundary validation to catch upgrade mismatches.
     window.addEventListener('load', () => {
         setTimeout(() => {
             let isStale = false;
-            
+
             // Check 1: HTML to JS Cache Mismatch
             if (window.EXPECTED_BSIM_VERSION && window.EXPECTED_BSIM_VERSION !== window.LOADED_BSIM_VERSION) {
                 isStale = true;
             }
-            
+
             // Check 2: Upgraded Engine vs Existing Local Storage State
             const storedVer = localStorage.getItem('bsim_state_version');
             if (!storedVer || storedVer !== window.LOADED_BSIM_VERSION) {
@@ -179,7 +181,7 @@ window.onload = () => {
                 toast.innerHTML = '<div style="color:#ff4757; font-size:13px; font-weight:800; margin-bottom:10px; letter-spacing:0.5px;">⚠️ STALE WORKSPACE DETECTED</div><div style="font-weight:normal; font-size:12px; color:#aaa; line-height:1.6;">The simulator engine has been updated, but you have a stale project loaded in your interface.<br><br>To avoid rendering bugs and logic faults, please sanitize your workspace:<br><br><span style="color:#fff; font-weight:bold;">1. File &gt; Export BSIM<br>2. File &gt; New Project<br>3. File &gt; Load BSIM</span></div><button onclick="this.parentElement.remove()" style="margin-top:18px; background:#ff4757; color:#fff; border:none; padding:8px; border-radius:4px; cursor:pointer; font-weight:bold; width:100%; transition:0.2s;">I Understand</button>';
                 document.body.appendChild(toast);
             }
-            
+
             localStorage.setItem('bsim_state_version', window.LOADED_BSIM_VERSION);
         }, 2000); // Delayed execution to ensure workspace load completion
     });
