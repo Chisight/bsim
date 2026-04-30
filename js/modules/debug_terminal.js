@@ -617,7 +617,8 @@ const DebugTerminal = {
             case 'help':
                 // [AUDIT: v1.24.95 | SEC_ARCH_LEAD] - Expanded help index for kernel telemetry and analysis commands.
                 this.print("[SYSTEM] ARCHITECTURAL PRIMITIVES:", "sys");
-                this.print("  - tick <n>    : Step the Wasm kernel N times.", "sys");
+                this.print("  - tick <n> [p]: Advance simulation. Phase: 0=Settle, 1=Latch, 2=Commit.", "sys");
+                this.print("  - trace <id>  : Trace signal paths to identify zero-delay loops.", "sys");
                 this.print("  - power       : Extract pJ switching activity from Region E.", "sys");
                 this.print("  - symbols     : Map linear memory addresses to high-level node IDs.", "sys");
                 this.print("  - timing <f>  : Configure gate delays (7nm, 28nm, ideal).", "sys");
@@ -628,8 +629,6 @@ const DebugTerminal = {
                 this.print("  - set <id> <v>: Set input node value.", "sys");
                 this.print("  - wire ...    : Connect two ports.", "sys");
                 this.print("  - synth <g>   : Compile logic from NANDs.", "sys");
-                break;
-                this.print("  trace [nodeId]      - Output topological connections and logic states.");
                 break;
             case 'pwd':
                 this.print(this.cwd, 'sys');
@@ -982,12 +981,24 @@ const DebugTerminal = {
                 this.print("Propagation tick queued.", "ok");
                 break;
             case 'step':
-            case 'tick':
-                // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Programmatic cycle advancement.
-                let ticks = parseInt(args[1]) || 1;
-                for(let i=0; i<ticks; i++) { Sim.seedQueue(); Sim.processQueue(); }
-                this.print(`Advanced ${ticks} clock cycle(s).`, "ok");
+            case 'tick': {
+                const count = parseInt(args[1]) || 1;
+                // [AUDIT: v1.24.96 | SEC_ARCH_LEAD] - Support for manual Phase-Stepping to debug Zero-Delay Cascades.
+                if (args[2] !== undefined) {
+                    const phase = parseInt(args[2]);
+                    for(let i=0; i<count; i++) WasmEngine.executeTick(phase);
+                    this.print(`Step: ${count} cycles in Phase ${phase} (Manual Commit).`, "warn");
+                } else {
+                    // Full 3-phase cycle
+                    for(let i=0; i<count; i++) {
+                        WasmEngine.executeTick(0); // Settle
+                        WasmEngine.executeTick(1); // Latch
+                        WasmEngine.executeTick(2); // Commit
+                    }
+                    this.print(`Executed ${count} full 3-phase simulation cycles.`, "ok");
+                }
                 break;
+            }
             case 'assert': {
                 // [AUDIT: v1.24.69 | SEC_ARCH_LEAD] - Hardened Assert primitive with multi-bit Bus-Value aggregation and Wasm linear-memory probing.
                 if (args.length < 4) return this.print("Usage: assert <nodeId> <portId> <value>", "err");
