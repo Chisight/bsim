@@ -14,6 +14,10 @@ const WasmEngine = {
     flatNodes: [],
     flatWires: [],
 
+    worker: null,
+    workerReady: false,
+    workerBusy: false,
+
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for Wasm kernel initialization.
      * @ARCH: KERNEL_LOADER
@@ -25,26 +29,43 @@ const WasmEngine = {
             const response = await fetch('js/wasm-bin/engine.wasm');
             if (!response.ok) throw new Error(`HTTP ${response.status}: Failed to fetch WebAssembly binary.`);
             const bytes = await response.arrayBuffer();
-            this.memory = new WebAssembly.Memory({ initial: 1 });
-            const { instance } = await WebAssembly.instantiate(bytes, {
-                env: {
-                    memory: this.memory
-                }
+
+            // [AUDIT: v1.24.95 | SEC_ARCH_LEAD] - SharedArrayBuffer allows the UI thread to read memory without copying.
+            // Requires HTTPS and COOP/COEP headers. Maximum set to 128MB for future-proofing.
+            this.memory = new WebAssembly.Memory({ 
+                initial: 512, // 32MB baseline
+                maximum: 2048, // 128MB ceiling
+                shared: true 
             });
-            this.instance = instance;
+
+            this.worker = new Worker('js/modules/wasm_worker.js');
+            this.worker.onmessage = (e) => {
+                if (e.data.action === 'ready') {
+                    this.workerReady = true;
+                    this.ready = true;
+                    console.log('[WasmEngine] Core Worker initialized successfully.');
+                    if (window.Sim) {
+                        Sim.seedQueue();
+                        Sim.processQueue();
+                        Sim.updateHUD();
+                    }
+                } else if (e.data.action === 'tick_done') {
+                    this.workerBusy = false;
+                } else if (e.data.action === 'error') {
+                    console.error('[WasmEngine] Worker error:', e.data.error);
+                }
+            };
+
+            this.worker.postMessage({
+                action: 'init',
+                wasmBuffer: bytes,
+                memory: this.memory
+            });
+
             this.memArray = new Int32Array(this.memory.buffer);
-            this.ready = true;
-            console.log('[WasmEngine] Core initialized successfully.');
-            // Force board re-evaluation now that the high-speed kernel is online
-            if (window.Sim) {
-                Sim.seedQueue();
-                Sim.processQueue();
-                Sim.updateHUD();
-            }
         } catch (e) {
             console.error('[WasmEngine] Initialization failed:', e);
         }
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Wasm kernel initialization lifecycle termination.
     },
 
     /**
