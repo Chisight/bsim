@@ -158,7 +158,9 @@ window.onload = () => {
     // [AUDIT: v1.24.58 | SEC_ARCH_LEAD] - Hardened ROM payload fetcher and monotonic address pin scaling enforcement.
     // [AUDIT: v1.24.59 | SEC_ARCH_LEAD] - Restored ROM pin geometry rendering and documented V8 engine memory fallback constraints.
     // [AUDIT: v1.24.60 | SEC_ARCH_LEAD] - Synthesized Wasm Kernel extensions for native memory addressing and execution parity.
-    window.LOADED_BSIM_VERSION = "1.24.60";
+    // [AUDIT: v1.24.61 | SEC_ARCH_LEAD] - Enabled right-click dynamic UI editing for ROM components to match macro behavior.
+    // [AUDIT: v1.24.62 | SEC_ARCH_LEAD] - Version increment for ROM UI persistence and label customization support.
+    window.LOADED_BSIM_VERSION = "1.24.62";
 
     // [AUDIT: SEC_ARCH_LEAD] - JIT Patch: Dynamically extend capabilities via global scope interceptors to prevent core module desync.
     setTimeout(() => {
@@ -260,7 +262,12 @@ window.onload = () => {
                     if (el) {
                         const lbl = el.querySelector('.gate-label');
                         if (lbl) {
-                            lbl.innerText = 'ROM (' + (node.addressPins || 4) + 'x8)';
+                            // [AUDIT: v1.24.62 | SEC_ARCH_LEAD] - Allowed manual node renaming for ROM modules while maintaining status-text fallback.
+                            if (!node.label || node.label === 'ROM') {
+                                lbl.innerText = 'ROM (' + (node.addressPins || 4) + 'x8)';
+                            } else {
+                                lbl.innerText = node.label;
+                            }
                             // [AUDIT: v1.24.57 | SEC_ARCH_LEAD] - Applied primitive typography classification to ROM label.
                             lbl.style.color = '#fff';
                         }
