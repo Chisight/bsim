@@ -1744,6 +1744,9 @@ const Sim = {
 
         if (connectedWires.length === 0) return null;
 
+        // [AUDIT: v1.24.80 | SEC_ARCH_LEAD] - Implemented V8 TTL bus resolution (1 > 0 > Z) to enforce engine parity with Wasm OP_BUS_RESOLVE.
+        let resolved = null;
+
         for (const w of connectedWires) {
             const peerNodeId = (w.to.nodeId === nodeId && w.to.portId === portId) ? w.from.nodeId : w.to.nodeId;
             const peerPortId = (w.to.nodeId === nodeId && w.to.portId === portId) ? w.from.portId : w.to.portId;
@@ -1754,21 +1757,23 @@ const Sim = {
             let isPeerOutput = false;
             if (peerNode.type.startsWith('IN-') || peerNode.type === 'CLOCK') isPeerOutput = true;
             if (peerNode.isCustom && peerPortId.startsWith('out')) isPeerOutput = true;
-            const NATIVE_GATES = new Set(['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR']);
-            if (NATIVE_GATES.has(peerNode.type) && (peerPortId === 'out' || peerPortId === 'q' || peerPortId === 'nq')) isPeerOutput = true;
+            const NATIVE_GATES = new Set(['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM', 'RAM']);
+            if (NATIVE_GATES.has(peerNode.type) && (peerPortId === 'out' || peerPortId === 'q' || peerPortId === 'nq' || ((peerNode.type === 'ROM' || peerNode.type === 'RAM') && peerPortId.startsWith('out')))) isPeerOutput = true;
 
+            let sig = null;
             if (peerNode.type === 'JUNCTION' || !isPeerOutput) {
                 // Keep tracing laterally across the net
-                const sig = this.getDrivingSignal(peerNodeId, peerPortId, visited);
-                if (sig !== null) return sig;
+                sig = this.getDrivingSignal(peerNodeId, peerPortId, visited);
             } else {
                 // Terminate trace at valid logical driver
-                const sig = this.getSignal(peerNodeId, peerPortId);
-                if (sig !== null) return sig;
+                sig = this.getSignal(peerNodeId, peerPortId);
             }
+
+            if (sig === 1 || sig === true) return 1; // High signal dominates the bus, short-circuit trace.
+            if (sig === 0 || sig === false) resolved = 0; // Low signal overrides High-Z, but trace continues to check for High.
         }
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Driver resolution complete for ${nodeId}:${portId}. No driver found (Floating).
-        return null;
+        
+        return resolved;
     },
 
     /**
