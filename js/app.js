@@ -141,7 +141,27 @@ window.onload = () => {
     // [AUDIT: v1.24.72 | SEC_ARCH_LEAD] - Expanded hitboxes, deterministic naming resolution, and exact wire deletion tracking.
     // [AUDIT: v1.24.73 | SEC_ARCH_LEAD] - Native RAM/ROM flattening safeguards, internal simulation evaluation, and dynamic assertions.
     // [AUDIT: v1.24.74 | SEC_ARCH_LEAD] - Repaired nested sub-menu dropdown rendering and synchronized version metadata.
-    window.LOADED_BSIM_VERSION = "1.24.74";
+    // [AUDIT: v1.24.75 | SEC_ARCH_LEAD] - Navbar sub-menu persistence locks and safe exception-handling for wire deletion parameters.
+    // [AUDIT: v1.24.76 | SEC_ARCH_LEAD] - Polyfilled bounding boxes for marquee scaling and hardened serialization for memory buffers.
+    window.LOADED_BSIM_VERSION = "1.24.76";
+
+    // [AUDIT: v1.24.76 | SEC_ARCH_LEAD] - JIT interceptor to prevent aggressive serialization filters from destroying RAM/ROM parametric data and UI dimensions.
+    if (window.Sim && typeof Sim._cleanNode === 'function') {
+        const _origCleanNode = Sim._cleanNode.bind(Sim);
+        Sim._cleanNode = function(n) {
+            const clean = _origCleanNode(n);
+            if (clean) {
+                if (n.memoryData) clean.memoryData = Array.from(n.memoryData);
+                if (n.addressPins !== undefined) clean.addressPins = n.addressPins;
+                if (n.dataUrl !== undefined) clean.dataUrl = n.dataUrl;
+                if (n.customWidth !== undefined) clean.customWidth = n.customWidth;
+                if (n.customHeight !== undefined) clean.customHeight = n.customHeight;
+                if (n.portLabels) clean.portLabels = JSON.parse(JSON.stringify(n.portLabels));
+                if (n.portPositions) clean.portPositions = JSON.parse(JSON.stringify(n.portPositions));
+            }
+            return clean;
+        };
+    }
 
     // [AUDIT: SEC_ARCH_LEAD] - JIT Patch: Dynamically extend capabilities via global scope interceptors to prevent core module desync.
     setTimeout(() => {

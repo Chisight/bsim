@@ -6,7 +6,7 @@
     <title>bSim</title>
     <link rel="icon" type="image/svg+xml" href="assets/bSim-logo-nand.svg">
     <link rel="stylesheet" href="css/style.css">
-    <script>window.EXPECTED_BSIM_VERSION = "1.24.74";</script>
+    <script>window.EXPECTED_BSIM_VERSION = "1.24.76";</script>
 </head>
 
 <body oncontextmenu="return false;">
@@ -15,7 +15,7 @@
         <div class="nav-brand" style="display: flex; align-items: center;">
             <img src="assets/bSim-logo-big.svg" alt="bSim Logo"
                 style="height: 31.25px; margin-right: 8px; transition: transform 0.2s ease;">
-            <span style="font-size:10px; color:var(--wire-on); padding-top: 4px;">v1.24.74</span>
+            <span style="font-size:10px; color:var(--wire-on); padding-top: 4px;">v1.24.76</span>
         </div>
 
         <div class="menu-item has-sub">File
@@ -177,33 +177,51 @@
     <script src="js/app.js"></script>
 
     <script>
-        // [AUDIT: v1.24.74 | SEC_ARCH_LEAD] - Corrected sub-menu toggle logic to prevent collapsing parent menus and fixed inline style clearing.
+        // [AUDIT: v1.24.75 | SEC_ARCH_LEAD] - Unified menu state locking for persistent input focus without breaking CSS hover cascade.
         function toggleSubMenu(el, e) {
             const sm = el.querySelector('.sub-menu');
-            const isVisible = sm.style.display === 'block' || sm.style.display === 'flex';
+            const isVisible = sm.style.display === 'flex' || sm.style.display === 'block';
             
-            // Hide only sibling sub-menus at the same depth
-            Array.from(el.parentElement.children).forEach(child => {
-                if (child !== el && child.classList.contains('menu-item')) {
-                    const childSub = child.querySelector(':scope > .sub-menu');
-                    if (childSub) childSub.style.display = 'none';
-                }
+            // Reset all sub-menus and keep-open locks not in the active chain
+            document.querySelectorAll('.sub-menu').forEach(s => {
+                if (!s.contains(sm) && s !== sm) s.style.display = '';
+            });
+            document.querySelectorAll('.keep-open').forEach(k => {
+                if (!k.contains(sm)) k.classList.remove('keep-open');
             });
             
-            sm.style.display = isVisible ? 'none' : 'flex';
-            
-            // Lock the parent menu open so it doesn't vanish on mouseleave
-            const parentMenu = el.parentElement.closest('.sub-menu');
-            if (parentMenu) parentMenu.style.display = 'flex';
+            if (!isVisible) {
+                sm.style.display = 'flex';
+                // Walk up the DOM tree and lock all ancestor .has-sub elements open
+                let current = el;
+                while (current) {
+                    if (current.classList && current.classList.contains('has-sub')) {
+                        current.classList.add('keep-open');
+                        const childMenu = current.querySelector(':scope > .sub-menu');
+                        if (childMenu) childMenu.style.display = 'flex';
+                    }
+                    current = current.parentElement;
+                }
+                
+                // Focus the text input if this menu has one
+                const input = sm.querySelector('input');
+                if (input) setTimeout(() => input.focus(), 10);
+            } else {
+                sm.style.display = '';
+                const parent = el.closest('.has-sub');
+                if (parent) parent.classList.remove('keep-open');
+            }
             
             e.stopPropagation();
         }
 
-        // Reset all menus on click outside to restore CSS hover rules
-        document.addEventListener('click', () => {
-            document.querySelectorAll('.sub-menu').forEach(s => {
-                s.style.display = '';
-            });
+        // Global click handler to clear persistent menu states when clicking off
+        document.addEventListener('click', (e) => {
+            // Don't close if we're clicking inside an input box inside a sub-menu
+            if (e.target.tagName === 'INPUT' && e.target.closest('.sub-menu')) return;
+            
+            document.querySelectorAll('.sub-menu').forEach(s => s.style.display = '');
+            document.querySelectorAll('.keep-open').forEach(el => el.classList.remove('keep-open'));
         });
     </script>
 </body>
