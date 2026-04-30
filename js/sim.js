@@ -86,7 +86,8 @@ const Sim = {
         const runQueue = () => {
             const now = performance.now();
             
-            const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
+            // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Synchronized Wasm whitelist to include Memory Primitives for native execution.
+            const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'ROM', 'RAM']);
             const checkPure = (nodes) => nodes.every(n => {
                 if (validWasmTypes.has(n.type)) return true;
                 if (n.isCustom && this.library[n.type]) return checkPure(this.library[n.type].nodes);
@@ -586,7 +587,7 @@ const Sim = {
                 node.lastClk = valClk;
                 return { q: node.state, nq: node.state === 1 ? 0 : 1 };
             }
-            // [AUDIT: v1.24.53 | SEC_ARCH_LEAD] - Memory retrieval logic for dynamic ROM component.
+            // [AUDIT: v1.24.58 | SEC_ARCH_LEAD] - Hardened memory retrieval logic mapping N-bit address space to 8-bit output vectors.
             case 'ROM': {
                 let addr = 0;
                 const pins = node.addressPins || 4;
@@ -599,6 +600,28 @@ const Sim = {
                 for (let i = 0; i < 8; i++) {
                     outObj[`out${i}`] = (data & (1 << i)) ? 1 : 0;
                 }
+                return outObj;
+            }
+            // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Implemented Synchronous R/W cycle for V8 RAM fallback.
+            case 'RAM': {
+                let addr = 0;
+                const pins = node.addressPins || 4;
+                for (let i = 0; i < pins; i++) {
+                    const bit = this.getDrivingSignal(node.id, `in${i}`);
+                    if (bit === 1 || bit === true) addr |= (1 << i);
+                }
+                const we = this.getDrivingSignal(node.id, 'we');
+                if (we === 1 || we === true) {
+                    let din = 0;
+                    for (let i = 0; i < 8; i++) {
+                        if (this.getDrivingSignal(node.id, `din${i}`) === 1) din |= (1 << i);
+                    }
+                    if (!node.memoryData) node.memoryData = [];
+                    node.memoryData[addr] = din;
+                }
+                const data = (node.memoryData && node.memoryData.length > addr) ? node.memoryData[addr] : 0;
+                const outObj = {};
+                for (let i = 0; i < 8; i++) outObj[`out${i}`] = (data & (1 << i)) ? 1 : 0;
                 return outObj;
             }
         }
@@ -690,7 +713,8 @@ const Sim = {
         // Wasm engine intercept
         if (this.useWasm && window.WasmEngine && WasmEngine.ready) {
             // Synchronized native primitive whitelist
-            const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
+            // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Synchronized Wasm whitelist to include Memory Primitives for native execution.
+            const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'ROM', 'RAM']);
             const checkPure = (nodes) => nodes.every(n => {
                 if (validWasmTypes.has(n.type)) return true;
                 if (n.isCustom && this.library && this.library[n.type]) return checkPure(this.library[n.type].nodes);
@@ -967,7 +991,8 @@ const Sim = {
         // Wait 50ms for the toast to render
         await new Promise(resolve => setTimeout(resolve, 50));
         // validate that the netlist is pure native
-        const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
+        // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Synchronized Wasm whitelist to include Memory Primitives for native execution.
+        const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'ROM', 'RAM']);
         const checkPure = (nodes) => nodes.every(n => {
             if (validWasmTypes.has(n.type)) return true;
             if (n.isCustom && this.library && this.library[n.type]) return checkPure(this.library[n.type].nodes);
@@ -1315,11 +1340,14 @@ const Sim = {
             state: (type.includes('-1') || type === 'CLOCK' || type === 'DFF' || type === 'TFF') ? 0 : (new Array(parseInt(type.split('-')[1]) || 1).fill(0)),
             outputs: {}, lastClk: 0,
             ...(type === 'CLOCK' && { freq: 1, interval: 1000, lastTick: performance.now() }),
-            // [AUDIT: v1.24.53 | SEC_ARCH_LEAD] - Parametric state initialization for dynamic ROM module.
-            ...(type === 'ROM' && { addressPins: 4, dataUrl: '', memoryData: Array.from(new Uint8Array(16)) })
+            // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Synchronized initialization for volatile RAM memory structures.
+            ...(type === 'ROM' && { addressPins: 4, dataUrl: '', memoryData: Array.from(new Uint8Array(16)) }),
+            ...(type === 'RAM' && { addressPins: 4, dataUrl: '', memoryData: Array.from(new Uint8Array(16)) })
         };
         // [AUDIT: v1.24.53 | SEC_ARCH_LEAD] - Injected ROM native component type to allow bypass of custom chip verifications.
-        const NATIVE_TYPES = new Set(['NAND', 'CLOCK', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'JUNCTION', 'TRISTATE', 'DFF', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM']);
+        // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Formally classified RAM as a native primitive to ensure linear memory execution priority.
+        // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Formally registered RAM as a core primitive to prevent macro-substitution logic.
+        const NATIVE_TYPES = new Set(['NAND', 'CLOCK', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'JUNCTION', 'TRISTATE', 'DFF', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM', 'RAM']);
         if (this.library[type] && !NATIVE_TYPES.has(type)) { node.isCustom = true; }
         History.execute(new AddNodeCommand(node));
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node command dispatched for ${node.id}.
@@ -1791,7 +1819,8 @@ const Sim = {
         else if (pos === 'top-left') { hud.style.top = '15px'; hud.style.left = '15px'; hud.style.right = 'auto'; hud.style.bottom = 'auto'; hud.style.textAlign = 'left'; }
         else if (pos === 'bottom-left') { hud.style.bottom = '15px'; hud.style.left = '15px'; hud.style.right = 'auto'; hud.style.top = 'auto'; hud.style.textAlign = 'left'; }
 
-        const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
+        // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Synchronized Wasm whitelist to include Memory Primitives for native execution.
+        const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'ROM', 'RAM']);
         const checkPure = (nodes) => nodes.every(n => {
             if (validWasmTypes.has(n.type)) return true;
             if (n.isCustom && this.library && this.library[n.type]) return checkPure(this.library[n.type].nodes);
@@ -1822,20 +1851,21 @@ const Sim = {
         if (!sb) return;
 
         const sections = {
-            'Input Ports': [
-                { label: 'Single Input', type: 'IN-1' },
-                { label: '4-Bit Port', type: 'IN-4' },
-                { label: '8-Bit Port', type: 'IN-8' }
-            ],
-            'Output Ports': [
-                { label: 'Single Output', type: 'OUT-1' },
-                { label: '4-Bit Port', type: 'OUT-4' },
-                { label: '8-Bit Port', type: 'OUT-8' }
+            'Primitives': [
+                { label: 'NAND', type: 'NAND' },
+                { label: 'Input 1', type: 'IN-1' },
+                { label: 'Input 4', type: 'IN-4' },
+                { label: 'Input 8', type: 'IN-8' },
+                { label: 'Output 1', type: 'OUT-1' },
+                { label: 'Output 4', type: 'OUT-4' },
+                { label: 'Output 8', type: 'OUT-8' },
+                // [AUDIT: v1.24.57 | SEC_ARCH_LEAD] - Relocated ROM instantiation to primitive category per updated UI specification.
+                { label: 'ROM 8-Bit', type: 'ROM' },
+                // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Injected RAM primitive into UI category.
+                { label: 'RAM 8-Bit', type: 'RAM' }
             ],
             'Utilities': [
-                { label: 'Clock Generator', type: 'CLOCK' },
-                // [AUDIT: v1.24.53 | SEC_ARCH_LEAD] - Injected ROM module into instantiation sidebar.
-                { label: '8-Bit ROM', type: 'ROM' }
+                { label: 'Clock Generator', type: 'CLOCK' }
             ]
         };
 
@@ -1879,7 +1909,9 @@ const Sim = {
             { label: 'TRISTATE', type: 'TRISTATE' },
             { label: 'INPUT', type: 'INPUT' },
             { label: 'OUTPUT', type: 'OUTPUT' },
-            { label: 'CLOCK', type: 'CLOCK' }
+            { label: 'CLOCK', type: 'CLOCK' },
+            // [AUDIT: v1.24.58 | SEC_ARCH_LEAD] - Injected ROM module into bottom navbar library.
+            { label: 'ROM', type: 'ROM' }
         ];
 
         nativeLib.forEach(it => {

@@ -5,6 +5,8 @@ const WasmEngine = {
     REGION_A_OFFSET: 0,
     // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Align JS bridge with expanded 1MB Wasm instruction boundary.
     REGION_B_OFFSET: 262144, // 1048576 bytes / 4 bytes per Int32
+    // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Defined Region C (Memory Heap) offset for ROM/RAM payloads.
+    REGION_C_OFFSET: 524288, // 2097152 bytes / 4 bytes per Int32
     instructionCount: 0,
     idMap: new Map(), // nodeId -> wasmIdx (Region A)
     flatNodes: [],
@@ -149,7 +151,12 @@ const WasmEngine = {
 
         // Expanded Memory Matrix calculation based on flat nodes, not parents
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Ensure memory allocation accounts for 1MB instruction base.
-        const requiredBytes = 1048576 + (this.flatNodes.length * 256);
+        // [AUDIT: v1.24.60 | SEC_ARCH_LEAD] - Dynamic Region C allocation injected for linear Wasm payload bridging.
+        let romPayloadSize = 0;
+        this.flatNodes.forEach(n => {
+            if (n.type === 'ROM' || n.type === 'RAM') romPayloadSize += (n.memoryData ? n.memoryData.length : 0);
+        });
+        const requiredBytes = 2097152 + (this.flatNodes.length * 256) + romPayloadSize;
         const requiredPages = Math.ceil(requiredBytes / 65536);
         const currentPages = this.memory.buffer.byteLength / 65536;
 
@@ -169,6 +176,10 @@ const WasmEngine = {
                 this.idMap.set(n.id, indices);
             } else if (n.type === 'DFF' || n.type === 'TFF') {
                 this.idMap.set(n.id, [slot++, slot++]);
+            } else if (n.type === 'ROM' || n.type === 'RAM') {
+                let indices = [];
+                for (let i = 0; i < 8; i++) indices.push(slot++);
+                this.idMap.set(n.id, indices);
             } else {
                 this.idMap.set(n.id, slot++);
             }
@@ -194,9 +205,12 @@ const WasmEngine = {
 
         // 4. Build the linear execution array
         const OP_NAND = 0; const OP_DFF = 1; const OP_CLOCK = 2; const OP_TRISTATE = 3; const OP_TFF = 4;
+        // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Injected Memory and Offset Opcodes for Kernel Parity.
+        const OP_ROM = 5; const OP_BUFFER = 6; const OP_RAM = 7; const OP_SET_OFFSET = 8;
         const OP_BUS_RESOLVE = 11;
 
         let virtualNodeCount = slot + 10;
+        let currentRomOffset = 0;
         /**
          * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for logical driver resolution.
          * @ARCH: SIGNAL_RESOLVER
@@ -212,9 +226,9 @@ const WasmEngine = {
                 if (!node) return;
                 const isInternalIO = (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) && nId.includes(':');
                 if (isInternalIO || node.type === 'JUNCTION') return;
-                const NATIVE_GATES = new Set(['NAND', 'DFF', 'CLOCK', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR']);
+                const NATIVE_GATES = new Set(['NAND', 'DFF', 'CLOCK', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM']);
                 if (node.type === 'CLOCK' && pId === 'out0') drivers.add(this.getSpecificIdx(nId, pId));
-                if (NATIVE_GATES.has(node.type) && (pId === 'q' || pId === 'nq' || pId === 'out')) drivers.add(this.getSpecificIdx(nId, pId));
+                if (NATIVE_GATES.has(node.type) && (pId === 'q' || pId === 'nq' || pId === 'out' || (node.type === 'ROM' && pId.startsWith('out')))) drivers.add(this.getSpecificIdx(nId, pId));
                 if (node.type.startsWith('IN-') && !nId.includes(':')) drivers.add(this.getSpecificIdx(nId, pId));
             };
             checkDriver(startNodeId, startPortId);
@@ -336,8 +350,8 @@ const WasmEngine = {
 
                 let isOutput = false;
                 if (node.type === 'CLOCK' && currPortId === 'out0') isOutput = true;
-                const NATIVE_GATES = new Set(['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR']);
-                if (NATIVE_GATES.has(node.type) && (currPortId === 'out' || currPortId === 'q' || currPortId === 'nq')) isOutput = true;
+                const NATIVE_GATES = new Set(['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM']);
+                if (NATIVE_GATES.has(node.type) && (currPortId === 'out' || currPortId === 'q' || currPortId === 'nq' || (node.type === 'ROM' && currPortId.startsWith('out')))) isOutput = true;
                 if (node.type.startsWith('IN-') && !currNodeId.includes(':')) isOutput = true;
                 // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Identify output nodes for topological sorting.
                 if (isOutput && !isPassThrough) {
@@ -377,6 +391,10 @@ const WasmEngine = {
             if (['NAND', 'AND', 'OR', 'XOR', 'NOR', 'XNOR'].includes(t)) inputPorts = ['a', 'b'];
             else if (t === 'NOT') inputPorts = ['a'];
             else if (t === 'TRISTATE') inputPorts = ['in', 'en'];
+            else if (t === 'ROM') {
+                const pins = receiverNode.addressPins || 4;
+                for (let i = 0; i < pins; i++) inputPorts.push(`in${i}`);
+            }
             else if (t.startsWith('OUT-') || t.startsWith('PROBE-')) {
                 const bits = parseInt(t.split('-')[1]) || 1;
                 for (let i = 0; i < bits; i++) inputPorts.push(`in${i}`);
@@ -485,6 +503,35 @@ const WasmEngine = {
                 emitNAND(v3, b, v1);
                 emitNAND(v4, v2, v3);
                 emitNAND(mapped, v4, v4);
+            } else if (t === 'ROM' || t === 'RAM') {
+                const pins = n.addressPins || 4;
+                const addrBase = virtualNodeCount;
+                virtualNodeCount += pins;
+                for (let i = 0; i < pins; i++) {
+                    emitOP(addrBase + i, buildBusTree(resolveAllDriverIndices(n.id, `in${i}`)), 0, OP_BUFFER);
+                }
+                
+                let dataPacking = 0;
+                if (t === 'RAM') {
+                    const dinBase = virtualNodeCount;
+                    virtualNodeCount += 8;
+                    for (let i = 0; i < 8; i++) {
+                        emitOP(dinBase + i, buildBusTree(resolveAllDriverIndices(n.id, `din${i}`)), 0, OP_BUFFER);
+                    }
+                    const weIdx = buildBusTree(resolveAllDriverIndices(n.id, 'we'));
+                    dataPacking = dinBase | (weIdx << 24);
+                }
+
+                if (n.memoryData) {
+                    const view = new Uint8Array(this.memory.buffer, 2097152 + currentRomOffset, n.memoryData.length);
+                    view.set(n.memoryData);
+                }
+                
+                const addrPacking = addrBase | (pins << 24);
+                emitOP(0, currentRomOffset, 0, OP_SET_OFFSET);
+                emitOP(mapped[0], addrPacking, dataPacking, t === 'RAM' ? OP_RAM : OP_ROM);
+                
+                currentRomOffset += (n.memoryData ? n.memoryData.length : 0);
             } else if (t === 'DFF' || t === 'CLOCK' || t === 'TRISTATE' || t === 'TFF') {
                 let pm = { a: 'a', b: 'b' };
                 if (t === 'DFF') { pm.a = 'd'; pm.b = 'clk'; }
@@ -659,7 +706,7 @@ const WasmEngine = {
 
                     let isDriver = false;
                     if (cNode.type === 'CLOCK' && cPort === 'out0') isDriver = true;
-                    if (['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR'].includes(cNode.type) && (cPort === 'out' || cPort === 'q' || cPort === 'nq')) isDriver = true;
+                    if (['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM'].includes(cNode.type) && (cPort === 'out' || cPort === 'q' || cPort === 'nq' || (cNode.type === 'ROM' && cPort.startsWith('out')))) isDriver = true;
                     if (cNode.type.startsWith('IN-') && !cId.includes(':') && cPort.startsWith('out')) isDriver = true;
 
                     if (isDriver) return { id: cId, port: cPort };
@@ -734,9 +781,10 @@ const WasmEngine = {
      * @INTENT: Generate and display a structured map of the Wasm linear memory allocation for all flattened nodes.
      */
     exportMemoryMap() {
-        console.group("WASM LINEAR MEMORY MAP (v1.23.81)");
+        console.group("WASM LINEAR MEMORY MAP (v1.24.60)");
         console.log("Region A (States) Offset: 0");
         console.log("Region B (Instructions) Offset: 1048576 (byte)");
+        console.log("Region C (ROM Payloads) Offset: 2097152 (byte)");
 
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Align diagnostic export with true Engine.wat physical memory layout, removing metadata phantom mapping.
         const map = this.flatNodes.map((node) => {

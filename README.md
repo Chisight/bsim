@@ -1,4 +1,4 @@
-# BrowserSim v1.24.44 - Modular Professional Logic Simulator
+# BrowserSim v1.24.55 - Modular Professional Logic Simulator
 
 bSim is a high-performance, modular digital logic simulator built for the web. It allows users to design, simulate, and synthesize complex digital circuits using an atomic NAND-based foundation.
 
@@ -10,6 +10,8 @@ bSim is a high-performance, modular digital logic simulator built for the web. I
 - **Modular Preferences Window**: A standalone, draggable configuration suite with global animation suppression for performance-critical simulation environments.
 - **Smart Wire Routing**: (New in v1.24.44) Intelligent auto-routing takeover for boundary wires during component translation, ensuring topological clean-up while preserving custom routing for isolated networks.
 - **MRAP Diagnostic Hardening**: Full codebase instrumentation with `@ARCH` architectural tags and high-density `EXIT_TRACE` markers for zero-trust state observability and deterministic layout history.
+- **Parametric ROM & URL Import**: (New in v1.24.53) Native 8-bit ROM module with parametric addressing and network-linked flash. Import workspaces directly via remote JSON URLs for cloud-based collaboration.
+- **High-Fidelity Export**: (New in v1.24.53) Integrated WebRTC capture system to generate pixel-perfect, lossless PNG screenshots of the simulation workspace.
 - **Logic Synthesis**: Integrated truth table generator and logic synthesizer to optimize and verify circuit behavior.
 
 ## 🛠 Technology Stack
@@ -45,8 +47,9 @@ browser-sim/
 1. **Workspace Tabs**: Use the `+` button in the top bar to create new boards. Double-click a tab to rename it.
 2. **Auto-Hide UI**: Click the **▲** or **▼** icons to collapse navbars. Hover near the edges to reveal them.
 3. **Split Editor**: Right-click the workspace while editing a chip to activate "Split Editor" mode (Left/Right/Popup).
-4. **Debug Terminal**: Press **`** (backtick) to open the CLI. Use `ls`, `spawn`, `rm`, and `Tab` to manage the netlist.
+4. **Debug Terminal**: Press **`** (backtick) to open the CLI. Use `ls`, `spawn`, `rm`, and `Tab` to manage the netlist. Use `#` at the end of a `spawn` command to assign a deterministic ID (e.g., `spawn NAND 100 100 # u1`).
 5. **Layout Mode**: Right-click any node and select `Node Prefs` to resize icons or relocate pins.
+6. **Force Layout Sync**: (New in v1.24.52) If the netlist and UI desynchronize, use the `Force Layout Sync` option in the File menu to flush Wasm memory and re-render the DOM graph.
 
 ## 🔬 Diagnostics
 

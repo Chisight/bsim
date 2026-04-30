@@ -44,11 +44,11 @@ const InteractionHandler = {
             if (node.type === 'CLOCK') {
                 configOption = `<div class="menu-item" onclick="Sim.handleNodeDblClick(new Event('dblclick'), Sim.nodes.find(n=>n.id==='${node.id}'), document.getElementById('${node.id}')); document.getElementById('context-menu').style.display='none';">Configure Frequency</div>`;
             // [AUDIT: SEC_ARCH_LEAD] - Added info readout layout mutation to preferences.
-            } else if (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.isCustom) {
+            } else if (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.isCustom || node.type === 'ROM' || node.type === 'RAM') {
                 // [AUDIT: v1.24.34 | SEC_ARCH_LEAD] - Replaced monolithic pin layout with granular dot/label mutators.
                 nodePrefs = `
                     <div class="menu-item" style="color:var(--accent); font-weight:bold; cursor:default;">Node Prefs:</div>
-                    ${(node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.isCustom) ? `
+                    ${(node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.isCustom || node.type === 'ROM' || node.type === 'RAM') ? `
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-leds'); document.getElementById('context-menu').style.display='none';">↳ Edit Pin LEDs</div>
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-labels'); document.getElementById('context-menu').style.display='none';">↳ Edit Pin Labels</div>
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-both'); document.getElementById('context-menu').style.display='none';">↳ Edit Both (Sync)</div>
@@ -67,6 +67,8 @@ const InteractionHandler = {
                 <div class="menu-item ${isNative ? 'disabled' : ''}" ${editAction}>Edit Internals</div>
                 <div class="menu-item danger" onclick="History.execute(new DeleteNodeCommand(Sim.nodes.find(n=>n.id==='${node.id}'))); document.getElementById('context-menu').style.display='none';">Delete</div>
             `;
+            
+            // [AUDIT: v1.24.67 | SEC_ARCH_LEAD] - Removed redundant legacy context menu extensions for ROM/Custom chips in favor of unified Node Prefs system.
             
             // [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Smart boundary collision detection for context menu positioning.
             menu.classList.remove('open-left', 'open-up');
@@ -462,10 +464,21 @@ const InteractionHandler = {
                 </div>
                 <div class="menu-item" onclick="Sim.addNode('CLOCK', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">Spawn Clock</div>
                 <div class="menu-item" style="color:#fff; font-weight:bold" onclick="Sim.addNode('NAND', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">Spawn NAND</div>
+                <div class="menu-item" style="color:#ffca28; font-weight:bold" onclick="Sim.addNode('ROM', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">Spawn ROM</div>
                 ${customChipsHtml}
+                ${Sim.activeEditingChip ? `
+                    <div class="menu-item has-sub" style="color:#ffca28; font-weight:bold; border-top:1px solid #334; margin-top:5px; padding-top:5px;">
+                        Split Editor
+                        <div class="sub-menu">
+                            <div class="menu-item" onclick="Sim.uiSplitEditor('left'); document.getElementById('context-menu').style.display='none';">Left</div>
+                            <div class="menu-item" onclick="Sim.uiSplitEditor('right'); document.getElementById('context-menu').style.display='none';">Right</div>
+                            <div class="menu-item" onclick="Sim.uiSplitEditor('popup'); document.getElementById('context-menu').style.display='none';">Popup</div>
+                        </div>
+                    </div>
+                ` : ''}
             `;
             
-            // [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Smart boundary collision detection for canvas context menus.
+            // [AUDIT: v1.24.68 | SEC_ARCH_LEAD] - Integrated Split Editor menu into primary workspace context logic to resolve 'under-delete' rendering fault.
             menu.classList.remove('open-left', 'open-up');
             const rect = menu.getBoundingClientRect();
             if (rect.right > window.innerWidth) {

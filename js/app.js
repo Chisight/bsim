@@ -96,37 +96,7 @@ window.onload = () => {
     };
 
     // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Split pane context menu hook for active chip editors.
-    document.getElementById('workspace').addEventListener('contextmenu', (e) => {
-        if (Sim.activeEditingChip) {
-            let menu = document.getElementById('context-menu');
-            if (!menu) return;
-
-            setTimeout(() => {
-                if (!menu.innerHTML.includes('Split Editor')) {
-                    menu.innerHTML += `
-                        <div class="menu-item has-sub" style="color:#ffca28; font-weight:bold; border-top:1px solid #334; margin-top:5px; padding-top:5px;">
-                            Split Editor
-                            <div class="sub-menu">
-                                <div class="menu-item" onclick="Sim.uiSplitEditor('left'); document.getElementById('context-menu').style.display='none';">Left</div>
-                                <div class="menu-item" onclick="Sim.uiSplitEditor('right'); document.getElementById('context-menu').style.display='none';">Right</div>
-                                <div class="menu-item" onclick="Sim.uiSplitEditor('popup'); document.getElementById('context-menu').style.display='none';">Popup</div>
-                            </div>
-                        </div>
-                    `;
-                    // [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Re-evaluate bounds after async split-editor item injection.
-                    const rect = menu.getBoundingClientRect();
-                    if (rect.right > window.innerWidth) {
-                        menu.style.left = (window.innerWidth - rect.width - 5) + 'px';
-                        menu.classList.add('open-left');
-                    }
-                    if (rect.bottom > window.innerHeight) {
-                        menu.style.top = (window.innerHeight - rect.height - 5) + 'px';
-                        menu.classList.add('open-up');
-                    }
-                }
-            }, 10);
-        }
-    });
+    // [AUDIT: v1.24.68 | SEC_ARCH_LEAD] - Relocated Split Editor context menu logic to InteractionHandler to resolve node-menu pollution.
 
     // [AUDIT: SEC_ARCH_LEAD] - Global keyboard shortcut bindings for state history traversal.
     window.addEventListener('keydown', (e) => {
@@ -153,7 +123,19 @@ window.onload = () => {
     // [AUDIT: v1.24.53 | SEC_ARCH_LEAD] - Implemented WebRTC High-Fidelity capture, URL-based workspace imports, and parametric ROM memory module.
     // [AUDIT: v1.24.54 | SEC_ARCH_LEAD] - Deployed topological pseudo-class assertions to rigidly pin hierarchical menu visibility during text input focus.
     // [AUDIT: v1.24.55 | SEC_ARCH_LEAD] - Resolved scheduler deadlock suppressing CLOCK node propagation in pure WebAssembly netlists.
-    window.LOADED_BSIM_VERSION = "1.24.55";
+    // [AUDIT: v1.24.56 | SEC_ARCH_LEAD] - Injected assert, step, peek, poke, reset primitives into kernel CLI.
+    // [AUDIT: v1.24.57 | SEC_ARCH_LEAD] - Reclassified ROM module as a core primitive and normalized rendering palette.
+    // [AUDIT: v1.24.58 | SEC_ARCH_LEAD] - Hardened ROM payload fetcher and monotonic address pin scaling enforcement.
+    // [AUDIT: v1.24.59 | SEC_ARCH_LEAD] - Restored ROM pin geometry rendering and documented V8 engine memory fallback constraints.
+    // [AUDIT: v1.24.60 | SEC_ARCH_LEAD] - Synthesized Wasm Kernel extensions for native memory addressing and execution parity.
+    // [AUDIT: v1.24.61 | SEC_ARCH_LEAD] - Enabled right-click dynamic UI editing for ROM components to match macro behavior.
+    // [AUDIT: v1.24.62 | SEC_ARCH_LEAD] - Version increment for ROM UI persistence and label customization support.
+    // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Integrated RAM 8-Bit primitive with Synchronous Write path and Wasm store8 support.
+    // [AUDIT: v1.24.64 | SEC_ARCH_LEAD] - Enabled interactive icon scaling and parametric RAM R/W pin rendering.
+    // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Finalized Wasm/V8 bridge parity for RAM/ROM primitives and updated opcode dispatch.
+    // [AUDIT: v1.24.67 | SEC_ARCH_LEAD] - Deprecated legacy context menu extensions for ROM chips; unified UI under Node Prefs.
+    // [AUDIT: v1.24.68 | SEC_ARCH_LEAD] - Purged global contextmenu listener causing illegal menu appends under the Delete entry.
+    window.LOADED_BSIM_VERSION = "1.24.68";
 
     // [AUDIT: SEC_ARCH_LEAD] - JIT Patch: Dynamically extend capabilities via global scope interceptors to prevent core module desync.
     setTimeout(() => {
@@ -193,12 +175,14 @@ window.onload = () => {
             };
         }
 
+        // [AUDIT: v1.24.58 | SEC_ARCH_LEAD] - Injected URL payload parser and monotonic address pin auto-scaling for ROM primitives.
         document.addEventListener('dblclick', (e) => {
             const gate = e.target.closest('.gate');
             if (!gate) return;
             const node = Sim.nodes.find(n => n.id === gate.id);
-            if (node && node.type === 'ROM') {
-                Sim.modal('Configure ROM Data', 'Enter URL to fetch raw binary data:', 'prompt', async (url) => {
+            // [AUDIT: v1.24.64 | SEC_ARCH_LEAD] - Unified configuration entry for both volatile RAM and static ROM payloads.
+            if (node && (node.type === 'ROM' || node.type === 'RAM')) {
+                Sim.modal(`Configure ${node.type} Data`, `Enter URL to fetch raw binary data:`, 'prompt', async (url) => {
                     if (url) {
                         node.dataUrl = url;
                         try {
@@ -210,14 +194,14 @@ window.onload = () => {
                             
                             const reqPins = Math.max(4, Math.ceil(Math.log2(bytes.length)));
                             if (reqPins > (node.addressPins || 4)) {
-                                node.addressPins = reqPins;
-                                Sim.toast(`Address bus scaled to ${reqPins} bits to fit payload.`, 'warning');
-                                if(window.NodeRenderer) {
+                                node.addressPins = reqPins; // Monotonic increase only
+                                Sim.toast(`Address bus scaled up to ${reqPins} bits to fit payload.`, 'warning');
+                                if (window.NodeRenderer) {
                                     gate.remove();
                                     NodeRenderer.renderNode(node);
                                 }
                             } else {
-                                Sim.toast('ROM payload flashed successfully.', 'success');
+                                Sim.toast(`ROM payload flashed successfully (${bytes.length} bytes).`, 'success');
                             }
                             Sim.updateWireVisuals();
                             Sim.seedQueue();
@@ -228,32 +212,44 @@ window.onload = () => {
                         }
                     }
                 }, node.dataUrl || '');
+                return;
             }
         });
         
         if (window.NodeRenderer && typeof NodeRenderer.renderNode === 'function') {
             const origRender = NodeRenderer.renderNode.bind(NodeRenderer);
             NodeRenderer.renderNode = function(node) {
-                if (node.type === 'ROM') {
+                // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Injected RAM pin-out generation including Data-In bus and Write-Enable control.
+                if (node.type === 'ROM' || node.type === 'RAM') {
                     const tmpType = node.type;
                     node.isCustom = true; 
-                    node.meta = {
+                    Sim.library[tmpType] = {
                         nodes: [
                             ...Array.from({length: node.addressPins || 4}).map((_, i) => ({ type: 'IN-1', id: `in${i}` })),
+                            ...(tmpType === 'RAM' ? [
+                                ...Array.from({length: 8}).map((_, i) => ({ type: 'IN-1', id: `din${i}` })),
+                                { type: 'IN-1', id: 'we' }
+                            ] : []),
                             ...Array.from({length: 8}).map((_, i) => ({ type: 'OUT-1', id: `out${i}` }))
                         ]
                     };
                     origRender(node);
                     node.type = tmpType;
                     node.isCustom = false;
-                    delete node.meta;
-                    
                     const el = document.getElementById(node.id);
                     if (el) {
                         const lbl = el.querySelector('.gate-label');
-                        if (lbl) lbl.innerText = 'ROM (' + (node.addressPins || 4) + 'x8)';
-                        el.style.backgroundColor = '#2c1e4a';
+                        if (lbl) {
+                            if (!node.label || node.label === 'ROM' || node.label === 'RAM') {
+                                lbl.innerText = `${tmpType} (${node.addressPins || 4}x8)`;
+                            } else {
+                                lbl.innerText = node.label;
+                            }
+                            lbl.style.color = '#fff';
+                        }
+                        el.style.backgroundColor = tmpType === 'RAM' ? '#1e4a2c' : '#2c1e4a';
                     }
+                    delete Sim.library[tmpType];
                     return;
                 }
                 return origRender(node);
