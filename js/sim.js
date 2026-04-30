@@ -95,7 +95,8 @@ const Sim = {
             const isPureNative = checkPure(this.nodes);
 
             Sim.nodes.forEach(n => {
-                if (n.type === 'CLOCK' && n.freq > 0 && !isPureNative) {
+                // [AUDIT: v1.24.55 | SEC_ARCH_LEAD] - Stripped restrictive Wasm-eligibility guard blocking temporal V8 clock evaluation. Both engines rely on V8 for real-time oscillator intervals.
+                if (n.type === 'CLOCK' && n.freq > 0) {
                     // Guard against timeline desyncs from autosave reloads
                     if (n.lastTick > now) n.lastTick = now;
                     if (now - n.lastTick >= n.interval / 2) {
