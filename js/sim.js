@@ -773,11 +773,12 @@ const Sim = {
                     this.calculateNextState(n);
                     WasmEngine.writeState(n.id, n.state);
                 });
-
-+                // [AUDIT: v1.24.91 | SEC_ARCH_LEAD] - Enforced Two-Phase Commit protocol (Combinatorial Settling -> Sequential Latching) to eradicate hazard latching.
-+                for (let i = 0; i < execDepth; i++) {
-+                    WasmEngine.executeTick(i === execDepth - 1 ? 1 : 0);
-+                }
+                // [AUDIT: v1.24.92 | SEC_ARCH_LEAD] - Upgraded to Three-Phase Commit (Settle -> Latch Shadow -> Commit) mirroring Verilog non-blocking assignments.
+                for (let i = 0; i < execDepth; i++) {
+                    WasmEngine.executeTick(0);
+                }
+                WasmEngine.executeTick(1);
+                WasmEngine.executeTick(2);
 
                 // extract Wasm Memory -> DOM Hardware States
                 this.nodes.forEach(n => {
@@ -1059,8 +1060,10 @@ const Sim = {
 
             // 2. Execute Wasm Array for 20 cycles to propagate signals
             for (let t = 0; t < 20; t++) {
-                WasmEngine.executeTick(t === 19 ? 1 : 0);
+                WasmEngine.executeTick(0);
             }
+            WasmEngine.executeTick(1);
+            WasmEngine.executeTick(2);
 
             // 3. Execute V8 Object Graph for 20 cycles to propagate signals
             for (let step = 0; step < 20; step++) {

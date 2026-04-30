@@ -191,8 +191,8 @@ const WasmEngine = {
                 for (let i = 0; i < bits; i++) indices.push(slot++);
                 this.idMap.set(n.id, indices);
             } else if (n.type === 'DFF' || n.type === 'TFF') {
-                // [AUDIT: v1.24.89 | SEC_ARCH_LEAD] - Expand Sequential memory allocation to correctly isolate Q, NQ, and lastClk in linear memory.
-                this.idMap.set(n.id, [slot++, slot++, slot++]);
+                // [AUDIT: v1.24.92 | SEC_ARCH_LEAD] - Expand to 4 slots to support Shadow State NextQ for Three-Phase Commit.
+                this.idMap.set(n.id, [slot++, slot++, slot++, slot++]);
             } else if (n.type === 'ROM' || n.type === 'RAM') {
                 let indices = [];
                 for (let i = 0; i < 8; i++) indices.push(slot++);
