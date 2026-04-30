@@ -11,8 +11,8 @@
   (global $REGION_A_BASE i32 (i32.const 0))      ;; start of node states
   ;; [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Expanded instruction boundary to 1MB to prevent macro flattening overflows.
   (global $REGION_B_BASE i32 (i32.const 1048576))  ;; start of instructions
-  ;; [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Injected Region C and Global Offset for native ROM/RAM addressing.
-  (global $REGION_C_BASE i32 (i32.const 2097152)) 
+  ;; [AUDIT: v1.24.88 | SEC_ARCH_LEAD] - Shifted Region C boundary to 16MB to protect Region B execution array from large netlist overflows.
+  (global $REGION_C_BASE i32 (i32.const 16777216)) 
   (global $MEM_OFFSET (mut i32) (i32.const 0))
 
   ;; -----------------------------------------------------------------------
@@ -81,21 +81,30 @@
           local.get $i i32.const 16 i32.mul global.get $REGION_B_BASE i32.add
           local.set $ptr
 
-          local.get $ptr i32.const 4 i32.add i32.load
-          local.tee $raw_a
-          i32.const 4 i32.mul i32.load
-          local.set $val_a
-
-          local.get $ptr i32.const 8 i32.add i32.load
-          local.tee $raw_b
-          i32.const 4 i32.mul i32.load
-          local.set $val_b
+          ;; [AUDIT: v1.24.88 | SEC_ARCH_LEAD] - Deferred val_a/val_b memory fetches to prevent Out-Of-Bounds (OOB) traps on packed metadata operands.
+          local.get $ptr i32.const 12 i32.add i32.load
+          local.set $opcode
 
           local.get $ptr i32.load i32.const 4 i32.mul
           local.tee $target_addr
 
-          local.get $ptr i32.const 12 i32.add i32.load
-          local.set $opcode
+          local.get $ptr i32.const 4 i32.add i32.load
+          local.set $raw_a
+
+          local.get $ptr i32.const 8 i32.add i32.load
+          local.set $raw_b
+
+          local.get $opcode i32.const 5 i32.ne
+          local.get $opcode i32.const 7 i32.ne
+          i32.and
+          local.get $opcode i32.const 8 i32.ne
+          i32.and
+          (if
+            (then
+              local.get $raw_a i32.const 4 i32.mul i32.load local.set $val_a
+              local.get $raw_b i32.const 4 i32.mul i32.load local.set $val_b
+            )
+          )
 
           ;; [AUDIT: v1.24.65 | SEC_ARCH_LEAD] - Unified Opcode Dispatcher with Corrected Folded Nesting.
           local.get $opcode i32.const 0 i32.eq
@@ -194,7 +203,7 @@
                             (else 
                               local.get $opcode i32.const 8 i32.eq
                               (if (result i32)
-                                (then local.get $val_a global.set $MEM_OFFSET i32.const 0)
+                                (then local.get $raw_a global.set $MEM_OFFSET i32.const 0)
                                 (else 
                                   local.get $opcode i32.const 11 i32.eq
                               (if (result i32)

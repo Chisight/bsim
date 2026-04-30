@@ -5,8 +5,8 @@ const WasmEngine = {
     REGION_A_OFFSET: 0,
     // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Align JS bridge with expanded 1MB Wasm instruction boundary.
     REGION_B_OFFSET: 262144, // 1048576 bytes / 4 bytes per Int32
-    // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Defined Region C (Memory Heap) offset for ROM/RAM payloads.
-    REGION_C_OFFSET: 524288, // 2097152 bytes / 4 bytes per Int32
+    // [AUDIT: v1.24.88 | SEC_ARCH_LEAD] - Relocated Region C boundary to 16MB to prevent instruction heap overflow (Region B collision).
+    REGION_C_OFFSET: 4194304, // 16777216 bytes / 4 bytes per Int32
     instructionCount: 0,
     idMap: new Map(), // nodeId -> wasmIdx (Region A)
     flatNodes: [],
@@ -172,7 +172,7 @@ const WasmEngine = {
         this.flatNodes.forEach(n => {
             if (n.type === 'ROM' || n.type === 'RAM') romPayloadSize += (1 << (n.addressPins || 4));
         });
-        const requiredBytes = 2097152 + (this.flatNodes.length * 256) + romPayloadSize;
+        const requiredBytes = 16777216 + (this.flatNodes.length * 256) + romPayloadSize;
         const requiredPages = Math.ceil(requiredBytes / 65536);
         const currentPages = this.memory.buffer.byteLength / 65536;
 
@@ -545,7 +545,7 @@ const WasmEngine = {
 
                 const allocSize = 1 << pins;
                 if (n.memoryData) {
-                    const view = new Uint8Array(this.memory.buffer, 2097152 + currentRomOffset, allocSize);
+                    const view = new Uint8Array(this.memory.buffer, 16777216 + currentRomOffset, allocSize);
                     view.set(n.memoryData.slice(0, allocSize)); // Safe truncation/expansion
                 }
                 
