@@ -402,7 +402,8 @@ const DebugTerminal = {
             
             if (parts.length === 1) {
                 // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Expand autocomplete index for new kernel CLI toolkit.
-                const cmds = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv', 'mkdir', 'tick', 'clock', 'force', 'unforce', 'watch', 'dump', 'cp', 'touch', 'find', 'bom', 'path'];
+                // [AUDIT: v1.24.56 | SEC_ARCH_LEAD] - Injected assert, step, peek, poke, reset primitives.
+                const cmds = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv', 'mkdir', 'tick', 'step', 'clock', 'force', 'unforce', 'watch', 'dump', 'cp', 'touch', 'find', 'bom', 'path', 'assert', 'peek', 'poke', 'reset'];
                 matches = cmds.filter(c => c.startsWith(prefix));
             } else if (cmd === 'cd' || cmd === 'ls' || cmd === 'tree' || cmd === 'rm' || cmd === 'mkdir') {
                 // [AUDIT: v1.24.03 | SEC_ARCH_LEAD] - Dynamic VFS path autocomplete with trailing slash parsing.
@@ -504,14 +505,18 @@ const DebugTerminal = {
                 const lines = ev.target.result.split('\n');
                 let count = 0;
                 this.print(`--- EXECUTING SCRIPT: ${file.name} ---`, 'warn');
-                lines.forEach(line => {
-                    const cmd = line.trim();
-                    if (cmd && !cmd.startsWith('#') && !cmd.startsWith('//')) {
-                        this.exec(cmd);
-                        count++;
+                try {
+                    for (const line of lines) {
+                        const cmd = line.trim();
+                        if (cmd && !cmd.startsWith('#') && !cmd.startsWith('//')) {
+                            this.exec(cmd);
+                            count++;
+                        }
                     }
-                });
-                this.print(`--- SCRIPT COMPLETE (${count} commands) ---`, 'ok');
+                    this.print(`--- SCRIPT COMPLETE (${count} commands) ---`, 'ok');
+                } catch (e) {
+                    this.print(`--- SCRIPT HALTED: ${e.message} ---`, 'err');
+                }
             };
             reader.readAsText(file);
         };
@@ -627,6 +632,11 @@ const DebugTerminal = {
                 this.print("  set <nodeId> <val>  - Set input node value (e.g., set node-xyz 1)");
                 this.print("  wire <n1> <p1> <n2> <p2> - Connect two nodes");
                 this.print("  sim                 - Force a manual propagation tick");
+                this.print("  assert <n> <p> <v>  - Verify port value (halts script on fail)");
+                this.print("  step [N]            - Advance synchronous clock cycles");
+                this.print("  peek <node> <addr>  - Read byte from memory/ROM");
+                this.print("  poke <n> <a> <v>    - Write byte to memory/ROM");
+                this.print("  reset               - Purge simulator state & histories");
                 this.print("  status              - Show engine and netlist statistics");
                 this.print("  synth <gate>        - Hierarchically compiles logic from NANDs.");
                 this.print("  trace [nodeId]      - Output topological connections and logic states.");
@@ -983,12 +993,73 @@ const DebugTerminal = {
                 Sim.seedQueue(); Sim.processQueue();
                 this.print("Propagation tick queued.", "ok");
                 break;
+            case 'step':
             case 'tick':
                 // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Programmatic cycle advancement.
                 let ticks = parseInt(args[1]) || 1;
                 for(let i=0; i<ticks; i++) { Sim.seedQueue(); Sim.processQueue(); }
                 this.print(`Advanced ${ticks} clock cycle(s).`, "ok");
                 break;
+            case 'assert': {
+                // [AUDIT: v1.24.56 | SEC_ARCH_LEAD] - Deterministic script halting mechanism.
+                if (args.length < 4) return this.print("Usage: assert <nodeId> <portId> <value>", "err");
+                const ctx = this.getContext();
+                let sn = ctx.nodes.find(n => n.id === args[1] || n.id === `node-${args[1]}`);
+                if (!sn) sn = ctx.nodes.find(node => node.label === args[1]);
+                if (!sn) return this.print(`Assert failed: Node ${args[1]} not found.`, "err");
+                const expVal = parseInt(args[3]);
+                let actVal = null;
+                if (ctx.simObj && typeof ctx.simObj.getSignal === 'function') actVal = ctx.simObj.getSignal(sn.id, args[2]);
+                if (actVal === undefined || actVal === null) actVal = Array.isArray(sn.state) ? sn.state[parseInt(args[2].replace(/\D/g, '')) || 0] : sn.state;
+                if (actVal !== expVal) {
+                    this.print(`ASSERTION FAULT: ${sn.id}[${args[2]}] Expected ${expVal}, got ${actVal}`, "err");
+                    throw new Error(`Assertion Fault: ${sn.id}[${args[2]}] !== ${expVal}`);
+                } else {
+                    this.print(`Assert PASS: ${sn.id}[${args[2]}] == ${expVal}`, "ok");
+                }
+                break;
+            }
+            case 'peek': {
+                // [AUDIT: v1.24.56 | SEC_ARCH_LEAD] - Memory introspection.
+                if (args.length < 3) return this.print("Usage: peek <nodeId> <address>", "err");
+                const ctx = this.getContext();
+                let sn = ctx.nodes.find(n => n.id === args[1] || n.id === `node-${args[1]}`);
+                if (!sn) sn = ctx.nodes.find(node => node.label === args[1]);
+                if (!sn || sn.type !== 'ROM') return this.print("Target must be a ROM module.", "err");
+                const addr = args[2].startsWith('0x') ? parseInt(args[2], 16) : parseInt(args[2]);
+                const data = (sn.memoryData && sn.memoryData.length > addr) ? sn.memoryData[addr] : 0;
+                this.print(`0x${addr.toString(16).padStart(4, '0').toUpperCase()} : 0x${data.toString(16).padStart(2, '0').toUpperCase()} (${data})`, "sys");
+                break;
+            }
+            case 'poke': {
+                // [AUDIT: v1.24.56 | SEC_ARCH_LEAD] - Dynamic firmware flashing.
+                if (args.length < 4) return this.print("Usage: poke <nodeId> <address> <value>", "err");
+                const ctx = this.getContext();
+                let sn = ctx.nodes.find(n => n.id === args[1] || n.id === `node-${args[1]}`);
+                if (!sn) sn = ctx.nodes.find(node => node.label === args[1]);
+                if (!sn || sn.type !== 'ROM') return this.print("Target must be a ROM module.", "err");
+                const addr = args[2].startsWith('0x') ? parseInt(args[2], 16) : parseInt(args[2]);
+                const val = args[3].startsWith('0x') ? parseInt(args[3], 16) : parseInt(args[3]);
+                if (!sn.memoryData) sn.memoryData = [];
+                while (sn.memoryData.length <= addr) sn.memoryData.push(0);
+                sn.memoryData[addr] = val & 0xFF;
+                if (ctx.simObj) { ctx.simObj.seedQueue(); ctx.simObj.processQueue(); ctx.simObj.autoSave(); }
+                this.print(`Flashed 0x${addr.toString(16).padStart(4, '0').toUpperCase()} -> 0x${(val & 0xFF).toString(16).padStart(2, '0').toUpperCase()}`, "ok");
+                break;
+            }
+            case 'reset': {
+                // [AUDIT: v1.24.56 | SEC_ARCH_LEAD] - Combinatorial and sequential state purge.
+                const ctx = this.getContext();
+                ctx.nodes.forEach(n => {
+                    if (Array.isArray(n.state)) n.state.fill(0); else n.state = 0;
+                    if (n.lastClk !== undefined) n.lastClk = 0;
+                    if (n.val !== undefined) n.val = Array.isArray(n.val) ? n.val.map(()=>0) : 0;
+                    n.outputs = {};
+                });
+                if (ctx.simObj) { ctx.simObj.seedQueue(); ctx.simObj.processQueue(); }
+                this.print("System state arrays and clock histories purged.", "ok");
+                break;
+            }
             case 'clock':
                 if (args.length < 3) return this.print("Usage: clock <nodeId> <freq>", "err");
                 let cNode = Sim.nodes.find(n => n.id === args[1] && n.type === 'CLOCK');
