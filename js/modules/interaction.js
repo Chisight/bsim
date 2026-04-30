@@ -68,17 +68,7 @@ const InteractionHandler = {
                 <div class="menu-item danger" onclick="History.execute(new DeleteNodeCommand(Sim.nodes.find(n=>n.id==='${node.id}'))); document.getElementById('context-menu').style.display='none';">Delete</div>
             `;
             
-            // [AUDIT: v1.24.61 | SEC_ARCH_LEAD] - Extended right-click context menu to support dynamic UI editing for ROM primitives.
-            // [AUDIT: v1.24.62 | SEC_ARCH_LEAD] - Injected standard node renaming entry for ROM components.
-            if (node.isCustom || node.type === 'ROM') {
-                const nodeId = node.id;
-                menu.innerHTML += `
-                    <div class="menu-item" onclick="Sim.modal('Rename Node', 'Enter new label:', 'prompt', (val) => { if(val !== null) { Sim.nodes.find(n => n.id === '${nodeId}').label = val; Sim.autoSave(); Sim.updateWireVisuals(); } }, '${node.label || ''}')">Rename Node</div>
-                    <div class="menu-item" onclick="Sim.enterNodeEditMode('${nodeId}', 'pins')">Edit Pin Positions</div>
-                    <div class="menu-item" onclick="Sim.enterNodeEditMode('${nodeId}', 'pin-labels')">Edit Pin Labels</div>
-                    <div class="menu-item" onclick="Sim.enterNodeEditMode('${nodeId}', 'pin-both')">Edit Pins & Labels</div>
-                `;
-            }
+            // [AUDIT: v1.24.67 | SEC_ARCH_LEAD] - Removed redundant legacy context menu extensions for ROM/Custom chips in favor of unified Node Prefs system.
             
             // [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Smart boundary collision detection for context menu positioning.
             menu.classList.remove('open-left', 'open-up');
