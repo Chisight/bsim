@@ -562,7 +562,8 @@ const WasmEngine = {
                 const inA = buildBusTree(resolveAllDriverIndices(n.id, pm.a));
                 const inB = buildBusTree(resolveAllDriverIndices(n.id, pm.b));
                 const opMap = { DFF: OP_DFF, CLOCK: OP_CLOCK, TRISTATE: OP_TRISTATE, TFF: OP_TFF };
-                emitOP(mapped, inA, inB, opMap[t]);
+                // [AUDIT: v1.24.86 | SEC_ARCH_LEAD] - Target array pointer flattening for Sequential targets to prevent NaN corruption in view index.
+                emitOP(Array.isArray(mapped) ? mapped[0] : mapped, inA, inB, opMap[t]);
             }
             // IO proxies and JUNCTION nodes produce no instructions — they are
             // transparent pass-through slots in Region A only.
