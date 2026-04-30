@@ -96,37 +96,7 @@ window.onload = () => {
     };
 
     // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Split pane context menu hook for active chip editors.
-    document.getElementById('workspace').addEventListener('contextmenu', (e) => {
-        if (Sim.activeEditingChip) {
-            let menu = document.getElementById('context-menu');
-            if (!menu) return;
-
-            setTimeout(() => {
-                if (!menu.innerHTML.includes('Split Editor')) {
-                    menu.innerHTML += `
-                        <div class="menu-item has-sub" style="color:#ffca28; font-weight:bold; border-top:1px solid #334; margin-top:5px; padding-top:5px;">
-                            Split Editor
-                            <div class="sub-menu">
-                                <div class="menu-item" onclick="Sim.uiSplitEditor('left'); document.getElementById('context-menu').style.display='none';">Left</div>
-                                <div class="menu-item" onclick="Sim.uiSplitEditor('right'); document.getElementById('context-menu').style.display='none';">Right</div>
-                                <div class="menu-item" onclick="Sim.uiSplitEditor('popup'); document.getElementById('context-menu').style.display='none';">Popup</div>
-                            </div>
-                        </div>
-                    `;
-                    // [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Re-evaluate bounds after async split-editor item injection.
-                    const rect = menu.getBoundingClientRect();
-                    if (rect.right > window.innerWidth) {
-                        menu.style.left = (window.innerWidth - rect.width - 5) + 'px';
-                        menu.classList.add('open-left');
-                    }
-                    if (rect.bottom > window.innerHeight) {
-                        menu.style.top = (window.innerHeight - rect.height - 5) + 'px';
-                        menu.classList.add('open-up');
-                    }
-                }
-            }, 10);
-        }
-    });
+    // [AUDIT: v1.24.68 | SEC_ARCH_LEAD] - Relocated Split Editor context menu logic to InteractionHandler to resolve node-menu pollution.
 
     // [AUDIT: SEC_ARCH_LEAD] - Global keyboard shortcut bindings for state history traversal.
     window.addEventListener('keydown', (e) => {
@@ -164,7 +134,8 @@ window.onload = () => {
     // [AUDIT: v1.24.64 | SEC_ARCH_LEAD] - Enabled interactive icon scaling and parametric RAM R/W pin rendering.
     // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Finalized Wasm/V8 bridge parity for RAM/ROM primitives and updated opcode dispatch.
     // [AUDIT: v1.24.67 | SEC_ARCH_LEAD] - Deprecated legacy context menu extensions for ROM chips; unified UI under Node Prefs.
-    window.LOADED_BSIM_VERSION = "1.24.67";
+    // [AUDIT: v1.24.68 | SEC_ARCH_LEAD] - Purged global contextmenu listener causing illegal menu appends under the Delete entry.
+    window.LOADED_BSIM_VERSION = "1.24.68";
 
     // [AUDIT: SEC_ARCH_LEAD] - JIT Patch: Dynamically extend capabilities via global scope interceptors to prevent core module desync.
     setTimeout(() => {

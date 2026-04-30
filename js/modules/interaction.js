@@ -466,9 +466,19 @@ const InteractionHandler = {
                 <div class="menu-item" style="color:#fff; font-weight:bold" onclick="Sim.addNode('NAND', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">Spawn NAND</div>
                 <div class="menu-item" style="color:#ffca28; font-weight:bold" onclick="Sim.addNode('ROM', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">Spawn ROM</div>
                 ${customChipsHtml}
+                ${Sim.activeEditingChip ? `
+                    <div class="menu-item has-sub" style="color:#ffca28; font-weight:bold; border-top:1px solid #334; margin-top:5px; padding-top:5px;">
+                        Split Editor
+                        <div class="sub-menu">
+                            <div class="menu-item" onclick="Sim.uiSplitEditor('left'); document.getElementById('context-menu').style.display='none';">Left</div>
+                            <div class="menu-item" onclick="Sim.uiSplitEditor('right'); document.getElementById('context-menu').style.display='none';">Right</div>
+                            <div class="menu-item" onclick="Sim.uiSplitEditor('popup'); document.getElementById('context-menu').style.display='none';">Popup</div>
+                        </div>
+                    </div>
+                ` : ''}
             `;
             
-            // [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Smart boundary collision detection for canvas context menus.
+            // [AUDIT: v1.24.68 | SEC_ARCH_LEAD] - Integrated Split Editor menu into primary workspace context logic to resolve 'under-delete' rendering fault.
             menu.classList.remove('open-left', 'open-up');
             const rect = menu.getBoundingClientRect();
             if (rect.right > window.innerWidth) {
