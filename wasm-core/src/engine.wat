@@ -223,23 +223,24 @@
                                   local.get $opcode i32.const 1 i32.eq
                                   (if (result i32)
                                     (then
-                                      ;; [AUDIT: v1.24.86 | SEC_ARCH_LEAD] - OP 1: Native Edge-Triggered DFF Evaluation.
-                                      local.get $target_addr i32.const 4 i32.add i32.load i32.const 0 i32.eq
+                                      ;; [AUDIT: v1.24.89 | SEC_ARCH_LEAD] - OP 1: Native Edge-Triggered DFF Evaluation (Fixed NQ mapping).
+                                      local.get $target_addr i32.const 8 i32.add i32.load i32.const 0 i32.eq
                                       local.get $val_b i32.const 1 i32.eq i32.and
                                       (if (result i32)
                                         (then local.get $val_a)
                                         (else local.get $target_addr i32.load)
                                       )
                                       local.set $data
-                                      local.get $target_addr i32.const 4 i32.add local.get $val_b i32.store
+                                      local.get $target_addr i32.const 8 i32.add local.get $val_b i32.store
+                                      local.get $target_addr i32.const 4 i32.add local.get $data i32.const 1 i32.eq (if (result i32) (then i32.const 0) (else i32.const 1)) i32.store
                                       local.get $data
                                     )
                                     (else 
                                       local.get $opcode i32.const 4 i32.eq
                                       (if (result i32)
                                         (then
-                                          ;; [AUDIT: v1.24.86 | SEC_ARCH_LEAD] - OP 4: Native Edge-Triggered TFF Evaluation.
-                                          local.get $target_addr i32.const 4 i32.add i32.load i32.const 0 i32.eq
+                                          ;; [AUDIT: v1.24.89 | SEC_ARCH_LEAD] - OP 4: Native Edge-Triggered TFF Evaluation (Fixed NQ mapping).
+                                          local.get $target_addr i32.const 8 i32.add i32.load i32.const 0 i32.eq
                                           local.get $val_b i32.const 1 i32.eq i32.and
                                           (if (result i32)
                                             (then 
@@ -252,7 +253,8 @@
                                             (else local.get $target_addr i32.load)
                                           )
                                           local.set $data
-                                          local.get $target_addr i32.const 4 i32.add local.get $val_b i32.store
+                                          local.get $target_addr i32.const 8 i32.add local.get $val_b i32.store
+                                          local.get $target_addr i32.const 4 i32.add local.get $data i32.const 1 i32.eq (if (result i32) (then i32.const 0) (else i32.const 1)) i32.store
                                           local.get $data
                                         )
                                         (else local.get $target_addr i32.load)
