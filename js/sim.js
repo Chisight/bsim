@@ -2371,7 +2371,9 @@ const Sim = {
      * @STATE: LAYOUT_MUTATION
      * @INTENT: Enable bounded spatial editing for internal pin indicators and node geometry via click-drag isolation.
      */
+    // [AUDIT: v1.24.43 | SEC_ARCH_LEAD] - Injected nomenclature translation layer to intercept legacy pin-dots dispatches.
     enterNodeEditMode(nodeId, mode) {
+        if (mode === 'pin-dots') mode = 'pin-leds';
         const node = this.nodes.find(n => n.id === nodeId);
         const el = document.getElementById(nodeId);
         if (!node || !el) return;
