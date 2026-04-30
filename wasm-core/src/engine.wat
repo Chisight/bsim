@@ -11,6 +11,8 @@
   (global $REGION_A_BASE i32 (i32.const 0))      ;; start of node states
   ;; [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Expanded instruction boundary to 1MB to prevent macro flattening overflows.
   (global $REGION_B_BASE i32 (i32.const 1048576))  ;; start of instructions
+  ;; [AUDIT: v1.24.60 | SEC_ARCH_LEAD] - Injected Region C boundary for contiguous ROM payload memory indexing.
+  (global $REGION_C_BASE i32 (i32.const 2097152))  ;; start of ROM binary payloads
 
   ;; -----------------------------------------------------------------------
   ;; ATOMIC PRIMITIVE: $nand
@@ -63,6 +65,14 @@
     (local $val_b i32)        ;; temp input b
     (local $target_addr i32)  ;; where we save the result
     (local $opcode i32)       ;; what we're doing
+    ;; [AUDIT: v1.24.60 | SEC_ARCH_LEAD] - Injected ROM local variables for memory addressing and bit unpacking.
+    (local $raw_a i32)
+    (local $raw_b i32)
+    (local $in_base i32)
+    (local $num_pins i32)
+    (local $addr i32)
+    (local $p i32)
+    (local $data i32)
 
     i32.const 0
     local.set $i
@@ -76,10 +86,14 @@
           local.get $i i32.const 16 i32.mul global.get $REGION_B_BASE i32.add
           local.set $ptr
 
-          local.get $ptr i32.const 4 i32.add i32.load i32.const 4 i32.mul i32.load
+          local.get $ptr i32.const 4 i32.add i32.load
+          local.tee $raw_a
+          i32.const 4 i32.mul i32.load
           local.set $val_a
 
-          local.get $ptr i32.const 8 i32.add i32.load i32.const 4 i32.mul i32.load
+          local.get $ptr i32.const 8 i32.add i32.load
+          local.tee $raw_b
+          i32.const 4 i32.mul i32.load
           local.set $val_b
 
           local.get $ptr i32.load i32.const 4 i32.mul
@@ -95,31 +109,86 @@
               ;; op 0: NAND - the universal primitive
               local.get $val_a local.get $val_b call $nand
             )
-            (else local.get $opcode i32.const 11 i32.eq
+            (else local.get $opcode i32.const 5 i32.eq
             (if (result i32)
               (then
-                ;; op 11: bus resolve (1 dominates 0, both dominate Z=2)
-                local.get $val_a i32.const 1 i32.eq
-                (if (result i32)
-                  (then i32.const 1)
-                  (else
-                    local.get $val_b i32.const 1 i32.eq
-                    (if (result i32)
-                      (then i32.const 1)
-                      (else
-                        local.get $val_a i32.const 0 i32.eq
-                        (if (result i32) (then i32.const 0) (else local.get $val_b))
+                ;; [AUDIT: v1.24.60 | SEC_ARCH_LEAD] - OP 5: Native ROM Memory Address Decoder & Fetcher
+                local.get $raw_a i32.const 0xFFFFFF i32.and local.set $in_base
+                local.get $raw_a i32.const 24 i32.shr_u local.set $num_pins
+                i32.const 0 local.set $addr
+                i32.const 0 local.set $p
+                (loop $pin_loop
+                  local.get $p local.get $num_pins i32.lt_u
+                  (if
+                    (then
+                      local.get $in_base local.get $p i32.add i32.const 4 i32.mul i32.load
+                      i32.const 1 i32.eq
+                      (if
+                        (then
+                          local.get $addr
+                          i32.const 1 local.get $p i32.shl
+                          i32.or
+                          local.set $addr
+                        )
                       )
+                      local.get $p i32.const 1 i32.add local.set $p
+                      br $pin_loop
                     )
                   )
                 )
+                global.get $REGION_C_BASE
+                local.get $raw_b i32.add
+                local.get $addr i32.add
+                i32.load8_u
+                local.set $data
+
+                i32.const 1 local.set $p
+                (loop $out_loop
+                  local.get $p i32.const 8 i32.lt_u
+                  (if
+                    (then
+                      local.get $target_addr local.get $p i32.const 4 i32.mul i32.add
+                      local.get $data i32.const 1 local.get $p i32.shl i32.and
+                      (if (result i32) (then i32.const 1) (else i32.const 0))
+                      i32.store
+                      local.get $p i32.const 1 i32.add local.set $p
+                      br $out_loop
+                    )
+                  )
+                )
+                local.get $data i32.const 1 i32.and
+                (if (result i32) (then i32.const 1) (else i32.const 0))
               )
-              (else
-                ;; op 1=DFF, 2=CLOCK, 3=TRISTATE, 4=TFF are handled by JS
-                ;; side-effects (they write directly into Region A via writeState).
-                ;; The kernel must preserve the current state for these.
-                local.get $target_addr
-                i32.load
+              (else local.get $opcode i32.const 6 i32.eq
+              (if (result i32)
+                (then local.get $val_a)
+                (else local.get $opcode i32.const 11 i32.eq
+                (if (result i32)
+                  (then
+                    ;; op 11: bus resolve (1 dominates 0, both dominate Z=2)
+                    local.get $val_a i32.const 1 i32.eq
+                    (if (result i32)
+                      (then i32.const 1)
+                      (else
+                        local.get $val_b i32.const 1 i32.eq
+                        (if (result i32)
+                          (then i32.const 1)
+                          (else
+                            local.get $val_a i32.const 0 i32.eq
+                            (if (result i32) (then i32.const 0) (else local.get $val_b))
+                          )
+                        )
+                      )
+                    )
+                  )
+                  (else
+                    ;; op 1=DFF, 2=CLOCK, 3=TRISTATE, 4=TFF are handled by JS
+                    local.get $target_addr
+                    i32.load
+                  )
+                )
+                )
+              )
               )
             )
             )
