@@ -219,11 +219,14 @@ nav .sub-menu .menu-item::after { display: none; }
 
 .inline-dot { width: 6px; height: 6px; margin: 0; pointer-events: auto; }
 
-/* [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Enlarged port interaction hitboxes to approx 1/2 snap grid for ease of wiring. */
+/* [AUDIT: v1.24.50 | SEC_ARCH_LEAD] - Reverted rigid port geometry to prevent layout corruption, injected invisible oversized pseudo-element for hitbox expansion. */
 .port {
-    position: absolute; width: 19px; height: 19px;
+    position: absolute; width: 10px; height: 10px;
     background: radial-gradient(circle at center, #555 var(--port-size, 40%), transparent calc(var(--port-size, 40%) + 1%));
     border-radius: 50%; cursor: crosshair; transform: translateY(-50%); z-index: 110; pointer-events: auto;
+}
+.port::after {
+    content: ''; position: absolute; top: 50%; left: 50%; width: 19px; height: 19px; transform: translate(-50%, -50%); background: transparent; cursor: inherit; z-index: 1;
 }
 .port:hover { background: radial-gradient(circle at center, var(--accent) var(--port-size, 40%), transparent calc(var(--port-size, 40%) + 1%)); }
 .port.input { left: -5px; }
