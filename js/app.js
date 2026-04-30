@@ -150,7 +150,8 @@ window.onload = () => {
      * @INTENT: Define the application semantic versioning for runtime compatibility checks.
      */
     // [AUDIT: v1.24.41 | SEC_ARCH_LEAD] - Version increment for polished toast mechanics, dynamic preferences window, and terminal scripting.
-    window.LOADED_BSIM_VERSION = "1.24.41";
+    // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Version increment for LED edit mode regression patch and forced UI nomenclature adjustment.
+    window.LOADED_BSIM_VERSION = "1.24.42";
 
     // [AUDIT: SEC_ARCH_LEAD] - Injected passive workspace boundary validation to catch upgrade mismatches.
     window.addEventListener('load', () => {

@@ -2171,7 +2171,7 @@ const Sim = {
                 <label style="display:flex; justify-content:space-between; align-items:center;"><span style="color:#ffca28">Disable UI Animations</span><input type="checkbox" ${this.disableAnimations ? 'checked' : ''} onchange="Sim.disableAnimations=this.checked; Sim.applyStyles(); Sim.autoSave();"></label>
                 <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">HUD Position: <select onchange="Sim.hudPos=this.value; Sim.updateHUD(); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px; padding:2px;"><option value="top-right" ${this.hudPos==='top-right'?'selected':''}>Top-Right</option><option value="top-left" ${this.hudPos==='top-left'?'selected':''}>Top-Left</option><option value="bottom-left" ${this.hudPos==='bottom-left'?'selected':''}>Bottom-Left</option></select></div>
                 <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">Port Size: <select onchange="Sim.portSize=this.value; Sim.applyStyles(); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px; padding:2px;"><option value="small" ${this.portSize==='small'?'selected':''}>Small</option><option value="medium" ${this.portSize==='medium'||!this.portSize?'selected':''}>Medium</option><option value="large" ${this.portSize==='large'?'selected':''}>Large</option></select></div>
-                <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">Indicator Dot Size: <select onchange="Sim.dotSize=this.value; Sim.applyStyles(); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px; padding:2px;"><option value="small" ${this.dotSize==='small'?'selected':''}>Small (8px)</option><option value="medium" ${this.dotSize==='medium'||!this.dotSize?'selected':''}>Medium (12px)</option><option value="large" ${this.dotSize==='large'?'selected':''}>Large (16px)</option></select></div>
+                <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">Indicator LED Size: <select onchange="Sim.dotSize=this.value; Sim.applyStyles(); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px; padding:2px;"><option value="small" ${this.dotSize==='small'?'selected':''}>Small (8px)</option><option value="medium" ${this.dotSize==='medium'||!this.dotSize?'selected':''}>Medium (12px)</option><option value="large" ${this.dotSize==='large'?'selected':''}>Large (16px)</option></select></div>
                 <div style="height:1px; background:#333; margin:8px 0 4px 0;"></div>
                 <label style="display:flex; align-items:center; justify-content:space-between; gap:10px;"><span style="font-weight:bold; color:var(--wire-on);">Execution Engine:</span><select onchange="Sim.setEngine(this.value); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #444; padding:4px 8px; border-radius:4px; outline:none; cursor:pointer; font-family:'JetBrains Mono', monospace; font-size:11px;"><option value="wasm" ${this.useWasm?'selected':''}>WASM (High Performance)</option><option value="v8" ${!this.useWasm?'selected':''}>V8 JavaScript (Fallback)</option></select></label>
             </div>
@@ -2386,7 +2386,8 @@ const Sim = {
         const pinCont = el.querySelector('.pin-container');
         const infoCont = el.querySelector('.visual-extra');
         const lblCont = el.querySelector('.gate-label');
-        let target = (mode === 'pins' || mode === 'pin-dots') ? pinCont : (mode === 'info' ? infoCont : (mode === 'label' ? lblCont : el));
+        // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Renamed pin-dots to pin-leds to fix nomenclature as instructed.
+        let target = (mode === 'pins' || mode === 'pin-leds') ? pinCont : (mode === 'info' ? infoCont : (mode === 'label' ? lblCont : el));
         
         // [AUDIT: v1.24.34 | SEC_ARCH_LEAD] - Dynamic proxy generation for port geometry mutations.
         if (mode === 'pin-labels' || mode === 'pin-both') {
@@ -2410,7 +2411,8 @@ const Sim = {
         if (!target) return;
         
         // [AUDIT: v1.24.26 | SEC_ARCH_LEAD] - Injected edit mode dispatch handling for gate label components.
-        if (mode === 'pins' || mode === 'pin-dots' || mode === 'info' || mode === 'label' || mode === 'pin-labels' || mode === 'pin-both') {
+        // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Adapted edit mode dispatch handling for pin-leds components.
+        if (mode === 'pins' || mode === 'pin-leds' || mode === 'info' || mode === 'label' || mode === 'pin-labels' || mode === 'pin-both') {
             if (mode === 'info' && node.infoX === undefined) {
                 // [AUDIT: SEC_ARCH_LEAD] - Initialize default offset coordinates if previously relative
                 node.infoX = target.offsetLeft;
@@ -2476,7 +2478,8 @@ const Sim = {
             const rTop = clickY < thY;
             const rBottom = clickY > target.offsetHeight - thY;
             // [AUDIT: v1.24.38 | SEC_ARCH_LEAD] - Unified translation and scaling boolean logic to prevent dead zones on proxy.
-            const isResizing = (mode === 'pin-labels' || mode === 'pin-both') ? (rLeft || rRight || rTop || rBottom) : ((mode === 'pins' || mode === 'pin-dots' || mode === 'info' || mode === 'label') && (rLeft || rRight || rTop || rBottom));
+            // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Adapted scaling hitboxes for renamed pin-leds target.
+            const isResizing = (mode === 'pin-labels' || mode === 'pin-both') ? (rLeft || rRight || rTop || rBottom) : ((mode === 'pins' || mode === 'pin-leds' || mode === 'info' || mode === 'label') && (rLeft || rRight || rTop || rBottom));
             
             const startX = e.clientX;
             const startY = e.clientY;
@@ -2503,7 +2506,8 @@ const Sim = {
                     el.style.width = node.customWidth + 'px';
                     el.style.height = node.customHeight + 'px';
                     Sim.updateWireVisuals();
-                } else if (mode === 'pins' || mode === 'info' || mode === 'label' || mode === 'pin-labels' || mode === 'pin-both') {
+                // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Restored missing target condition for pin-leds scaling and translation propagation to fix regression.
+                } else if (mode === 'pins' || mode === 'pin-leds' || mode === 'info' || mode === 'label' || mode === 'pin-labels' || mode === 'pin-both') {
                     let cX = startPinX, cY = startPinY, cW = startPinW, cH = startPinH;
                     if (isResizing || m.shiftKey) { 
                         // [AUDIT: v1.24.27 | SEC_ARCH_LEAD] - Adjusted scaling constraints for label geometries to permit overhangs and font scaling.
@@ -2596,7 +2600,8 @@ const Sim = {
         const pinCont = el?.querySelector('.pin-container');
         const infoCont = el?.querySelector('.visual-extra');
         const lblCont = el?.querySelector('.gate-label');
-        let target = state.mode === 'pins' || state.mode === 'pin-dots' ? pinCont : (state.mode === 'info' ? infoCont : (state.mode === 'label' ? lblCont : el));
+        // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Updated node edit exit hook for LED nomenclature sync.
+        let target = state.mode === 'pins' || state.mode === 'pin-leds' ? pinCont : (state.mode === 'info' ? infoCont : (state.mode === 'label' ? lblCont : el));
         if (state.mode === 'pin-labels' || state.mode === 'pin-both') target = el?.querySelector('.port-edit-proxy');
         
         if (target && this._editModeDown) {
