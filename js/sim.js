@@ -585,6 +585,21 @@ const Sim = {
                 node.lastClk = valClk;
                 return { q: node.state, nq: node.state === 1 ? 0 : 1 };
             }
+            // [AUDIT: v1.24.53 | SEC_ARCH_LEAD] - Memory retrieval logic for dynamic ROM component.
+            case 'ROM': {
+                let addr = 0;
+                const pins = node.addressPins || 4;
+                for (let i = 0; i < pins; i++) {
+                    const bit = this.getDrivingSignal(node.id, `in${i}`);
+                    if (bit === 1 || bit === true) addr |= (1 << i);
+                }
+                const data = (node.memoryData && node.memoryData.length > addr) ? node.memoryData[addr] : 0;
+                const outObj = {};
+                for (let i = 0; i < 8; i++) {
+                    outObj[`out${i}`] = (data & (1 << i)) ? 1 : 0;
+                }
+                return outObj;
+            }
         }
         // output nodes
         if (node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
@@ -1298,9 +1313,12 @@ const Sim = {
             type, x, y, label: label || type, val: 0,
             state: (type.includes('-1') || type === 'CLOCK' || type === 'DFF' || type === 'TFF') ? 0 : (new Array(parseInt(type.split('-')[1]) || 1).fill(0)),
             outputs: {}, lastClk: 0,
-            ...(type === 'CLOCK' && { freq: 1, interval: 1000, lastTick: performance.now() })
+            ...(type === 'CLOCK' && { freq: 1, interval: 1000, lastTick: performance.now() }),
+            // [AUDIT: v1.24.53 | SEC_ARCH_LEAD] - Parametric state initialization for dynamic ROM module.
+            ...(type === 'ROM' && { addressPins: 4, dataUrl: '', memoryData: Array.from(new Uint8Array(16)) })
         };
-        const NATIVE_TYPES = new Set(['NAND', 'CLOCK', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'JUNCTION', 'TRISTATE', 'DFF', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR']);
+        // [AUDIT: v1.24.53 | SEC_ARCH_LEAD] - Injected ROM native component type to allow bypass of custom chip verifications.
+        const NATIVE_TYPES = new Set(['NAND', 'CLOCK', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'JUNCTION', 'TRISTATE', 'DFF', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM']);
         if (this.library[type] && !NATIVE_TYPES.has(type)) { node.isCustom = true; }
         History.execute(new AddNodeCommand(node));
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node command dispatched for ${node.id}.
@@ -1814,7 +1832,9 @@ const Sim = {
                 { label: '8-Bit Port', type: 'OUT-8' }
             ],
             'Utilities': [
-                { label: 'Clock Generator', type: 'CLOCK' }
+                { label: 'Clock Generator', type: 'CLOCK' },
+                // [AUDIT: v1.24.53 | SEC_ARCH_LEAD] - Injected ROM module into instantiation sidebar.
+                { label: '8-Bit ROM', type: 'ROM' }
             ]
         };
 
