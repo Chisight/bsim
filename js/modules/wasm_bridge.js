@@ -7,6 +7,8 @@ const WasmEngine = {
     REGION_B_OFFSET: 262144, // 1048576 bytes / 4 bytes per Int32
     // [AUDIT: v1.24.88 | SEC_ARCH_LEAD] - Relocated Region C boundary to 16MB to prevent instruction heap overflow (Region B collision).
     REGION_C_OFFSET: 4194304, // 16777216 bytes / 4 bytes per Int32
+    // [AUDIT: v1.24.93 | SEC_ARCH_LEAD] - Region E boundary allocated at 24MB for Power Analysis toggle counters.
+    REGION_E_OFFSET: 6291456, // 25165824 bytes / 4 bytes per Int32
     instructionCount: 0,
     idMap: new Map(), // nodeId -> wasmIdx (Region A)
     flatNodes: [],
@@ -172,7 +174,8 @@ const WasmEngine = {
         this.flatNodes.forEach(n => {
             if (n.type === 'ROM' || n.type === 'RAM') romPayloadSize += (1 << (n.addressPins || 4));
         });
-        const requiredBytes = 16777216 + (this.flatNodes.length * 256) + romPayloadSize;
+        // [AUDIT: v1.24.94 | SEC_ARCH_LEAD] - Shifted allocation baseline to 24MB to encompass Region E power analysis buffers and prevent OOB traps.
+        const requiredBytes = 25165824 + (this.flatNodes.length * 256) + romPayloadSize;
         const requiredPages = Math.ceil(requiredBytes / 65536);
         const currentPages = this.memory.buffer.byteLength / 65536;
 
@@ -661,6 +664,14 @@ const WasmEngine = {
      * @IO: WASM_TO_HOST
      * @INTENT: Retrieve the entire state vector for a node from Wasm linear memory.
      */
+    getToggleCount(nodeId) {
+        if (!this.ready || !this.memArray) return 0;
+        let idx = this.idMap.get(nodeId);
+        if (idx === undefined) return 0;
+        if (Array.isArray(idx)) idx = idx[0];
+        return this.memArray[this.REGION_E_OFFSET + idx] || 0;
+    },
+
     readState(nodeId) {
         if (!this.ready) {
             // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Read failure for ${nodeId} (memory not ready).

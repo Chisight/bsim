@@ -13,6 +13,8 @@
   (global $REGION_B_BASE i32 (i32.const 1048576))  ;; start of instructions
   ;; [AUDIT: v1.24.88 | SEC_ARCH_LEAD] - Shifted Region C boundary to 16MB to protect Region B execution array from large netlist overflows.
   (global $REGION_C_BASE i32 (i32.const 16777216)) 
+  ;; [AUDIT: v1.24.93 | SEC_ARCH_LEAD] - Power Analysis Region E allocated at 24MB for cycle-accurate switching activity tracking.
+  (global $REGION_E_BASE i32 (i32.const 25165824)) 
   (global $MEM_OFFSET (mut i32) (i32.const 0))
 
   ;; -----------------------------------------------------------------------
@@ -314,7 +316,18 @@
           )
         )
       )
-      i32.store
+      ;; [AUDIT: v1.24.93 | SEC_ARCH_LEAD] - Cycle-Accurate Power Analysis: Gate-level switching activity tracker.
+      local.set $data
+      drop ;; Clear $target_addr pushed prior to dispatch
+      
+      local.get $target_addr i32.load local.get $data i32.ne
+      (if (then
+        global.get $REGION_E_BASE local.get $target_addr i32.add
+        global.get $REGION_E_BASE local.get $target_addr i32.add i32.load i32.const 1 i32.add
+        i32.store
+      ))
+      
+      local.get $target_addr local.get $data i32.store
           local.get $i i32.const 1 i32.add local.set $i
           br $eval_loop
         )

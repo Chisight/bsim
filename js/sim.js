@@ -880,6 +880,7 @@ const Sim = {
             }
         }
 
+        if (!this.timing) this.timing = { node: 'ideal', delay: 0 };
         // [AUDIT: v1.24.90 | SEC_ARCH_LEAD] - Fast shallow equality check to bypass CPU-heavy JSON stringification during V8 ticks.
         const fastEqual = (a, b) => {
             if (a === b) return true;
@@ -908,6 +909,7 @@ const Sim = {
                 const rawNew = (typeof newVal === 'string' && newVal !== 'Z') ? JSON.parse(newVal) : newVal;
                 // if node value changed
                 if (!fastEqual(node.val, rawNew) || node._forcePropagate) {
+                    if (!fastEqual(node.val, rawNew)) node.toggles = (node.toggles || 0) + 1;
                     node._forcePropagate = false;
                     // increment transition count
                     const flips = (this._transitions.get(node.id) || 0) + 1;
