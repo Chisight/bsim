@@ -1234,10 +1234,11 @@ const DebugTerminal = {
             case 'status':
                 this.print(`--- SIMULATOR STATUS ---`, "warn");
                 this.print(`Nodes: ${Sim.nodes.length} | Wires: ${Sim.wires.length}`, "ok");
+                this.print(`Netlist: ${Sim._netlistDirty ? 'Dirty (Pending Sync)' : 'Clean'}`, Sim._netlistDirty ? "warn" : "ok");
+                this.print(`SharedArrayBuffer: ${window.SharedArrayBuffer ? 'Supported' : 'Disabled (COOP/COEP Restricted)'}`, window.SharedArrayBuffer ? "ok" : "err");
                 this.print(`Engine: ${Sim.useWasm ? 'WebAssembly (Fast)' : 'V8 JavaScript (Fallback)'}`, "sys");
                 if (window.WasmEngine) {
                     this.print(`Wasm Parity: ${WasmEngine.ready ? 'ONLINE' : 'OFFLINE'}`, WasmEngine.ready ? "ok" : "err");
-                    if (WasmEngine.wasmMemory) this.print(`Cycle Map: ${(WasmEngine.wasmMemory.buffer.byteLength / 1024).toFixed(2)} KB`, "sys");
                 }
                 break;
             case 'synth':

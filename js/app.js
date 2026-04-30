@@ -162,7 +162,8 @@ window.onload = () => {
     // [AUDIT: v1.24.93 | SEC_ARCH_LEAD] - Power analysis switching counters, DWARF-aware Wasm symbol mapper, and hardware-agnostic temporal shims injected.
     // [AUDIT: v1.24.94 | SEC_ARCH_LEAD] - Expanded Wasm linear memory allocation baseline to safely encompass the 24MB Power Analysis Region E.
     // [AUDIT: v1.24.95 | SEC_ARCH_LEAD] - Deployed Asynchronous Worker Kernel, Wasm SIMD Vectorization, and Combinatorial Oscillation Watchdog.
-    window.LOADED_BSIM_VERSION = "1.24.95";
+    // [AUDIT: v1.24.96 | SEC_ARCH_LEAD] - Parity Recovery: Reverted to non-shared memory to bypass Cross-Origin Isolation requirements for local deployment.
+    window.LOADED_BSIM_VERSION = "1.24.96";
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Enforce ring-buffer limits on the History stack to prevent V8 heap exhaustion during macro execution.
     if (window.History) {
