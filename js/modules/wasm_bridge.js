@@ -580,12 +580,13 @@ const WasmEngine = {
      * @CONSTRAINT: DETERMINISTIC_TICK
      * @INTENT: Trigger a single simulation cycle in the Wasm engine.
      */
-    executeTick() {
+    // [AUDIT: v1.24.91 | SEC_ARCH_LEAD] - Expanded signature to support Two-Phase Commit for sequential latching.
+    executeTick(evalSeq = 1) {
         if (!this.ready || !this.instance) {
             // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Early exit, Wasm engine not ready.
             return;
         }
-        this.instance.exports.tick(this.instructionCount);
+        this.instance.exports.tick(this.instructionCount, evalSeq);
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Wasm tick executed successfully.
     },
 

@@ -774,10 +774,10 @@ const Sim = {
                     WasmEngine.writeState(n.id, n.state);
                 });
 
-                // [AUDIT: v1.24.89 | SEC_ARCH_LEAD] - Purged redundant V8 side-effect polling for sequential gates (DFF/TFF/TRISTATE) to leverage true Wasm-native speeds.
-                for (let i = 0; i < execDepth; i++) {
-                    WasmEngine.executeTick();
-                }
++                // [AUDIT: v1.24.91 | SEC_ARCH_LEAD] - Enforced Two-Phase Commit protocol (Combinatorial Settling -> Sequential Latching) to eradicate hazard latching.
++                for (let i = 0; i < execDepth; i++) {
++                    WasmEngine.executeTick(i === execDepth - 1 ? 1 : 0);
++                }
 
                 // extract Wasm Memory -> DOM Hardware States
                 this.nodes.forEach(n => {
@@ -1059,7 +1059,7 @@ const Sim = {
 
             // 2. Execute Wasm Array for 20 cycles to propagate signals
             for (let t = 0; t < 20; t++) {
-                WasmEngine.executeTick();
+                WasmEngine.executeTick(t === 19 ? 1 : 0);
             }
 
             // 3. Execute V8 Object Graph for 20 cycles to propagate signals
@@ -1763,6 +1763,8 @@ const Sim = {
         this._transitions.clear(); 
         this.nodes.forEach(n => { n._oscillating = false; n._forcePropagate = true; }); 
         this.eventQueue = new Set(this.nodes); 
+        // [AUDIT: v1.24.91 | SEC_ARCH_LEAD] - Force wake lock on scheduler to prevent stalled evaluation of newly instantiated clock sources.
+        if (this.wakeQueue) this.wakeQueue();
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Queue seeded for full propagation sweep.
     },
     /**
