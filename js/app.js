@@ -149,14 +149,115 @@ window.onload = () => {
      * @STATE: BSIM_METADATA
      * @INTENT: Define the application semantic versioning for runtime compatibility checks.
      */
-    // [AUDIT: v1.24.41 | SEC_ARCH_LEAD] - Version increment for polished toast mechanics, dynamic preferences window, and terminal scripting.
-    // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Version increment for deterministic script ID propagation, interaction hitboxes, and wire deletion patches.
-    // [AUDIT: v1.24.48 | SEC_ARCH_LEAD] - Version increment for zero-coordinate falsy evaluation patch in CLI parser.
-    // [AUDIT: v1.24.49 | SEC_ARCH_LEAD] - Version increment for successful verification of deterministic execution macro-scripts.
-    // [AUDIT: v1.24.50 | SEC_ARCH_LEAD] - Version increment for port geometry restoration and transparent pseudo-element hitbox injection.
-    // [AUDIT: v1.24.51 | SEC_ARCH_LEAD] - Hitbox geometry restoration validated. Wasm logic engine confirmed deterministic.
     // [AUDIT: v1.24.52 | SEC_ARCH_LEAD] - Version increment for V8 tick fallback parity sync injection and Force Layout Sync utility.
-    window.LOADED_BSIM_VERSION = "1.24.52";
+    // [AUDIT: v1.24.53 | SEC_ARCH_LEAD] - Implemented WebRTC High-Fidelity capture, URL-based workspace imports, and parametric ROM memory module.
+    window.LOADED_BSIM_VERSION = "1.24.53";
+
+    // [AUDIT: SEC_ARCH_LEAD] - JIT Patch: Dynamically extend capabilities via global scope interceptors to prevent core module desync.
+    setTimeout(() => {
+        if (window.ProjectManager) {
+            ProjectManager.importFromUrl = async function(url) {
+                try {
+                    const res = await fetch(url);
+                    if (!res.ok) throw new Error("HTTP " + res.status);
+                    const data = await res.json();
+                    localStorage.setItem('bsim_autosave', JSON.stringify(data));
+                    location.reload();
+                } catch (e) {
+                    if(window.Sim) Sim.toast('URL Load Fault: ' + e.message, 'danger');
+                }
+            };
+
+            ProjectManager.exportHighFidelity = async function() {
+                try {
+                    const stream = await navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: "browser" }, audio: false, preferCurrentTab: true });
+                    const video = document.createElement('video');
+                    video.srcObject = stream;
+                    await video.play();
+                    const canvas = document.createElement('canvas');
+                    canvas.width = video.videoWidth;
+                    canvas.height = video.videoHeight;
+                    const ctx = canvas.getContext('2d');
+                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                    stream.getTracks().forEach(track => track.stop());
+                    const link = document.createElement('a');
+                    link.download = `bSim_HiFi_${Date.now()}.png`;
+                    link.href = canvas.toDataURL('image/png');
+                    link.click();
+                    if(window.Sim) Sim.toast('High-Fidelity framebuffer captured.', 'success');
+                } catch (err) {
+                    if(window.Sim) Sim.toast('Capture aborted or permission denied.', 'danger');
+                }
+            };
+        }
+
+        document.addEventListener('dblclick', (e) => {
+            const gate = e.target.closest('.gate');
+            if (!gate) return;
+            const node = Sim.nodes.find(n => n.id === gate.id);
+            if (node && node.type === 'ROM') {
+                Sim.modal('Configure ROM Data', 'Enter URL to fetch raw binary data:', 'prompt', async (url) => {
+                    if (url) {
+                        node.dataUrl = url;
+                        try {
+                            Sim.toast('Fetching ROM data via network...', 'info');
+                            const res = await fetch(url);
+                            const buffer = await res.arrayBuffer();
+                            const bytes = new Uint8Array(buffer);
+                            node.memoryData = Array.from(bytes);
+                            
+                            const reqPins = Math.max(4, Math.ceil(Math.log2(bytes.length)));
+                            if (reqPins > (node.addressPins || 4)) {
+                                node.addressPins = reqPins;
+                                Sim.toast(`Address bus scaled to ${reqPins} bits to fit payload.`, 'warning');
+                                if(window.NodeRenderer) {
+                                    gate.remove();
+                                    NodeRenderer.renderNode(node);
+                                }
+                            } else {
+                                Sim.toast('ROM payload flashed successfully.', 'success');
+                            }
+                            Sim.updateWireVisuals();
+                            Sim.seedQueue();
+                            Sim.processQueue();
+                            Sim.autoSave();
+                        } catch(err) {
+                            Sim.toast('Network fault during ROM flash.', 'danger');
+                        }
+                    }
+                }, node.dataUrl || '');
+            }
+        });
+        
+        if (window.NodeRenderer && typeof NodeRenderer.renderNode === 'function') {
+            const origRender = NodeRenderer.renderNode.bind(NodeRenderer);
+            NodeRenderer.renderNode = function(node) {
+                if (node.type === 'ROM') {
+                    const tmpType = node.type;
+                    node.isCustom = true; 
+                    node.meta = {
+                        nodes: [
+                            ...Array.from({length: node.addressPins || 4}).map((_, i) => ({ type: 'IN-1', id: `in${i}` })),
+                            ...Array.from({length: 8}).map((_, i) => ({ type: 'OUT-1', id: `out${i}` }))
+                        ]
+                    };
+                    origRender(node);
+                    node.type = tmpType;
+                    node.isCustom = false;
+                    delete node.meta;
+                    
+                    const el = document.getElementById(node.id);
+                    if (el) {
+                        const lbl = el.querySelector('.gate-label');
+                        if (lbl) lbl.innerText = 'ROM (' + (node.addressPins || 4) + 'x8)';
+                        el.style.backgroundColor = '#2c1e4a';
+                    }
+                    return;
+                }
+                return origRender(node);
+            }
+        }
+    }, 500);
 
     // [AUDIT: SEC_ARCH_LEAD] - Injected passive workspace boundary validation to catch upgrade mismatches.
     window.addEventListener('load', () => {

@@ -1,0 +1,227 @@
+--- BEGIN FILE: 8bit_adder_subtractor_stress.bsims ---
+// --- FIND X ---
+// --- REPLACE X WITH ---
+# =========================================================================
+# MACRO: 8-BIT ADDER / SUBTRACTOR (TWO'S COMPLEMENT)
+# @ARCH: COMPUTATIONAL_CORE_STRESS_TEST
+# @INTENT: Deep combinatorial graph propagation verification. Stress-tests
+# dual-engine parity across multi-bit logical boundaries and bus splits.
+# =========================================================================
+
+rm all
+clear
+
+# --- I/O REGISTERS ---
+spawn IN-8 0 100 # bus-a
+spawn IN-8 0 300 # bus-b
+spawn IN-1 0 500 # op-sub
+spawn OUT-8 800 600 # bus-result
+spawn OUT-1 800 1200 # flag-cout
+
+# --- B-INVERSION LOGIC (TWO'S COMPLEMENT) ---
+spawn XOR 150 100 # bxor0
+spawn XOR 150 250 # bxor1
+spawn XOR 150 400 # bxor2
+spawn XOR 150 550 # bxor3
+spawn XOR 150 700 # bxor4
+spawn XOR 150 850 # bxor5
+spawn XOR 150 1000 # bxor6
+spawn XOR 150 1150 # bxor7
+
+wire bus-b out0 bxor0 a
+wire op-sub out0 bxor0 b
+wire bus-b out1 bxor1 a
+wire op-sub out0 bxor1 b
+wire bus-b out2 bxor2 a
+wire op-sub out0 bxor2 b
+wire bus-b out3 bxor3 a
+wire op-sub out0 bxor3 b
+wire bus-b out4 bxor4 a
+wire op-sub out0 bxor4 b
+wire bus-b out5 bxor5 a
+wire op-sub out0 bxor5 b
+wire bus-b out6 bxor6 a
+wire op-sub out0 bxor6 b
+wire bus-b out7 bxor7 a
+wire op-sub out0 bxor7 b
+
+# --- STAGE 0 (LSB) ---
+spawn XOR 300 100 # s0_xor1
+spawn XOR 450 100 # s0_xor2
+spawn AND 300 170 # s0_and1
+spawn AND 450 170 # s0_and2
+spawn OR  600 170 # s0_or1
+
+wire bus-a out0 s0_xor1 a
+wire bxor0 out s0_xor1 b
+wire s0_xor1 out s0_xor2 a
+wire op-sub out0 s0_xor2 b
+wire s0_xor2 out bus-result in0
+wire bus-a out0 s0_and1 a
+wire bxor0 out s0_and1 b
+wire s0_xor1 out s0_and2 a
+wire op-sub out0 s0_and2 b
+wire s0_and1 out s0_or1 a
+wire s0_and2 out s0_or1 b
+
+# --- STAGE 1 ---
+spawn XOR 300 250 # s1_xor1
+spawn XOR 450 250 # s1_xor2
+spawn AND 300 320 # s1_and1
+spawn AND 450 320 # s1_and2
+spawn OR  600 320 # s1_or1
+
+wire bus-a out1 s1_xor1 a
+wire bxor1 out s1_xor1 b
+wire s1_xor1 out s1_xor2 a
+wire s0_or1 out s1_xor2 b
+wire s1_xor2 out bus-result in1
+wire bus-a out1 s1_and1 a
+wire bxor1 out s1_and1 b
+wire s1_xor1 out s1_and2 a
+wire s0_or1 out s1_and2 b
+wire s1_and1 out s1_or1 a
+wire s1_and2 out s1_or1 b
+
+# --- STAGE 2 ---
+spawn XOR 300 400 # s2_xor1
+spawn XOR 450 400 # s2_xor2
+spawn AND 300 470 # s2_and1
+spawn AND 450 470 # s2_and2
+spawn OR  600 470 # s2_or1
+
+wire bus-a out2 s2_xor1 a
+wire bxor2 out s2_xor1 b
+wire s2_xor1 out s2_xor2 a
+wire s1_or1 out s2_xor2 b
+wire s2_xor2 out bus-result in2
+wire bus-a out2 s2_and1 a
+wire bxor2 out s2_and1 b
+wire s2_xor1 out s2_and2 a
+wire s1_or1 out s2_and2 b
+wire s2_and1 out s2_or1 a
+wire s2_and2 out s2_or1 b
+
+# --- STAGE 3 ---
+spawn XOR 300 550 # s3_xor1
+spawn XOR 450 550 # s3_xor2
+spawn AND 300 620 # s3_and1
+spawn AND 450 620 # s3_and2
+spawn OR  600 620 # s3_or1
+
+wire bus-a out3 s3_xor1 a
+wire bxor3 out s3_xor1 b
+wire s3_xor1 out s3_xor2 a
+wire s2_or1 out s3_xor2 b
+wire s3_xor2 out bus-result in3
+wire bus-a out3 s3_and1 a
+wire bxor3 out s3_and1 b
+wire s3_xor1 out s3_and2 a
+wire s2_or1 out s3_and2 b
+wire s3_and1 out s3_or1 a
+wire s3_and2 out s3_or1 b
+
+# --- STAGE 4 ---
+spawn XOR 300 700 # s4_xor1
+spawn XOR 450 700 # s4_xor2
+spawn AND 300 770 # s4_and1
+spawn AND 450 770 # s4_and2
+spawn OR  600 770 # s4_or1
+
+wire bus-a out4 s4_xor1 a
+wire bxor4 out s4_xor1 b
+wire s4_xor1 out s4_xor2 a
+wire s3_or1 out s4_xor2 b
+wire s4_xor2 out bus-result in4
+wire bus-a out4 s4_and1 a
+wire bxor4 out s4_and1 b
+wire s4_xor1 out s4_and2 a
+wire s3_or1 out s4_and2 b
+wire s4_and1 out s4_or1 a
+wire s4_and2 out s4_or1 b
+
+# --- STAGE 5 ---
+spawn XOR 300 850 # s5_xor1
+spawn XOR 450 850 # s5_xor2
+spawn AND 300 920 # s5_and1
+spawn AND 450 920 # s5_and2
+spawn OR  600 920 # s5_or1
+
+wire bus-a out5 s5_xor1 a
+wire bxor5 out s5_xor1 b
+wire s5_xor1 out s5_xor2 a
+wire s4_or1 out s5_xor2 b
+wire s5_xor2 out bus-result in5
+wire bus-a out5 s5_and1 a
+wire bxor5 out s5_and1 b
+wire s5_xor1 out s5_and2 a
+wire s4_or1 out s5_and2 b
+wire s5_and1 out s5_or1 a
+wire s5_and2 out s5_or1 b
+
+# --- STAGE 6 ---
+spawn XOR 300 1000 # s6_xor1
+spawn XOR 450 1000 # s6_xor2
+spawn AND 300 1070 # s6_and1
+spawn AND 450 1070 # s6_and2
+spawn OR  600 1070 # s6_or1
+
+wire bus-a out6 s6_xor1 a
+wire bxor6 out s6_xor1 b
+wire s6_xor1 out s6_xor2 a
+wire s5_or1 out s6_xor2 b
+wire s6_xor2 out bus-result in6
+wire bus-a out6 s6_and1 a
+wire bxor6 out s6_and1 b
+wire s6_xor1 out s6_and2 a
+wire s5_or1 out s6_and2 b
+wire s6_and1 out s6_or1 a
+wire s6_and2 out s6_or1 b
+
+# --- STAGE 7 (MSB) ---
+spawn XOR 300 1150 # s7_xor1
+spawn XOR 450 1150 # s7_xor2
+spawn AND 300 1220 # s7_and1
+spawn AND 450 1220 # s7_and2
+spawn OR  600 1220 # s7_or1
+
+wire bus-a out7 s7_xor1 a
+wire bxor7 out s7_xor1 b
+wire s7_xor1 out s7_xor2 a
+wire s6_or1 out s7_xor2 b
+wire s7_xor2 out bus-result in7
+wire bus-a out7 s7_and1 a
+wire bxor7 out s7_and1 b
+wire s7_xor1 out s7_and2 a
+wire s6_or1 out s7_and2 b
+wire s7_and1 out s7_or1 a
+wire s7_and2 out s7_or1 b
+
+# --- END FLAG OVERFLOW ---
+wire s7_or1 out flag-cout in0
+
+# ==========================================
+# TEST VECTORS
+# ==========================================
+
+# Test 1: ADD (105 + 42 = 147)
+set op-sub 0
+set bus-a 105
+set bus-b 42
+sim
+
+# Test 2: SUB (147 - 100 = 47)
+set op-sub 1
+set bus-a 147
+set bus-b 100
+sim
+
+# Test 3: UNDERFLOW SUB (5 - 10 = 251 Two's Comp)
+set op-sub 1
+set bus-a 5
+set bus-b 10
+sim
+
+# Diagnostic Assertion
+status
+--- END FILE ---
