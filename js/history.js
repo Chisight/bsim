@@ -251,6 +251,49 @@ window.AddNodeCommand = AddNodeCommand;
 window.DeleteNodeCommand = DeleteNodeCommand;
 window.AddWireCommand = AddWireCommand;
 window.DeleteWireCommand = DeleteWireCommand;
+
+/**
+ * @ARCH: COMMAND_PATTERN
+ * @STATE: NETLIST_STATE
+ * @INTENT: Encapsulate atomic wire splitting with inline junction creation to prevent fragmented Undo stack entries.
+ */
+class SplitWireCommand {
+    constructor(wire, clickX, clickY) {
+        this.wire = wire;
+        this.clickX = clickX;
+        this.clickY = clickY;
+        this.jId = 'node-' + Math.random().toString(36).substr(2, 9);
+        this.newWire = { from: { nodeId: this.jId, portId: 'j' }, to: { ...wire.to } };
+        this.oldTo = { ...wire.to };
+    }
+    do() {
+        const junction = { id: this.jId, type: 'JUNCTION', x: this.clickX, y: this.clickY, label: 'JUNCTION', val: 0, state: 0, outputs: {}, lastClk: 0 };
+        Sim.nodes.push(junction);
+        if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(junction);
+        
+        this.wire.to = { nodeId: this.jId, portId: 'j' };
+        if (!Sim.wires.find(w => w.from.nodeId === this.newWire.from.nodeId && w.to.nodeId === this.newWire.to.nodeId && w.from.portId === this.newWire.from.portId && w.to.portId === this.newWire.to.portId)) {
+            Sim.wires.push(this.newWire);
+        }
+        Sim.updateWireVisuals();
+        Sim.updateHUD();
+        Sim.eventQueue.add(junction);
+        Sim.wakeQueue();
+    }
+    undo() {
+        Sim.nodes = Sim.nodes.filter(n => n.id !== this.jId);
+        const el = document.getElementById(this.jId);
+        if (el) el.remove();
+        
+        this.wire.to = this.oldTo;
+        Sim.wires = Sim.wires.filter(w => !(w.from.nodeId === this.newWire.from.nodeId && w.to.nodeId === this.newWire.to.nodeId && w.from.portId === this.newWire.from.portId && w.to.portId === this.newWire.to.portId));
+        Sim.updateWireVisuals();
+        Sim.updateHUD();
+        Sim.seedQueue(); Sim.processQueue();
+    }
+}
+
+window.SplitWireCommand = SplitWireCommand;
 /**
  * [AUDIT: SEC_ARCH_LEAD] - Layout mutation structural command updated for chip info readouts.
  * @ARCH: COMMAND_PATTERN

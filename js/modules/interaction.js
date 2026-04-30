@@ -261,23 +261,9 @@ const InteractionHandler = {
     _splitWire(fromNodeId, fromPortId, toNodeId, toPortId, clickX, clickY) {
         const wire = Sim.wires.find(w => w.from.nodeId === fromNodeId && w.to.nodeId === toNodeId && w.from.portId === fromPortId && w.to.portId === toPortId);
         if (!wire) return;
-
-        const junction = Sim.addNode('JUNCTION', clickX, clickY); 
-        const oldTo = { ...wire.to };
-        const newWire = { from: { nodeId: junction.id, portId: 'j' }, to: oldTo };
-
-        History.execute({
-            do: () => {
-                wire.to = { nodeId: junction.id, portId: 'j' };
-                if (!Sim.wires.includes(newWire)) Sim.wires.push(newWire);
-                Sim.updateWireVisuals();
-            },
-            undo: () => {
-                wire.to = oldTo;
-                Sim.wires = Sim.wires.filter(w => w !== newWire);
-                Sim.updateWireVisuals();
-            }
-        });
+        
+        // [AUDIT: v1.24.77 | SEC_ARCH_LEAD] - Atomic wire splitting via unified history command.
+        History.execute(new SplitWireCommand(wire, clickX, clickY));
         Sim.autoSave();
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire split successful at (${clickX}, ${clickY}).
     },
@@ -305,6 +291,7 @@ const InteractionHandler = {
             const clickY = (e.clientY - sr.top) / View.scale;
 
             // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Stricter wire resolution referencing ports to prevent incorrect deletion of parallel multi-bit connections.
+            // [AUDIT: v1.24.77 | SEC_ARCH_LEAD] - Hardened missing-wire exception handling for direct-action menus.
             menu.innerHTML = `
                 <div class="menu-item" onclick="InteractionHandler._splitWire(${wire.from.nodeId ? `'${wire.from.nodeId}'` : null}, '${wire.from.portId}', ${wire.to.nodeId ? `'${wire.to.nodeId}'` : null}, '${wire.to.portId}', ${clickX}, ${clickY}); document.getElementById('context-menu').style.display='none';">Add Node Here</div>
                 <div class="menu-item danger" onclick="const wTarget = Sim.wires.find(w => w.from.nodeId === '${wire.from.nodeId}' && w.to.nodeId === '${wire.to.nodeId}' && w.from.portId === '${wire.from.portId}' && w.to.portId === '${wire.to.portId}'); if(wTarget) History.execute(new DeleteWireCommand(wTarget)); document.getElementById('context-menu').style.display='none';">Delete Wire</div>
@@ -336,24 +323,8 @@ const InteractionHandler = {
             const clickY = (e.clientY - sr.top) / View.scale;
 
             if (e.shiftKey) {
-                const junction = Sim.addNode('JUNCTION', clickX, clickY); // Already registers AddNodeCommand
-                const oldTo = { ...wire.to };
-                const newWire = { from: { nodeId: junction.id, portId: 'j' }, to: oldTo };
-
-                // Atomically track the wire modifications
-                History.execute({
-                    do: () => {
-                        wire.to = { nodeId: junction.id, portId: 'j' };
-                        if (!Sim.wires.includes(newWire)) Sim.wires.push(newWire);
-                        Sim.updateWireVisuals();
-                    },
-                    undo: () => {
-                        wire.to = oldTo;
-                        Sim.wires = Sim.wires.filter(w => w !== newWire);
-                        Sim.updateWireVisuals();
-                    }
-                });
-                
+                // [AUDIT: v1.24.77 | SEC_ARCH_LEAD] - Shifted inline splitting to unified atomic SplitWireCommand to prevent fragmented Undo stack entries.
+                History.execute(new SplitWireCommand(wire, clickX, clickY));
                 Sim.autoSave();
                 return;
             }

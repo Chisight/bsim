@@ -280,10 +280,17 @@ const Sim = {
             const cloned = JSON.parse(JSON.stringify(n));
             cloned.id = newId; return cloned;
         });
-        const newWires = this._clipboard.wires.map(w => ({
-            from: { nodeId: idMap[w.from.nodeId], portId: w.from.portId },
-            to: { nodeId: idMap[w.to.nodeId], portId: w.to.portId }
-        }));
+        // [AUDIT: v1.24.77 | SEC_ARCH_LEAD] - Hardened PasteCommand wire instantiation to preserve user-defined midpoints and orthogonality properties.
+        const newWires = this._clipboard.wires.map(w => {
+            const nw = {
+                from: { nodeId: idMap[w.from.nodeId], portId: w.from.portId },
+                to: { nodeId: idMap[w.to.nodeId], portId: w.to.portId },
+                orthoDir: w.orthoDir
+            };
+            if (w.midX !== undefined) nw.midX = w.midX + 20;
+            if (w.midY !== undefined) nw.midY = w.midY + 20;
+            return nw;
+        });
         History.execute(new PasteCommand(newNodes, newWires));
         this.selection.forEach(id => document.getElementById(id)?.classList.remove('selected'));
         this.selection.clear();
