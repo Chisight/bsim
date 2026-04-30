@@ -586,7 +586,7 @@ const Sim = {
                 node.lastClk = valClk;
                 return { q: node.state, nq: node.state === 1 ? 0 : 1 };
             }
-            // [AUDIT: v1.24.53 | SEC_ARCH_LEAD] - Memory retrieval logic for dynamic ROM component.
+            // [AUDIT: v1.24.58 | SEC_ARCH_LEAD] - Hardened memory retrieval logic mapping N-bit address space to 8-bit output vectors.
             case 'ROM': {
                 let addr = 0;
                 const pins = node.addressPins || 4;

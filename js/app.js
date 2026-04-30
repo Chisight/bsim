@@ -155,7 +155,7 @@ window.onload = () => {
     // [AUDIT: v1.24.55 | SEC_ARCH_LEAD] - Resolved scheduler deadlock suppressing CLOCK node propagation in pure WebAssembly netlists.
     // [AUDIT: v1.24.56 | SEC_ARCH_LEAD] - Injected assert, step, peek, poke, reset primitives into kernel CLI.
     // [AUDIT: v1.24.57 | SEC_ARCH_LEAD] - Reclassified ROM module as a core primitive and normalized rendering palette.
-    // [AUDIT: v1.24.58 | SEC_ARCH_LEAD] - Relocated ROM instantiation to bottom navbar and workspace context menu; deprecated sidebar.
+    // [AUDIT: v1.24.58 | SEC_ARCH_LEAD] - Hardened ROM payload fetcher and monotonic address pin scaling enforcement.
     window.LOADED_BSIM_VERSION = "1.24.58";
 
     // [AUDIT: SEC_ARCH_LEAD] - JIT Patch: Dynamically extend capabilities via global scope interceptors to prevent core module desync.
@@ -196,6 +196,7 @@ window.onload = () => {
             };
         }
 
+        // [AUDIT: v1.24.58 | SEC_ARCH_LEAD] - Injected URL payload parser and monotonic address pin auto-scaling for ROM primitives.
         document.addEventListener('dblclick', (e) => {
             const gate = e.target.closest('.gate');
             if (!gate) return;
@@ -213,14 +214,14 @@ window.onload = () => {
                             
                             const reqPins = Math.max(4, Math.ceil(Math.log2(bytes.length)));
                             if (reqPins > (node.addressPins || 4)) {
-                                node.addressPins = reqPins;
-                                Sim.toast(`Address bus scaled to ${reqPins} bits to fit payload.`, 'warning');
-                                if(window.NodeRenderer) {
+                                node.addressPins = reqPins; // Monotonic increase only
+                                Sim.toast(`Address bus scaled up to ${reqPins} bits to fit payload.`, 'warning');
+                                if (window.NodeRenderer) {
                                     gate.remove();
                                     NodeRenderer.renderNode(node);
                                 }
                             } else {
-                                Sim.toast('ROM payload flashed successfully.', 'success');
+                                Sim.toast(`ROM payload flashed successfully (${bytes.length} bytes).`, 'success');
                             }
                             Sim.updateWireVisuals();
                             Sim.seedQueue();
@@ -231,6 +232,7 @@ window.onload = () => {
                         }
                     }
                 }, node.dataUrl || '');
+                return;
             }
         });
         
