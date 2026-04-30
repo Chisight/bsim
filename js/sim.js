@@ -1822,20 +1822,19 @@ const Sim = {
         if (!sb) return;
 
         const sections = {
-            'Input Ports': [
-                { label: 'Single Input', type: 'IN-1' },
-                { label: '4-Bit Port', type: 'IN-4' },
-                { label: '8-Bit Port', type: 'IN-8' }
-            ],
-            'Output Ports': [
-                { label: 'Single Output', type: 'OUT-1' },
-                { label: '4-Bit Port', type: 'OUT-4' },
-                { label: '8-Bit Port', type: 'OUT-8' }
+            'Primitives': [
+                { label: 'NAND', type: 'NAND' },
+                { label: 'Input 1', type: 'IN-1' },
+                { label: 'Input 4', type: 'IN-4' },
+                { label: 'Input 8', type: 'IN-8' },
+                { label: 'Output 1', type: 'OUT-1' },
+                { label: 'Output 4', type: 'OUT-4' },
+                { label: 'Output 8', type: 'OUT-8' },
+                // [AUDIT: v1.24.57 | SEC_ARCH_LEAD] - Relocated ROM instantiation to primitive category per updated UI specification.
+                { label: 'ROM 8-Bit', type: 'ROM' }
             ],
             'Utilities': [
-                { label: 'Clock Generator', type: 'CLOCK' },
-                // [AUDIT: v1.24.53 | SEC_ARCH_LEAD] - Injected ROM module into instantiation sidebar.
-                { label: '8-Bit ROM', type: 'ROM' }
+                { label: 'Clock Generator', type: 'CLOCK' }
             ]
         };
 

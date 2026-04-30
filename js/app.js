@@ -154,7 +154,8 @@ window.onload = () => {
     // [AUDIT: v1.24.54 | SEC_ARCH_LEAD] - Deployed topological pseudo-class assertions to rigidly pin hierarchical menu visibility during text input focus.
     // [AUDIT: v1.24.55 | SEC_ARCH_LEAD] - Resolved scheduler deadlock suppressing CLOCK node propagation in pure WebAssembly netlists.
     // [AUDIT: v1.24.56 | SEC_ARCH_LEAD] - Injected assert, step, peek, poke, reset primitives into kernel CLI.
-    window.LOADED_BSIM_VERSION = "1.24.56";
+    // [AUDIT: v1.24.57 | SEC_ARCH_LEAD] - Reclassified ROM module as a core primitive and normalized rendering palette.
+    window.LOADED_BSIM_VERSION = "1.24.57";
 
     // [AUDIT: SEC_ARCH_LEAD] - JIT Patch: Dynamically extend capabilities via global scope interceptors to prevent core module desync.
     setTimeout(() => {
@@ -252,7 +253,11 @@ window.onload = () => {
                     const el = document.getElementById(node.id);
                     if (el) {
                         const lbl = el.querySelector('.gate-label');
-                        if (lbl) lbl.innerText = 'ROM (' + (node.addressPins || 4) + 'x8)';
+                        if (lbl) {
+                            lbl.innerText = 'ROM (' + (node.addressPins || 4) + 'x8)';
+                            // [AUDIT: v1.24.57 | SEC_ARCH_LEAD] - Applied primitive typography classification to ROM label.
+                            lbl.style.color = '#fff';
+                        }
                         el.style.backgroundColor = '#2c1e4a';
                     }
                     return;
