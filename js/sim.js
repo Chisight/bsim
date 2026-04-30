@@ -310,6 +310,11 @@ const Sim = {
                 const cNodes = this.nodes.map(n => this._cleanNode(n)).filter(n => n !== null);
                 const cWires = this.wires.map(w => this._cleanWire(w)).filter(w => w !== null);
                 
+                // [AUDIT: v1.24.90 | SEC_ARCH_LEAD] - Sync Wasm volatile RAM payloads back to JS Host hierarchy before serialization.
+                if (this.useWasm && window.WasmEngine && WasmEngine.ready) {
+                    WasmEngine.syncMemoryToHost(this.nodes);
+                }
+
                 const wsStack = (this.workspaceStack || []).map(ws => ({ 
                     nodes: (ws.nodes || []).map(n => this._cleanNode(n)).filter(n => n !== null), 
                     wires: (ws.wires || []).map(w => this._cleanWire(w)).filter(w => w !== null) 
@@ -762,39 +767,18 @@ const Sim = {
 
                 // execute high frequency tick based on structural depth ceiling
                 const execDepth = Math.max(20, this.nodes.length);
-                const seqNodes = WasmEngine.flatNodes ? WasmEngine.flatNodes.filter(n => ['DFF', 'TFF', 'TRISTATE'].includes(n.type)) : [];
                 
                 // [AUDIT: v1.24.52 | SEC_ARCH_LEAD] - V8 Fallback Hook: Evaluate pure-JS Clock dependencies outside Wasm.
                 this.nodes.filter(n => n.type === 'CLOCK').forEach(n => {
                     this.calculateNextState(n);
                     WasmEngine.writeState(n.id, n.state);
                 });
-
+                // [AUDIT: v1.24.92 | SEC_ARCH_LEAD] - Upgraded to Three-Phase Commit (Settle -> Latch Shadow -> Commit) mirroring Verilog non-blocking assignments.
                 for (let i = 0; i < execDepth; i++) {
-                    WasmEngine.executeTick();
-                    
-                    if (seqNodes.length > 0) {
-                        seqNodes.forEach(n => {
-                            if (n.type === 'DFF') {
-                                const clk = WasmEngine.readPinState(n.id, 'clk');
-                                const d = WasmEngine.readPinState(n.id, 'd');
-                                if (clk === 1 && n.lastClk === 0) { n.state = d; }
-                                n.lastClk = clk;
-                                WasmEngine.writeState(n.id, [n.state, n.state === 1 ? 0 : 1]);
-                            } else if (n.type === 'TFF') {
-                                const clk = WasmEngine.readPinState(n.id, 'clk');
-                                const t = WasmEngine.readPinState(n.id, 't');
-                                if (clk === 1 && n.lastClk === 0 && t === 1) { n.state = n.state === 1 ? 0 : 1; }
-                                n.lastClk = clk;
-                                WasmEngine.writeState(n.id, [n.state, n.state === 1 ? 0 : 1]);
-                            } else if (n.type === 'TRISTATE') {
-                                const en = WasmEngine.readPinState(n.id, 'en');
-                                const d = WasmEngine.readPinState(n.id, 'in');
-                                WasmEngine.writeState(n.id, en === 1 ? d : 2);
-                            }
-                        });
-                    }
+                    WasmEngine.executeTick(0);
                 }
+                WasmEngine.executeTick(1);
+                WasmEngine.executeTick(2);
 
                 // extract Wasm Memory -> DOM Hardware States
                 this.nodes.forEach(n => {
@@ -803,7 +787,8 @@ const Sim = {
                     if (NATIVE_GATES.has(n.type) && !n.isCustom) {
                         let newVal = WasmEngine.readState(n.id);
                         if (newVal === 2 && n.type === 'TRISTATE') newVal = 'Z';
-                        if (JSON.stringify(n.val) !== JSON.stringify(newVal) || n._forcePropagate) {
+                        // [AUDIT: v1.24.90 | SEC_ARCH_LEAD] - Purged JSON.stringify overhead from Wasm scalar extraction.
+                        if (n.val !== newVal || n._forcePropagate) {
                             n._forcePropagate = false;
                             n.val = newVal;
                             changed = true;
@@ -812,10 +797,10 @@ const Sim = {
                     } else if ((n.type === 'DFF' || n.type === 'TFF') && !n.isCustom) {
                         const newVal = WasmEngine.readState(n.id);
                         if (newVal && newVal.length >= 2) {
-                            const structVal = { q: newVal[0], nq: newVal[1] };
-                            if (JSON.stringify(n.val) !== JSON.stringify(structVal) || n._forcePropagate) {
+                            // [AUDIT: v1.24.90 | SEC_ARCH_LEAD] - High-performance object comparison for Wasm sequential extraction.
+                            if (!n.val || n.val.q !== newVal[0] || n.val.nq !== newVal[1] || n._forcePropagate) {
                                 n._forcePropagate = false;
-                                n.val = structVal;
+                                n.val = { q: newVal[0], nq: newVal[1] };
                                 changed = true;
                                 this.updateNodeVisual(n);
                             }
@@ -895,6 +880,21 @@ const Sim = {
             }
         }
 
+        // [AUDIT: v1.24.90 | SEC_ARCH_LEAD] - Fast shallow equality check to bypass CPU-heavy JSON stringification during V8 ticks.
+        const fastEqual = (a, b) => {
+            if (a === b) return true;
+            if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false;
+            if (Array.isArray(a)) {
+                if (!Array.isArray(b) || a.length !== b.length) return false;
+                for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+                return true;
+            }
+            const ka = Object.keys(a), kb = Object.keys(b);
+            if (ka.length !== kb.length) return false;
+            for (let k of ka) if (a[k] !== b[k]) return false;
+            return true;
+        };
+
         let iterations = 0;
         const MAX_ITERS = 1000; // Expanded ceiling for hierarchical stability
         // process the queue
@@ -907,7 +907,7 @@ const Sim = {
                 const newVal = this.calculateNextState(node);
                 const rawNew = (typeof newVal === 'string' && newVal !== 'Z') ? JSON.parse(newVal) : newVal;
                 // if node value changed
-                if (JSON.stringify(node.val) !== JSON.stringify(rawNew) || node._forcePropagate) {
+                if (!fastEqual(node.val, rawNew) || node._forcePropagate) {
                     node._forcePropagate = false;
                     // increment transition count
                     const flips = (this._transitions.get(node.id) || 0) + 1;
@@ -1059,31 +1059,11 @@ const Sim = {
             });
 
             // 2. Execute Wasm Array for 20 cycles to propagate signals
-            const seqNodes = WasmEngine.flatNodes ? WasmEngine.flatNodes.filter(n => ['DFF', 'TFF', 'TRISTATE'].includes(n.type)) : [];
             for (let t = 0; t < 20; t++) {
-                WasmEngine.executeTick();
-                if (seqNodes.length > 0) {
-                    seqNodes.forEach(n => {
-                        if (n.type === 'DFF') {
-                            const clk = WasmEngine.readPinState(n.id, 'clk');
-                            const d = WasmEngine.readPinState(n.id, 'd');
-                            if (clk === 1 && n.lastClk === 0) { n.state = d; }
-                            n.lastClk = clk;
-                            WasmEngine.writeState(n.id, [n.state, n.state === 1 ? 0 : 1]);
-                        } else if (n.type === 'TFF') {
-                            const clk = WasmEngine.readPinState(n.id, 'clk');
-                            const t = WasmEngine.readPinState(n.id, 't');
-                            if (clk === 1 && n.lastClk === 0 && t === 1) { n.state = n.state === 1 ? 0 : 1; }
-                            n.lastClk = clk;
-                            WasmEngine.writeState(n.id, [n.state, n.state === 1 ? 0 : 1]);
-                        } else if (n.type === 'TRISTATE') {
-                            const en = WasmEngine.readPinState(n.id, 'en');
-                            const d = WasmEngine.readPinState(n.id, 'in');
-                            WasmEngine.writeState(n.id, en === 1 ? d : 2);
-                        }
-                    });
-                }
+                WasmEngine.executeTick(0);
             }
+            WasmEngine.executeTick(1);
+            WasmEngine.executeTick(2);
 
             // 3. Execute V8 Object Graph for 20 cycles to propagate signals
             for (let step = 0; step < 20; step++) {
@@ -1786,6 +1766,8 @@ const Sim = {
         this._transitions.clear(); 
         this.nodes.forEach(n => { n._oscillating = false; n._forcePropagate = true; }); 
         this.eventQueue = new Set(this.nodes); 
+        // [AUDIT: v1.24.91 | SEC_ARCH_LEAD] - Force wake lock on scheduler to prevent stalled evaluation of newly instantiated clock sources.
+        if (this.wakeQueue) this.wakeQueue();
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Queue seeded for full propagation sweep.
     },
     /**
@@ -1952,8 +1934,8 @@ const Sim = {
             { label: 'INPUT', type: 'INPUT' },
             { label: 'OUTPUT', type: 'OUTPUT' },
             { label: 'CLOCK', type: 'CLOCK' },
-            // [AUDIT: v1.24.58 | SEC_ARCH_LEAD] - Injected ROM module into bottom navbar library.
-            { label: 'ROM', type: 'ROM' }
+            // [AUDIT: v1.24.90 | SEC_ARCH_LEAD] - Transitioned base memory primitive in UI to RAM.
+            { label: 'RAM', type: 'RAM' }
         ];
 
         nativeLib.forEach(it => {

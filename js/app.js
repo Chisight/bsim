@@ -155,7 +155,11 @@ window.onload = () => {
     // [AUDIT: v1.24.86 | SEC_ARCH_LEAD] - Synthesized native Wasm sequential logic (DFF/TFF) and resolved mapped array pointer corruption.
     // [AUDIT: v1.24.87 | SEC_ARCH_LEAD] - Finalized Wasm kernel AST parenthesis alignment to resolve unexpected EOF compilation trap.
     // [AUDIT: v1.24.88 | SEC_ARCH_LEAD] - Hardened Wasm operand fetch pipeline to prevent OOB traps and mitigated Region C heap collision.
-    window.LOADED_BSIM_VERSION = "1.24.88";
+    // [AUDIT: v1.24.89 | SEC_ARCH_LEAD] - Isolated NQ memory offsets for Wasm sequential components and purged redundant V8 polling loops.
+    // [AUDIT: v1.24.90 | SEC_ARCH_LEAD] - Synchronized Wasm volatile memory back to Host arrays and purged JSON serialization from the simulation hot path.
+    // [AUDIT: v1.24.91 | SEC_ARCH_LEAD] - Deployed Two-Phase Commit protocol in Wasm to eliminate sequential hazard race conditions and resolved V8 scheduler deadlocks.
+    // [AUDIT: v1.24.92 | SEC_ARCH_LEAD] - Upgraded Wasm to Three-Phase Commit (Shadow Registers) mirroring Verilog non-blocking assignments to eradicate zero-delay cascades.
+    window.LOADED_BSIM_VERSION = "1.24.92";
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Enforce ring-buffer limits on the History stack to prevent V8 heap exhaustion during macro execution.
     if (window.History) {

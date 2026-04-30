@@ -191,7 +191,8 @@ const WasmEngine = {
                 for (let i = 0; i < bits; i++) indices.push(slot++);
                 this.idMap.set(n.id, indices);
             } else if (n.type === 'DFF' || n.type === 'TFF') {
-                this.idMap.set(n.id, [slot++, slot++]);
+                // [AUDIT: v1.24.92 | SEC_ARCH_LEAD] - Expand to 4 slots to support Shadow State NextQ for Three-Phase Commit.
+                this.idMap.set(n.id, [slot++, slot++, slot++, slot++]);
             } else if (n.type === 'ROM' || n.type === 'RAM') {
                 let indices = [];
                 for (let i = 0; i < 8; i++) indices.push(slot++);
@@ -579,12 +580,13 @@ const WasmEngine = {
      * @CONSTRAINT: DETERMINISTIC_TICK
      * @INTENT: Trigger a single simulation cycle in the Wasm engine.
      */
-    executeTick() {
+    // [AUDIT: v1.24.91 | SEC_ARCH_LEAD] - Expanded signature to support Two-Phase Commit for sequential latching.
+    executeTick(evalSeq = 1) {
         if (!this.ready || !this.instance) {
             // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Early exit, Wasm engine not ready.
             return;
         }
-        this.instance.exports.tick(this.instructionCount);
+        this.instance.exports.tick(this.instructionCount, evalSeq);
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Wasm tick executed successfully.
     },
 
@@ -805,11 +807,50 @@ const WasmEngine = {
      * @IO: CONSOLE_EXPORT
      * @INTENT: Generate and display a structured map of the Wasm linear memory allocation for all flattened nodes.
      */
+    /**
+     * [AUDIT: v1.24.90 | SEC_ARCH_LEAD] - Entry trace for reverse memory synchronization.
+     * @ARCH: MEMORY_SYNC
+     * @INTENT: Extract volatile RAM payloads from Wasm Region C back to JS host objects to preserve state during AutoSave.
+     */
+    syncMemoryToHost(rootNodes) {
+        if (!this.ready || !this.memArray || !this.flatNodes) return;
+        
+        // Traverse the hierarchical namespace mapping (macro:macro:node) to find the JS instance
+        const resolveInstanceNode = (flatId) => {
+            const parts = flatId.split(':');
+            let current = rootNodes.find(n => n.id === parts[0]);
+            if (!current) return null;
+            for (let i = 1; i < parts.length; i++) {
+                if (!current.meta) return null;
+                current = current.meta.nodes.find(n => n.id === parts[i]);
+                if (!current) return null;
+            }
+            return current;
+        };
+
+        let currentRomOffset = 0;
+        this.flatNodes.forEach(fn => {
+            if (fn.type === 'ROM' || fn.type === 'RAM') {
+                const pins = fn.addressPins || 4;
+                const allocSize = 1 << pins;
+                if (fn.type === 'RAM') {
+                    const hostNode = resolveInstanceNode(fn.id);
+                    if (hostNode) {
+                        const view = new Uint8Array(this.memory.buffer, 16777216 + currentRomOffset, allocSize);
+                        if (!hostNode.memoryData || hostNode.memoryData.length !== allocSize) hostNode.memoryData = new Array(allocSize).fill(0);
+                        for(let i = 0; i < allocSize; i++) hostNode.memoryData[i] = view[i];
+                    }
+                }
+                currentRomOffset += allocSize;
+            }
+        });
+    },
+
     exportMemoryMap() {
-        console.group("WASM LINEAR MEMORY MAP (v1.24.60)");
+        console.group("WASM LINEAR MEMORY MAP (v1.24.90)");
         console.log("Region A (States) Offset: 0");
         console.log("Region B (Instructions) Offset: 1048576 (byte)");
-        console.log("Region C (ROM Payloads) Offset: 2097152 (byte)");
+        console.log("Region C (ROM Payloads) Offset: 16777216 (byte)");
 
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Align diagnostic export with true Engine.wat physical memory layout, removing metadata phantom mapping.
         const map = this.flatNodes.map((node) => {

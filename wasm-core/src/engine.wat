@@ -59,7 +59,7 @@
   ;; @ARCH: CORE_KERNEL
   ;; @CONSTRAINT: LINEAR_EXECUTION
   ;; @INTENT: Main execution loop for redrawing the logical state across all synthesized primitive gates in linear memory.
-  (func $tick (param $instruction_count i32)
+  (func $tick (param $instruction_count i32) (param $eval_seq i32)
     (local $i i32)            ;; loop index
     (local $ptr i32)          ;; address for current inst
     (local $val_a i32)        ;; temp input a
@@ -162,19 +162,22 @@
                       ;; [AUDIT: v1.24.81 | SEC_ARCH_LEAD] - RAM Address Boundary Clamp enforcement to prevent linear memory host traps.
                       i32.const 1 local.get $num_pins i32.shl i32.const 1 i32.sub local.get $addr i32.and local.set $addr
                       local.get $raw_b i32.const 0xFFFFFF i32.and local.set $in_base
-                      ;; [AUDIT: v1.24.83 | SEC_ARCH_LEAD] - Re-aligned WE evaluation to contiguous +8 memory offset to bypass 32-bit shift truncation.
-                      local.get $in_base i32.const 8 i32.add i32.const 4 i32.mul i32.load i32.const 1 i32.eq
+                      ;; [AUDIT: v1.24.91 | SEC_ARCH_LEAD] - Gated RAM WE evaluation to Sequential Enable phase to prevent hazard latching.
+                      local.get $eval_seq i32.const 1 i32.eq
                       (if (then
-                        i32.const 0 local.set $data i32.const 0 local.set $p
-                        (loop $ram_d_loop
-                          local.get $p i32.const 8 i32.lt_u
-                          (if (then
-                            local.get $in_base local.get $p i32.add i32.const 4 i32.mul i32.load i32.const 1 i32.eq
-                            (if (then local.get $data i32.const 1 local.get $p i32.shl i32.or local.set $data))
-                            local.get $p i32.const 1 i32.add local.set $p br $ram_d_loop
-                          ))
-                        )
-                        global.get $REGION_C_BASE global.get $MEM_OFFSET i32.add local.get $addr i32.add local.get $data i32.store8
+                        local.get $in_base i32.const 8 i32.add i32.const 4 i32.mul i32.load i32.const 1 i32.eq
+                        (if (then
+                          i32.const 0 local.set $data i32.const 0 local.set $p
+                          (loop $ram_d_loop
+                            local.get $p i32.const 8 i32.lt_u
+                            (if (then
+                              local.get $in_base local.get $p i32.add i32.const 4 i32.mul i32.load i32.const 1 i32.eq
+                              (if (then local.get $data i32.const 1 local.get $p i32.shl i32.or local.set $data))
+                              local.get $p i32.const 1 i32.add local.set $p br $ram_d_loop
+                            ))
+                          )
+                          global.get $REGION_C_BASE global.get $MEM_OFFSET i32.add local.get $addr i32.add local.get $data i32.store8
+                        ))
                       ))
                       global.get $REGION_C_BASE global.get $MEM_OFFSET i32.add local.get $addr i32.add i32.load8_u local.set $data
                       i32.const 1 local.set $p
@@ -223,37 +226,75 @@
                                   local.get $opcode i32.const 1 i32.eq
                                   (if (result i32)
                                     (then
-                                      ;; [AUDIT: v1.24.86 | SEC_ARCH_LEAD] - OP 1: Native Edge-Triggered DFF Evaluation.
-                                      local.get $target_addr i32.const 4 i32.add i32.load i32.const 0 i32.eq
-                                      local.get $val_b i32.const 1 i32.eq i32.and
+                                      ;; [AUDIT: v1.24.92 | SEC_ARCH_LEAD] - OP 1: Native Edge-Triggered DFF Three-Phase Commit.
+                                      local.get $eval_seq i32.const 1 i32.eq
                                       (if (result i32)
-                                        (then local.get $val_a)
-                                        (else local.get $target_addr i32.load)
+                                        (then
+                                          ;; Phase 1: Latch to NextQ Shadow Register
+                                          local.get $target_addr i32.const 8 i32.add i32.load i32.const 0 i32.eq
+                                          local.get $val_b i32.const 1 i32.eq i32.and
+                                          (if (result i32)
+                                            (then local.get $val_a)
+                                            (else local.get $target_addr i32.load)
+                                          )
+                                          local.set $data
+                                          local.get $target_addr i32.const 12 i32.add local.get $data i32.store
+                                          local.get $target_addr i32.const 8 i32.add local.get $val_b i32.store
+                                          local.get $target_addr i32.load
+                                        )
+                                        (else
+                                          local.get $eval_seq i32.const 2 i32.eq
+                                          (if (result i32)
+                                            (then
+                                              ;; Phase 2: Commit NextQ to Output
+                                              local.get $target_addr i32.const 12 i32.add i32.load local.set $data
+                                              local.get $target_addr i32.const 4 i32.add local.get $data i32.const 1 i32.eq (if (result i32) (then i32.const 0) (else i32.const 1)) i32.store
+                                              local.get $data
+                                            )
+                                            (else local.get $target_addr i32.load)
+                                          )
+                                        )
                                       )
-                                      local.set $data
-                                      local.get $target_addr i32.const 4 i32.add local.get $val_b i32.store
-                                      local.get $data
                                     )
                                     (else 
                                       local.get $opcode i32.const 4 i32.eq
                                       (if (result i32)
                                         (then
-                                          ;; [AUDIT: v1.24.86 | SEC_ARCH_LEAD] - OP 4: Native Edge-Triggered TFF Evaluation.
-                                          local.get $target_addr i32.const 4 i32.add i32.load i32.const 0 i32.eq
-                                          local.get $val_b i32.const 1 i32.eq i32.and
+                                          ;; [AUDIT: v1.24.92 | SEC_ARCH_LEAD] - OP 4: Native Edge-Triggered TFF Three-Phase Commit.
+                                          local.get $eval_seq i32.const 1 i32.eq
                                           (if (result i32)
-                                            (then 
-                                              local.get $val_a i32.const 1 i32.eq
+                                            (then
+                                              ;; Phase 1: Latch to NextQ Shadow Register
+                                              local.get $target_addr i32.const 8 i32.add i32.load i32.const 0 i32.eq
+                                              local.get $val_b i32.const 1 i32.eq i32.and
                                               (if (result i32)
-                                                (then local.get $target_addr i32.load i32.const 1 i32.xor)
+                                                (then 
+                                                  local.get $val_a i32.const 1 i32.eq
+                                                  (if (result i32)
+                                                    (then local.get $target_addr i32.load i32.const 1 i32.xor)
+                                                    (else local.get $target_addr i32.load)
+                                                  )
+                                                )
+                                                (else local.get $target_addr i32.load)
+                                              )
+                                              local.set $data
+                                              local.get $target_addr i32.const 12 i32.add local.get $data i32.store
+                                              local.get $target_addr i32.const 8 i32.add local.get $val_b i32.store
+                                              local.get $target_addr i32.load
+                                            )
+                                            (else
+                                              local.get $eval_seq i32.const 2 i32.eq
+                                              (if (result i32)
+                                                (then
+                                                  ;; Phase 2: Commit NextQ to Output
+                                                  local.get $target_addr i32.const 12 i32.add i32.load local.set $data
+                                                  local.get $target_addr i32.const 4 i32.add local.get $data i32.const 1 i32.eq (if (result i32) (then i32.const 0) (else i32.const 1)) i32.store
+                                                  local.get $data
+                                                )
                                                 (else local.get $target_addr i32.load)
                                               )
                                             )
-                                            (else local.get $target_addr i32.load)
                                           )
-                                          local.set $data
-                                          local.get $target_addr i32.const 4 i32.add local.get $val_b i32.store
-                                          local.get $data
                                         )
                                         (else local.get $target_addr i32.load)
                                       )
