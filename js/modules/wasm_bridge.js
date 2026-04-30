@@ -56,7 +56,8 @@ const WasmEngine = {
         // EVERYTHING else is expanded via Sim.library (user-defined chips).
         // The bridge has zero knowledge of AND/OR/XOR/etc — if a user wants those
         // gates, they build them from NANDs in the library. Done.
-        const KERNEL = new Set(['NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'DFF', 'CLOCK', 'TFF', 'TRISTATE', 'JUNCTION']);
+        // [AUDIT: v1.24.73 | SEC_ARCH_LEAD] - Synchronized KERNEL primitives to prevent errant flattening of ROM/RAM modules.
+        const KERNEL = new Set(['NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'DFF', 'CLOCK', 'TFF', 'TRISTATE', 'JUNCTION', 'ROM', 'RAM']);
 
         let fNodes = [];
         let fWires = [];
