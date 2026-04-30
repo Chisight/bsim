@@ -103,7 +103,7 @@
           local.get $ptr i32.const 12 i32.add i32.load
           local.set $opcode
 
-          ;; --- opcode dispatch ---
+          ;; [AUDIT: v1.24.65 | SEC_ARCH_LEAD] - Unified Opcode Dispatcher with Corrected Folded Nesting.
           local.get $opcode i32.const 0 i32.eq
           (if (result i32)
             (then
@@ -138,81 +138,83 @@
                   )
                   local.get $data i32.const 1 i32.and (if (result i32) (then i32.const 1) (else i32.const 0))
                 )
-              (else local.get $opcode i32.const 6 i32.eq
-              (if (result i32)
-                (then local.get $val_a)
-                (else local.get $opcode i32.const 11 i32.eq
-                (if (result i32)
-                  (then
-                    ;; op 11: bus resolve (1 dominates 0, both dominate Z=2)
-                    local.get $val_a i32.const 1 i32.eq
-                    (if (result i32)
-                      (then i32.const 1)
-                      (else
-                        local.get $val_b i32.const 1 i32.eq
-                        (if (result i32)
-                          (then i32.const 1)
-                          (else
-                            local.get $val_a i32.const 0 i32.eq
-                            (if (result i32) (then i32.const 0) (else local.get $val_b))
+                (else 
+                  local.get $opcode i32.const 7 i32.eq
+                  (if (result i32)
+                    (then
+                      ;; op 7: RAM
+                      local.get $raw_a i32.const 0xFFFFFF i32.and local.set $in_base
+                      local.get $raw_a i32.const 24 i32.shr_u local.set $num_pins
+                      i32.const 0 local.set $addr i32.const 0 local.set $p
+                      (loop $ram_a_loop
+                        local.get $p local.get $num_pins i32.lt_u
+                        (if (then
+                          local.get $in_base local.get $p i32.add i32.const 4 i32.mul i32.load i32.const 1 i32.eq
+                          (if (then local.get $addr i32.const 1 local.get $p i32.shl i32.or local.set $addr))
+                          local.get $p i32.const 1 i32.add local.set $p br $ram_a_loop
+                        ))
+                      )
+                      local.get $raw_b i32.const 0xFFFFFF i32.and local.set $in_base
+                      local.get $raw_b i32.const 24 i32.shr_u i32.const 4 i32.mul i32.load i32.const 1 i32.eq
+                      (if (then
+                        i32.const 0 local.set $data i32.const 0 local.set $p
+                        (loop $ram_d_loop
+                          local.get $p i32.const 8 i32.lt_u
+                          (if (then
+                            local.get $in_base local.get $p i32.add i32.const 4 i32.mul i32.load i32.const 1 i32.eq
+                            (if (then local.get $data i32.const 1 local.get $p i32.shl i32.or local.set $data))
+                            local.get $p i32.const 1 i32.add local.set $p br $ram_d_loop
+                          ))
+                        )
+                        global.get $REGION_C_BASE global.get $MEM_OFFSET i32.add local.get $addr i32.add local.get $data i32.store8
+                      ))
+                      global.get $REGION_C_BASE global.get $MEM_OFFSET i32.add local.get $addr i32.add i32.load8_u local.set $data
+                      i32.const 1 local.set $p
+                      (loop $ram_o_loop
+                        local.get $p i32.const 8 i32.lt_u
+                        (if (then
+                          local.get $target_addr local.get $p i32.const 4 i32.mul i32.add
+                          local.get $data i32.const 1 local.get $p i32.shl i32.and (if (result i32) (then i32.const 1) (else i32.const 0)) i32.store
+                          local.get $p i32.const 1 i32.add local.set $p br $ram_o_loop
+                        ))
+                      )
+                      local.get $data i32.const 1 i32.and (if (result i32) (then i32.const 1) (else i32.const 0))
+                    )
+                    (else 
+                      local.get $opcode i32.const 6 i32.eq
+                      (if (result i32)
+                        (then local.get $val_a)
+                        (else 
+                          local.get $opcode i32.const 8 i32.eq
+                          (if (result i32)
+                            (then local.get $val_a global.set $MEM_OFFSET i32.const 0)
+                            (else 
+                              local.get $opcode i32.const 11 i32.eq
+                              (if (result i32)
+                                (then
+                                  local.get $val_a i32.const 1 i32.eq
+                                  (if (result i32) (then i32.const 1)
+                                    (else local.get $val_b i32.const 1 i32.eq
+                                      (if (result i32) (then i32.const 1)
+                                        (else local.get $val_a i32.const 0 i32.eq
+                                          (if (result i32) (then i32.const 0) (else local.get $val_b))
+                                        )
+                                      )
+                                    )
+                                  )
+                                )
+                                (else local.get $target_addr i32.load)
+                              )
+                            )
                           )
                         )
                       )
                     )
                   )
-              (else local.get $opcode i32.const 7 i32.eq
-              (if (result i32)
-                (then
-                  ;; [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - OP 7: Synchronous RAM R/W Pipeline.
-                  ;; Unpack Address and Pins from val_a
-                  local.get $raw_a i32.const 0xFFFFFF i32.and local.set $in_base
-                  local.get $raw_a i32.const 24 i32.shr_u local.set $num_pins
-                  i32.const 0 local.set $addr
-                  i32.const 0 local.set $p
-                  (loop $a_loop
-                    local.get $p local.get $num_pins i32.lt_u
-                    (if (then
-                      local.get $in_base local.get $p i32.add i32.const 4 i32.mul i32.load i32.const 1 i32.eq
-                      (if (then local.get $addr i32.const 1 local.get $p i32.shl i32.or local.set $addr))
-                      local.get $p i32.const 1 i32.add local.set $p br $a_loop
-                    ))
-                  )
-                  ;; Unpack Data-In and WE from val_b
-                  local.get $raw_b i32.const 0xFFFFFF i32.and local.set $in_base ;; re-use for din
-                  local.get $raw_b i32.const 24 i32.shr_u i32.const 4 i32.mul i32.load i32.const 1 i32.eq
-                  (if (then
-                    ;; WE is High: Pack byte and store8 to Region C
-                    i32.const 0 local.set $data i32.const 0 local.set $p
-                    (loop $d_loop
-                      local.get $p i32.const 8 i32.lt_u
-                      (if (then
-                        local.get $in_base local.get $p i32.add i32.const 4 i32.mul i32.load i32.const 1 i32.eq
-                        (if (then local.get $data i32.const 1 local.get $p i32.shl i32.or local.set $data))
-                        local.get $p i32.const 1 i32.add local.set $p br $d_loop
-                      ))
-                    )
-                    global.get $REGION_C_BASE global.get $MEM_OFFSET i32.add local.get $addr i32.add
-                    local.get $data i32.store8
-                  ))
-                  ;; Read-back current state at Address
-                  global.get $REGION_C_BASE global.get $MEM_OFFSET i32.add local.get $addr i32.add i32.load8_u local.set $data
-                  i32.const 1 local.set $p
-                  (loop $o_loop
-                    local.get $p i32.const 8 i32.lt_u
-                    (if (then
-                      local.get $target_addr local.get $p i32.const 4 i32.mul i32.add
-                      local.get $data i32.const 1 local.get $p i32.shl i32.and (if (result i32) (then i32.const 1) (else i32.const 0)) i32.store
-                      local.get $p i32.const 1 i32.add local.set $p br $o_loop
-                    ))
-                  )
-                  local.get $data i32.const 1 i32.and (if (result i32) (then i32.const 1) (else i32.const 0))
                 )
-                (else local.get $opcode i32.const 6 i32.eq
-                  (then local.get $val_a)
-                  (else local.get $opcode i32.const 8 i32.eq
-                    (then local.get $val_a global.set $MEM_OFFSET i32.const 0)
-                    (else local.get $opcode i32.const 11 i32.eq
-
+              )
+            )
+          )
           i32.store
           local.get $i i32.const 1 i32.add local.set $i
           br $eval_loop
