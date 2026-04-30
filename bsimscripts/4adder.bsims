@@ -1,0 +1,111 @@
+# 4-Bit Ripple Carry Adder Implementation
+rm all
+clear
+
+# --- I/O Setup ---
+# Inputs: A (4-bit) at x=0, B (4-bit) at x=0
+spawn IN-4 0 100    # node-a
+spawn IN-4 0 300    # node-b
+# Outputs: Sum (4-bit) and Carry-out (1-bit)
+spawn OUT-4 800 200 # node-sum
+spawn OUT-1 800 400 # node-cout
+
+# --- Stage 0 (LSB) ---
+spawn XOR 200 50    # s0_xor1
+spawn XOR 350 50    # s0_xor2
+spawn AND 200 120   # s0_and1
+spawn AND 350 120   # s0_and2
+spawn OR  500 120   # s0_or1
+
+# Stage 0 Wiring (Cin is 0)
+wire node-a out0 s0_xor1 a
+wire node-b out0 s0_xor1 b
+wire s0_xor1 out s0_xor2 a
+# (Cin stage 0 is grounded/floating 0)
+wire s0_xor2 out node-sum in0
+
+wire node-a out0 s0_and1 a
+wire node-b out0 s0_and1 b
+wire s0_xor1 out s0_and2 a
+# s0_and2 b is Cin (0)
+wire s0_and1 out s0_or1 a
+wire s0_and2 out s0_or1 b
+
+# --- Stage 1 ---
+spawn XOR 200 250   # s1_xor1
+spawn XOR 350 250   # s1_xor2
+spawn AND 200 320   # s1_and1
+spawn AND 350 320   # s1_and2
+spawn OR  500 320   # s1_or1
+
+# Stage 1 Wiring (Carry from s0)
+wire node-a out1 s1_xor1 a
+wire node-b out1 s1_xor1 b
+wire s1_xor1 out s1_xor2 a
+wire s0_or1 out s1_xor2 b
+wire s1_xor2 out node-sum in1
+
+wire node-a out1 s1_and1 a
+wire node-b out1 s1_and1 b
+wire s1_xor1 out s1_and2 a
+wire s0_or1 out s1_and2 b
+wire s1_and1 out s1_or1 a
+wire s1_and2 out s1_or1 b
+
+# --- Stage 2 ---
+spawn XOR 200 450   # s2_xor1
+spawn XOR 350 450   # s2_xor2
+spawn AND 200 520   # s2_and1
+spawn AND 350 520   # s2_and2
+spawn OR  500 520   # s2_or1
+
+# Stage 2 Wiring (Carry from s1)
+wire node-a out2 s2_xor1 a
+wire node-b out2 s2_xor1 b
+wire s2_xor1 out s2_xor2 a
+wire s1_or1 out s2_xor2 b
+wire s2_xor2 out node-sum in2
+
+wire node-a out2 s2_and1 a
+wire node-b out2 s2_and1 b
+wire s2_xor1 out s2_and2 a
+wire s1_or1 out s2_and2 b
+wire s2_and1 out s2_or1 a
+wire s2_and2 out s2_or1 b
+
+# --- Stage 3 (MSB) ---
+spawn XOR 200 650   # s3_xor1
+spawn XOR 350 650   # s3_xor2
+spawn AND 200 720   # s3_and1
+spawn AND 350 720   # s3_and2
+spawn OR  500 720   # s3_or1
+
+# Stage 3 Wiring (Carry from s2)
+wire node-a out3 s3_xor1 a
+wire node-b out3 s3_xor1 b
+wire s3_xor1 out s3_xor2 a
+wire s2_or1 out s3_xor2 b
+wire s3_xor2 out node-sum in3
+
+wire node-a out3 s3_and1 a
+wire node-b out3 s3_and1 b
+wire s3_xor1 out s3_and2 a
+wire s2_or1 out s3_and2 b
+wire s3_and1 out s3_or1 a
+wire s3_and2 out s3_or1 b
+
+# Final Carry Out
+wire s3_or1 out node-cout in0
+
+# --- Test Vectors ---
+# Set A=5 (0101), B=3 (0011). Expected Sum=8 (1000), Cout=0
+set node-a 5
+set node-b 3
+sim
+status
+
+# Set A=15 (1111), B=1 (0001). Expected Sum=0 (0000), Cout=1
+set node-a 15
+set node-b 1
+sim
+status

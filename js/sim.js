@@ -212,16 +212,34 @@ const Sim = {
             if ((e.ctrlKey || e.metaKey) && (key === 'y' || code === 'KeyY')) { e.preventDefault(); History.redo(); }
             if (key === 'delete' || key === 'backspace' || code === 'Delete' || code === 'Backspace') {
                 if (this.selection.size > 0) {
-                    const del = () => {
-                        this.selection.forEach(id => { const n = Sim.nodes.find(x => x.id === id); if (n) History.execute(new DeleteNodeCommand(n)); });
-                        this.selection.clear();
-                    };
                     if (this.confirmDelete) {
-                        this.modal('Delete Components', `Delete ${this.selection.size} selected items?`, 'danger', ok => { if (ok) del(); });
-                    } else del();
+                        this.modal('Delete Components', `Delete ${this.selection.size} selected items?`, 'danger', ok => { 
+                            if (ok) this.deleteSelection(); 
+                        });
+                    } else {
+                        this.deleteSelection();
+                    }
                 }
             }
         });
+    },
+
+    /**
+     * @ARCH: NETLIST_MUTATION
+     * @INTENT: Delete all currently selected nodes and wires via the History system.
+     */
+    deleteSelection() {
+        if (this.selection.size === 0) return;
+        
+        // [AUDIT: v1.24.46 | SEC_ARCH_LEAD] - Exposing centralized deletion interface for terminal 'rm all' parity.
+        this.selection.forEach(id => {
+            const n = this.nodes.find(x => x.id === id);
+            if (n) History.execute(new DeleteNodeCommand(n));
+        });
+        
+        this.selection.clear();
+        if (typeof this.updateWireVisuals === 'function') this.updateWireVisuals();
+        this.autoSave();
     },
 
     /**
