@@ -1,16 +1,15 @@
-# bSim v1.24.32 - Modular Professional Logic Simulator
+# BrowserSim v1.24.44 - Modular Professional Logic Simulator
 
 bSim is a high-performance, modular digital logic simulator built for the web. It allows users to design, simulate, and synthesize complex digital circuits using an atomic NAND-based foundation.
 
 ## 🚀 Key Features
 
-- **Multi-Tab Workspace**: (New in v1.24.32) Manage multiple independent circuit boards within a single project context, featuring isolated undo/redo stacks.
-- **Split-Pane Editor**: (New in v1.24.32) Professional dual-pane editing environment for macro chips. Compare sub-circuits side-by-side or spawn external popup editors.
-- **Hybrid Simulation Engine**: Utilizes a high-frequency WebAssembly (WASM) kernel for O(1) signal propagation in pure-native circuits, with a robust V8 object-graph fallback.
-- **Debug Terminal CLI**: Integrated command-line interface with tab-completion and visual workspace highlighting for headless project manipulation.
-- **Auto-Hiding Navigation**: Modern shell with collapsing navbars and edge-reveal telemetry to maximize workspace real estate.
-- **Parametric Layout Engine**: Hardened spatial mutator for custom chip icons, featuring 8-way proportional scaling and independent coordinate translation for pins and readouts.
-- **MRAP Diagnostic Hardening**: Full codebase instrumentation with `@ARCH` tags and high-density `EXIT_TRACE` markers for zero-trust state observability.
+- **Hybrid Simulation Engine**: Utilizes a high-frequency WebAssembly (WASM) kernel for O(1) signal propagation in pure-native circuits, with a robust V8 object-graph fallback for mixed-mode simulation.
+- **Independent Popup Editor**: (New in v1.24.40) Robust window management for sub-circuits, featuring multi-directional custom edge resizers, minimize/restore states, and pointer-event shielding for uninterruptible editing.
+- **Debug Terminal & Scripting**: (New in v1.24.41) Integrated Linux-style CLI for real-time telemetry, advanced diagnostic control, and `.bsimscript` batch processing for automated circuit verification.
+- **Modular Preferences Window**: A standalone, draggable configuration suite with global animation suppression for performance-critical simulation environments.
+- **Smart Wire Routing**: (New in v1.24.44) Intelligent auto-routing takeover for boundary wires during component translation, ensuring topological clean-up while preserving custom routing for isolated networks.
+- **MRAP Diagnostic Hardening**: Full codebase instrumentation with `@ARCH` architectural tags and high-density `EXIT_TRACE` markers for zero-trust state observability and deterministic layout history.
 - **Logic Synthesis**: Integrated truth table generator and logic synthesizer to optimize and verify circuit behavior.
 
 ## 🛠 Technology Stack
