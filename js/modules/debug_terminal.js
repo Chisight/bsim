@@ -615,40 +615,20 @@ const DebugTerminal = {
 
         switch (c) {
             case 'help':
-                // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Expanded help index for kernel telemetry commands.
-                this.print("Commands: exit, clear, verbosity [0-3], synth [gate], trace [nodeId]");
-                this.print("  pwd                 - Print Working Directory (VFS)");
-                this.print("  cd <path>           - Change Directory (VFS)");
-                this.print("  mkdir [-p] <dir>    - Create VFS directory");
-                this.print("  mv <chip> <folder>  - Move chip to a library folder");
-                this.print("  cp <src> <dest>     - Clone a macro in the library");
-                this.print("  touch <macro>       - Instantiate an empty macro");
-                this.print("  ls [-l] [path]      - List workspace nodes or VFS contents");
-                this.print("  tree [path]         - Display directory structure recursively");
-                this.print("  find <pattern>      - Regex search across VFS and nodes");
-                this.print("  spawn <type> [x y]  - Add a node (e.g., spawn NAND 100 100)");
-                this.print("  rm [-rf] <id>       - Delete nodes or directories");
-                this.print("  set <nodeId> <val>  - Set input node value (e.g., set node-xyz 1)");
-                this.print("  force <n> <p> <v>   - Override a pin signal (e.g., force n1 in0 1)");
-                this.print("  unforce <n> <p>     - Release an overridden pin");
-                this.print("  tick [N]            - Advance simulation clock N cycles");
-                this.print("  clock <id> <freq>   - Set oscillator frequency (Hz)");
-                this.print("  watch <nodeId>      - Subscribe to state transitions");
-                this.print("  dump <nodeId>       - Dump raw JSON state array");
-                this.print("  bom [macro]         - Generate Bill of Materials");
-                this.print("  path <n1> <n2>      - Trace topological electrical path");
-                this.print("  rm <id> [id2...]    - Delete nodes (or 'rm all')");
-                this.print("  set <nodeId> <val>  - Set input node value (e.g., set node-xyz 1)");
-                this.print("  wire <n1> <p1> <n2> <p2> - Connect two nodes");
-                this.print("  sim                 - Force a manual propagation tick");
-                this.print("  assert <n> <p> <v>  - Verify port value (halts script on fail)");
-                this.print("  step [N]            - Advance synchronous clock cycles");
-                this.print("  peek <node> <addr>  - Read byte from memory/ROM");
-                this.print("  poke <n> <a> <v>    - Write byte to memory/ROM");
-                this.print("  reset               - Purge simulator state & histories");
-                this.print("  status              - Show engine and netlist statistics");
-                this.print("  synth <gate>        - Hierarchically compiles logic from NANDs.");
-                this.print("  trace [nodeId]      - Output topological connections and logic states.");
+                // [AUDIT: v1.24.95 | SEC_ARCH_LEAD] - Expanded help index for kernel telemetry and analysis commands.
+                this.print("[SYSTEM] ARCHITECTURAL PRIMITIVES:", "sys");
+                this.print("  - tick <n> [p]: Advance simulation. Phase: 0=Settle, 1=Latch, 2=Commit.", "sys");
+                this.print("  - trace <id>  : Trace signal paths to identify zero-delay loops.", "sys");
+                this.print("  - power       : Extract pJ switching activity from Region E.", "sys");
+                this.print("  - symbols     : Map linear memory addresses to high-level node IDs.", "sys");
+                this.print("  - timing <f>  : Configure gate delays (7nm, 28nm, ideal).", "sys");
+                this.print("  - reset       : Flush Region A and re-center the viewport.", "sys");
+                this.print("  - ls [-l]     : List workspace nodes or VFS contents.", "sys");
+                this.print("  - spawn <t>   : Add a node (e.g., spawn NAND 100 100).", "sys");
+                this.print("  - rm <id>     : Delete nodes or directories.", "sys");
+                this.print("  - set <id> <v>: Set input node value.", "sys");
+                this.print("  - wire ...    : Connect two ports.", "sys");
+                this.print("  - synth <g>   : Compile logic from NANDs.", "sys");
                 break;
             case 'pwd':
                 this.print(this.cwd, 'sys');
@@ -1001,12 +981,24 @@ const DebugTerminal = {
                 this.print("Propagation tick queued.", "ok");
                 break;
             case 'step':
-            case 'tick':
-                // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Programmatic cycle advancement.
-                let ticks = parseInt(args[1]) || 1;
-                for(let i=0; i<ticks; i++) { Sim.seedQueue(); Sim.processQueue(); }
-                this.print(`Advanced ${ticks} clock cycle(s).`, "ok");
+            case 'tick': {
+                const count = parseInt(args[1]) || 1;
+                // [AUDIT: v1.24.96 | SEC_ARCH_LEAD] - Support for manual Phase-Stepping to debug Zero-Delay Cascades.
+                if (args[2] !== undefined) {
+                    const phase = parseInt(args[2]);
+                    for(let i=0; i<count; i++) WasmEngine.executeTick(phase);
+                    this.print(`Step: ${count} cycles in Phase ${phase} (Manual Commit).`, "warn");
+                } else {
+                    // Full 3-phase cycle
+                    for(let i=0; i<count; i++) {
+                        WasmEngine.executeTick(0); // Settle
+                        WasmEngine.executeTick(1); // Latch
+                        WasmEngine.executeTick(2); // Commit
+                    }
+                    this.print(`Executed ${count} full 3-phase simulation cycles.`, "ok");
+                }
                 break;
+            }
             case 'assert': {
                 // [AUDIT: v1.24.69 | SEC_ARCH_LEAD] - Hardened Assert primitive with multi-bit Bus-Value aggregation and Wasm linear-memory probing.
                 if (args.length < 4) return this.print("Usage: assert <nodeId> <portId> <value>", "err");
@@ -1253,10 +1245,11 @@ const DebugTerminal = {
             case 'status':
                 this.print(`--- SIMULATOR STATUS ---`, "warn");
                 this.print(`Nodes: ${Sim.nodes.length} | Wires: ${Sim.wires.length}`, "ok");
+                this.print(`Netlist: ${Sim._netlistDirty ? 'Dirty (Pending Sync)' : 'Clean'}`, Sim._netlistDirty ? "warn" : "ok");
+                this.print(`SharedArrayBuffer: ${window.SharedArrayBuffer ? 'Supported' : 'Disabled (COOP/COEP Restricted)'}`, window.SharedArrayBuffer ? "ok" : "err");
                 this.print(`Engine: ${Sim.useWasm ? 'WebAssembly (Fast)' : 'V8 JavaScript (Fallback)'}`, "sys");
                 if (window.WasmEngine) {
                     this.print(`Wasm Parity: ${WasmEngine.ready ? 'ONLINE' : 'OFFLINE'}`, WasmEngine.ready ? "ok" : "err");
-                    if (WasmEngine.wasmMemory) this.print(`Cycle Map: ${(WasmEngine.wasmMemory.buffer.byteLength / 1024).toFixed(2)} KB`, "sys");
                 }
                 break;
             case 'synth':
@@ -1268,7 +1261,11 @@ const DebugTerminal = {
                 this.traceNode(args[1]);
                 break;
             default:
-                this.print(`Command not found: ${c}`, 'err');
+                this.print(`ERR: '${c}' is not recognized in the current ISA context.`, "err");
+                const suggestion = this.findClosestCommand(c);
+                if (suggestion) {
+                    this.print(`SUGGESTION: Did you mean '${suggestion}'?`, "sys");
+                }
         }
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Command execution finalized: ${cmd}.
     },
@@ -1367,6 +1364,33 @@ const DebugTerminal = {
             if (node.outputs) this.print(`  Latched Outputs: ${JSON.stringify(node.outputs)}`, "sys");
         }
         this.print(`===================================`, "sys");
+    },
+
+    /**
+     * [AUDIT: v1.24.95 | SEC_ARCH_LEAD] - Levenshtein-distance algorithm for command suggestions.
+     */
+    levenshtein(a, b) {
+        const matrix = [];
+        for (let i = 0; i <= b.length; i++) matrix[i] = [i];
+        for (let j = 0; j <= a.length; j++) matrix[0][j] = j;
+        for (let i = 1; i <= b.length; i++) {
+            for (let j = 1; j <= a.length; j++) {
+                if (b.charAt(i - 1) === a.charAt(j - 1)) {
+                    matrix[i][j] = matrix[i - 1][j - 1];
+                } else {
+                    matrix[i][j] = Math.min(matrix[i - 1][j - 1] + 1, Math.min(matrix[i][j - 1] + 1, matrix[i - 1][j] + 1));
+                }
+            }
+        }
+        return matrix[b.length][a.length];
+    },
+
+    findClosestCommand(input) {
+        const commands = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv', 'mkdir', 'tick', 'step', 'clock', 'force', 'unforce', 'watch', 'dump', 'cp', 'touch', 'find', 'bom', 'path', 'assert', 'peek', 'poke', 'reset', 'power', 'symbols', 'timing'];
+        return commands
+            .map(cmd => ({ cmd, distance: this.levenshtein(input, cmd) }))
+            .filter(res => res.distance <= 2)
+            .sort((a, b) => a.distance - b.distance)[0]?.cmd;
     }
 };
 

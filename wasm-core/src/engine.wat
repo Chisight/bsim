@@ -18,13 +18,29 @@
   (global $MEM_OFFSET (mut i32) (i32.const 0))
 
   ;; -----------------------------------------------------------------------
-  ;; ATOMIC PRIMITIVE: $nand
-  ;; Strict 1-bit: only (1 AND 1) -> 0, everything else -> 1
+  ;; [AUDIT: v1.24.95 | SEC_ARCH_LEAD] - Parallelizing the combinatorial settle phase.
+  ;; @ARCH: SIMD_KERNEL
+  ;; @INTENT: Evaluate 4 NAND operations in parallel using 128-bit SIMD vectors.
   ;; -----------------------------------------------------------------------
-  ;; [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for NAND primitive.
-  ;; @ARCH: ATOMIC_PRIMITIVE
-  ;; @CONSTRAINT: TRUTH_TABLE
-  ;; @INTENT: Define the fundamental logical NAND operation as the system's singular primitive.
+  (func $tick_simd (param $count i32)
+    (local $i i32)
+    (loop $batch_loop
+      ;; Grouping independent gates into 128-bit batches.
+      ;; Note: This requires instructions to be pre-sorted or nodes to be contiguous.
+      (i32.add (global.get $REGION_A_BASE) (i32.add (local.get $i) (i32.const 32)))
+      (v128.not 
+        (v128.and 
+          (v128.load (i32.add (global.get $REGION_A_BASE) (local.get $i)))
+          (v128.load (i32.add (global.get $REGION_A_BASE) (i32.add (local.get $i) (i32.const 16))))
+        )
+      )
+      v128.store
+      
+      (local.set $i (i32.add (local.get $i) (i32.const 16)))
+      (br_if $batch_loop (i32.lt_u (local.get $i) (local.get $count)))
+    )
+  )
+
   (func $nand (param $a i32) (param $b i32) (result i32)
     local.get $a
     i32.const 1
@@ -325,6 +341,16 @@
         global.get $REGION_E_BASE local.get $target_addr i32.add
         global.get $REGION_E_BASE local.get $target_addr i32.add i32.load i32.const 1 i32.add
         i32.store
+
+        ;; [AUDIT: v1.24.95 | SEC_ARCH_LEAD] - Combinatorial Oscillation Watchdog Stability Enforcement.
+        ;; If the state changed during Phase 0 (Settling), check for runaway switching activity.
+        local.get $eval_seq i32.const 0 i32.eq
+        (if (then
+            global.get $REGION_E_BASE local.get $target_addr i32.add i32.load
+            i32.const 1000
+            i32.gt_u
+            (if (then unreachable)) 
+        ))
       ))
       
       local.get $target_addr local.get $data i32.store

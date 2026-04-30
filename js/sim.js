@@ -1535,9 +1535,19 @@ const Sim = {
             isActive = (n.state === 1);
             isZero = (n.state === 0);
             isFloat = false;
+
+            // [AUDIT: v1.24.95 | SEC_ARCH_LEAD] - Phase-Rotation logic for mechanical-style visual cues.
+            const arm = el.querySelector('.indicator-arm');
+            if (arm) {
+                // If the simulation is running, rotate the arm based on current tick count or state
+                // Using node.id and state to create a deterministic but "moving" rotation
+                const angle = (n.state === 1) ? 180 : 90; 
+                arm.style.transform = `rotate(${angle}deg)`;
+            }
         }
 
-        el.classList.toggle('active', isActive);
+        // [AUDIT: v1.24.95 | SEC_ARCH_LEAD] - Clamped 'active' class flash for Clocks to eliminate visual fatigue.
+        el.classList.toggle('active', isActive && n.type !== 'CLOCK');
         el.classList.toggle('inactive', isZero && !isActive && !isFloat);
         el.classList.toggle('floating', isFloat);
 

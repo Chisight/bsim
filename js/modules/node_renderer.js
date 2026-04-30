@@ -66,7 +66,19 @@ const NodeRenderer = {
         }
  else {
             if (node.type === 'JUNCTION') portsHtml = `<div class="port input output" data-port="j" style="top:50%;left:50%;transform:translate(-50%,-50%)" onmousedown="if(!Sim.wiring.active) return; event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'j')"></div>`;
-            else if (node.type === 'CLOCK') portsHtml = `<div class="port output" data-port="out0" style="top:50%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out0')"><span class="port-label">CLK</span></div>`;
+            else if (node.type === 'CLOCK') {
+                portsHtml = `
+                    <div class="port output" data-port="out0" style="top:50%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out0')">
+                        <span class="port-label">CLK</span>
+                    </div>
+                    <div class="clock-indicator-wrap" style="position:absolute; top:4px; right:4px; width:12px; height:12px;">
+                        <svg viewBox="0 0 12 12" style="width:100%; height:100%;">
+                            <circle cx="6" cy="6" r="5" fill="none" stroke="#00FF00" stroke-width="1"/>
+                            <line class="indicator-arm" x1="6" y1="6" x2="6" y2="2" stroke="#00FF00" stroke-width="1.5" stroke-linecap="round" style="transform-origin: 6px 6px; transition: transform 0.1s linear;"/>
+                        </svg>
+                    </div>
+                `;
+            }
             else if (['NAND', 'AND', 'OR', 'NOR', 'XOR', 'XNOR'].includes(node.type)) {
                 portsHtml = `
                     <div class="port input" data-port="a" style="top:42%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'a')"><span class="port-label">A</span></div>
