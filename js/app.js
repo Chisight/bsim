@@ -137,7 +137,8 @@ window.onload = () => {
     // [AUDIT: v1.24.68 | SEC_ARCH_LEAD] - Purged global contextmenu listener causing illegal menu appends under the Delete entry.
     // [AUDIT: v1.24.69 | SEC_ARCH_LEAD] - Synchronized RAM driver resolution and hardened terminal Assertions with Wasm memory probing.
     // [AUDIT: v1.24.70 | SEC_ARCH_LEAD] - Refined Assert primitive to use getDrivingSignal for input port fallbacks.
-    window.LOADED_BSIM_VERSION = "1.24.70";
+    // [AUDIT: v1.24.71 | SEC_ARCH_LEAD] - Hardened persistence layer with deep state sanitization and global context purging.
+    window.LOADED_BSIM_VERSION = "1.24.71";
 
     // [AUDIT: SEC_ARCH_LEAD] - JIT Patch: Dynamically extend capabilities via global scope interceptors to prevent core module desync.
     setTimeout(() => {

@@ -254,9 +254,23 @@ const ProjectManager = {
             mainWires = Sim.workspaceStack[0].wires;
         }
 
+        // [AUDIT: v1.24.46 | SEC_ARCH_LEAD] - Execute deep state sanitization to purge circular DOM references prior to JSON serialization.
+        const cNodes = mainNodes.map(n => Sim._cleanNode(n)).filter(n => n !== null);
+        const cWires = mainWires.map(w => Sim._cleanWire(w)).filter(w => w !== null);
+        const cLib = {};
+        Object.keys(Sim.library).forEach(k => {
+            if (Sim.library[k]) {
+                cLib[k] = {
+                    nodes: (Sim.library[k].nodes || []).map(n => Sim._cleanNode(n)).filter(n => n !== null),
+                    wires: (Sim.library[k].wires || []).map(w => Sim._cleanWire(w)).filter(w => w !== null),
+                    folder: Sim.library[k].folder || ''
+                };
+            }
+        });
+
         const project = { 
-            nodes: mainNodes, wires: mainWires, library: Sim.library,
-            meta: { version: "1.24.00-Modular", exportedAt: new Date().toISOString() }
+            nodes: cNodes, wires: cWires, library: cLib,
+            meta: { version: (window.LOADED_BSIM_VERSION || "1.24.46") + "-Modular", exportedAt: new Date().toISOString() }
         };
         
         const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
@@ -286,19 +300,40 @@ const ProjectManager = {
                 try {
                     let data = JSON.parse(re.target.result);
                     data = this._normalizeData(data);
+                    
+                    // [AUDIT: v1.24.46 | SEC_ARCH_LEAD] - Purge global contextual states to prevent phantom tab desynchronization and editor lockups upon ingestion.
                     Sim.library = data.library || {};
                     Sim.nodes = [];
                     Sim.wires = [];
+                    Sim.workspaceStack = [];
+                    Sim.activeEditingChip = null;
+                    Sim.activeSplitChip = null;
+                    
+                    const exitBtn = document.getElementById('btn-exit-chip');
+                    if (exitBtn) exitBtn.style.display = 'none';
+
                     document.getElementById('scene').innerHTML = '';
-                    Sim.updateLibraryUI();
                     
                     if (data.nodes) {
-                        data.nodes.forEach(n => { Sim.nodes.push(n); NodeRenderer.renderNode(n); });
-                        Sim.wires = data.wires || [];
-                        WireRenderer.drawWires();
+                        data.nodes.forEach(n => { 
+                            const c = Sim._cleanNode(n);
+                            if (c) {
+                                Sim.nodes.push(c); 
+                                if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(c); 
+                            }
+                        });
+                        Sim.wires = (data.wires || []).map(w => Sim._cleanWire(w)).filter(w => w !== null);
+                        if (typeof WireRenderer !== 'undefined') WireRenderer.drawWires();
                     }
+                    
+                    Sim.tabs = [{ id: 'tab-1', name: 'Main', nodes: Sim.nodes.map(n => Sim._cleanNode(n)), wires: Sim.wires.map(w => Sim._cleanWire(w)), historyStack: [], historyIndex: -1 }];
+                    Sim.activeTabId = 'tab-1';
+                    if (typeof Sim.updateTabsUI === 'function') Sim.updateTabsUI();
+
+                    Sim.updateLibraryUI();
                     Sim.seedQueue();
                     Sim.processQueue();
+                    Sim.autoSave();
                 } catch (err) {
                     Sim.modal('Import Failed', 'Invalid .bsim file format.', 'alert');
                 }
