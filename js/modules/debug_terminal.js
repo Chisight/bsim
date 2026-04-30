@@ -1022,7 +1022,7 @@ const DebugTerminal = {
                         if (window.WasmEngine && WasmEngine.ready && !Sim._netlistDirty) {
                             bit = WasmEngine.readPinState(sn.id, `in${i}`) || WasmEngine.readPinState(sn.id, `out${i}`);
                         } else {
-                            bit = ctx.simObj.getSignal(sn.id, `in${i}`) || ctx.simObj.getSignal(sn.id, `out${i}`);
+                            bit = ctx.simObj.getDrivingSignal(sn.id, `in${i}`) || ctx.simObj.getSignal(sn.id, `out${i}`);
                         }
                         if (bit === 1) val |= (1 << i);
                     }
