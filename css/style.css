@@ -219,8 +219,9 @@ nav .sub-menu .menu-item::after { display: none; }
 
 .inline-dot { width: 6px; height: 6px; margin: 0; pointer-events: auto; }
 
+/* [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Expanded logical interaction hitboxes for macro port connectivity. */
 .port {
-    position: absolute; width: 10px; height: 10px;
+    position: absolute; width: 18px; height: 18px;
     background: radial-gradient(circle at center, #555 var(--port-size, 40%), transparent calc(var(--port-size, 40%) + 1%));
     border-radius: 50%; cursor: crosshair; transform: translateY(-50%); z-index: 110; pointer-events: auto;
 }

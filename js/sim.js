@@ -1269,9 +1269,14 @@ const Sim = {
      * @STATE: NODE_INITIALIZATION
      * @INTENT: Construct the internal node object representation and trigger the AddNodeCommand.
      */
-    _finalizeAddNode(type, x, y, label) {
+    // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Injected deterministic ID parameterization for deterministic terminal commands.
+    _finalizeAddNode(type, x, y, label, preferredId = null) {
+        const id = (preferredId && !this.nodes.some(n => n.id === preferredId)) 
+            ? preferredId 
+            : 'node-' + Math.random().toString(36).substr(2, 9);
+            
         const node = {
-            id: 'node-' + Math.random().toString(36).substr(2, 9),
+            id: id,
             type, x, y, label: label || type, val: 0,
             state: (type.includes('-1') || type === 'CLOCK' || type === 'DFF' || type === 'TFF') ? 0 : (new Array(parseInt(type.split('-')[1]) || 1).fill(0)),
             outputs: {}, lastClk: 0,

@@ -155,7 +155,8 @@ window.onload = () => {
     // [AUDIT: v1.24.44 | SEC_ARCH_LEAD] - Version increment for context menu nomenclature synchronization (Dots -> LEDs).
     // [AUDIT: v1.24.45 | SEC_ARCH_LEAD] - Version increment for script shorthand extension support (.bsims).
     // [AUDIT: v1.24.46 | SEC_ARCH_LEAD] - Version increment for deletion logic encapsulation (Sim.deleteSelection).
-    window.LOADED_BSIM_VERSION = "1.24.46";
+    // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Version increment for deterministic IDs, label-based terminal lookup, and hitbox expansions.
+    window.LOADED_BSIM_VERSION = "1.24.47";
 
     // [AUDIT: SEC_ARCH_LEAD] - Injected passive workspace boundary validation to catch upgrade mismatches.
     window.addEventListener('load', () => {

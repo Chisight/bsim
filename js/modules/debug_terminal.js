@@ -943,10 +943,12 @@ const DebugTerminal = {
                 }
                 break;
             }
+            // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Modified lookup behavior to safely map generic aliases to nodes to support scripted automation paths.
             case 'set': {
                 if (args.length < 3) return this.print("Usage: set <nodeId> <value>", "err");
                 const ctx = this.getContext();
-                const sn = ctx.nodes.find(n => n.id === args[1] || n.id === `node-${args[1]}`);
+                let sn = ctx.nodes.find(n => n.id === args[1] || n.id === `node-${args[1]}`);
+                if (!sn) sn = ctx.nodes.find(node => node.label === args[1]);
                 if (!sn) return this.print(`Node ${args[1]} not found.`, "err");
                 const val = parseInt(args[2]);
                 if (isNaN(val)) return this.print("Value must be a number.", "err");
