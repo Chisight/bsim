@@ -6,7 +6,7 @@ bSim is a high-performance, modular digital logic simulator built for the web. I
 
 - **Hybrid Simulation Engine**: Utilizes a high-frequency WebAssembly (WASM) kernel for O(1) signal propagation in pure-native circuits, with a robust V8 object-graph fallback for mixed-mode simulation.
 - **Independent Popup Editor**: (New in v1.24.40) Robust window management for sub-circuits, featuring multi-directional custom edge resizers, minimize/restore states, and pointer-event shielding for uninterruptible editing.
-- **Debug Terminal & Scripting**: (New in v1.24.41) Integrated Linux-style CLI for real-time telemetry, advanced diagnostic control, and `.bsimscript` batch processing for automated circuit verification.
+- **Debug Terminal & Scripting**: (New in v1.24.41) Integrated Linux-style CLI for real-time telemetry, advanced diagnostic control, and `.bsims` batch processing for automated circuit verification. See [SCRIPTING.md](./SCRIPTING.md) for the full guide.
 - **Modular Preferences Window**: A standalone, draggable configuration suite with global animation suppression for performance-critical simulation environments.
 - **Smart Wire Routing**: (New in v1.24.44) Intelligent auto-routing takeover for boundary wires during component translation, ensuring topological clean-up while preserving custom routing for isolated networks.
 - **MRAP Diagnostic Hardening**: Full codebase instrumentation with `@ARCH` architectural tags and high-density `EXIT_TRACE` markers for zero-trust state observability and deterministic layout history.
