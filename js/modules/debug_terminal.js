@@ -468,6 +468,7 @@ const DebugTerminal = {
             <div style="height:1px; background:#334; margin:4px 0;"></div>
             <div class="dt-menu-item" onclick="window.open(window.location.href, '_blank')">New Tab</div>
             <div class="dt-menu-item" onclick="DebugTerminal.saveContents()">Save Contents</div>
+            <div class="dt-menu-item" onclick="DebugTerminal.importScript()">Import Script</div>
             <div class="dt-menu-item" onclick="DebugTerminal.exec('clear')">Clear Terminal</div>
         `;
         menu.style.left = x + 'px';
@@ -488,6 +489,33 @@ const DebugTerminal = {
         a.download = 'bsim_terminal_log.txt';
         a.click();
         this.print("Terminal contents saved.", "ok");
+    },
+
+    // [AUDIT: v1.24.37 | SEC_ARCH_LEAD] - Injected CLI script batch processor.
+    importScript() {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.txt,.bsimscript,.sh,.js';
+        input.onchange = e => {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = ev => {
+                const lines = ev.target.result.split('\n');
+                let count = 0;
+                this.print(`--- EXECUTING SCRIPT: ${file.name} ---`, 'warn');
+                lines.forEach(line => {
+                    const cmd = line.trim();
+                    if (cmd && !cmd.startsWith('#') && !cmd.startsWith('//')) {
+                        this.exec(cmd);
+                        count++;
+                    }
+                });
+                this.print(`--- SCRIPT COMPLETE (${count} commands) ---`, 'ok');
+            };
+            reader.readAsText(file);
+        };
+        input.click();
     },
 
     // [AUDIT: v1.24.06 | SEC_ARCH_LEAD] - Polyfilled node highlighting to transcend iframe boundaries.
