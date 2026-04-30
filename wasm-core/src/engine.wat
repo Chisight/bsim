@@ -264,8 +264,6 @@
           )
         )
       )
-      )
-      )
       i32.store
           local.get $i i32.const 1 i32.add local.set $i
           br $eval_loop
