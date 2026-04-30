@@ -495,7 +495,7 @@ const DebugTerminal = {
     importScript() {
         const input = document.createElement('input');
         input.type = 'file';
-        input.accept = '.txt,.bsimscript,.sh,.js';
+        input.accept = '.txt,.bsimscript,.bsims,.sh,.js';
         input.onchange = e => {
             const file = e.target.files[0];
             if (!file) return;

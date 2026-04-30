@@ -40,3 +40,4 @@ modular_sim_audit_scratchpad.md
 # Audit Logs and Markdown
 *.md
 !README.md
+!SCRIPTING.md

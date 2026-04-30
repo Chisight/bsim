@@ -153,7 +153,8 @@ window.onload = () => {
     // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Version increment for LED edit mode regression patch and forced UI nomenclature adjustment.
     // [AUDIT: v1.24.43 | SEC_ARCH_LEAD] - Version increment for legacy edit mode dispatch interception.
     // [AUDIT: v1.24.44 | SEC_ARCH_LEAD] - Version increment for context menu nomenclature synchronization (Dots -> LEDs).
-    window.LOADED_BSIM_VERSION = "1.24.44";
+    // [AUDIT: v1.24.45 | SEC_ARCH_LEAD] - Version increment for script shorthand extension support (.bsims).
+    window.LOADED_BSIM_VERSION = "1.24.45";
 
     // [AUDIT: SEC_ARCH_LEAD] - Injected passive workspace boundary validation to catch upgrade mismatches.
     window.addEventListener('load', () => {
