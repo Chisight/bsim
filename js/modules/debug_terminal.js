@@ -1019,22 +1019,29 @@ const DebugTerminal = {
                 const bits = parseInt(sn.type.split('-')[1]) || 1;
                 const isGenericPort = !(/\d/.test(args[2])) && args[2] !== 'clk' && args[2] !== 'we';
 
-                if (bits > 1 && isGenericPort) {
-                    // Aggregate full bus value for multi-bit nodes
+                if (isGenericPort) {
+                    // [AUDIT: v1.24.73 | SEC_ARCH_LEAD] - Generic port assert resolution improved for OUT-1/IN-1 and bus ports to prevent 1-bit strict-lookup failures.
                     let val = 0;
                     for (let i = 0; i < bits; i++) {
-                        let bit;
+                        let bit = null;
                         if (window.WasmEngine && WasmEngine.ready && !Sim._netlistDirty) {
-                            bit = WasmEngine.readPinState(sn.id, `in${i}`) || WasmEngine.readPinState(sn.id, `out${i}`);
+                            bit = WasmEngine.readPinState(sn.id, `in${i}`);
+                            if (bit === null || bit === undefined) bit = WasmEngine.readPinState(sn.id, `out${i}`);
+                            if (bit === null || bit === undefined) bit = WasmEngine.readPinState(sn.id, 'out');
                         } else {
-                            bit = ctx.simObj.getDrivingSignal(sn.id, `in${i}`) || ctx.simObj.getSignal(sn.id, `out${i}`);
+                            bit = ctx.simObj.getDrivingSignal(sn.id, `in${i}`);
+                            if (bit === null || bit === undefined) bit = ctx.simObj.getSignal(sn.id, `out${i}`);
+                            if (bit === null || bit === undefined) bit = ctx.simObj.getSignal(sn.id, 'out');
                         }
                         if (bit === 1) val |= (1 << i);
                     }
                     actVal = val;
                 } else {
-                    if (window.WasmEngine && WasmEngine.ready && !Sim._netlistDirty) actVal = WasmEngine.readPinState(sn.id, args[2]);
-                    else actVal = ctx.simObj.getSignal(sn.id, args[2]);
+                    if (window.WasmEngine && WasmEngine.ready && !Sim._netlistDirty) {
+                        actVal = WasmEngine.readPinState(sn.id, args[2]);
+                    } else {
+                        actVal = args[2].startsWith('in') ? ctx.simObj.getDrivingSignal(sn.id, args[2]) : ctx.simObj.getSignal(sn.id, args[2]);
+                    }
                 }
 
                 if (actVal !== expVal) {

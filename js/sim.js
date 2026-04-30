@@ -1279,6 +1279,30 @@ const Sim = {
                     nVal = { q: inner.state, nq: inner.state === 1 ? 0 : 1 };
                 } else if (inner.type === 'JUNCTION') {
                     nVal = getDrive(inner.id, 'j');
+                } else if (inner.type === 'ROM') {
+                    // [AUDIT: v1.24.73 | SEC_ARCH_LEAD] - Internal macro sub-simulation logic applied for ROM.
+                    let addr = 0;
+                    const pins = inner.addressPins || 4;
+                    for (let i = 0; i < pins; i++) if (getDrive(inner.id, `in${i}`) === 1) addr |= (1 << i);
+                    const data = (inner.memoryData && inner.memoryData.length > addr) ? inner.memoryData[addr] : 0;
+                    const outObj = {};
+                    for (let i = 0; i < 8; i++) outObj[`out${i}`] = (data & (1 << i)) ? 1 : 0;
+                    nVal = outObj;
+                } else if (inner.type === 'RAM') {
+                    // [AUDIT: v1.24.73 | SEC_ARCH_LEAD] - Internal macro sub-simulation logic applied for RAM.
+                    let addr = 0;
+                    const pins = inner.addressPins || 4;
+                    for (let i = 0; i < pins; i++) if (getDrive(inner.id, `in${i}`) === 1) addr |= (1 << i);
+                    if (getDrive(inner.id, 'we') === 1) {
+                        let din = 0;
+                        for (let i = 0; i < 8; i++) if (getDrive(inner.id, `din${i}`) === 1) din |= (1 << i);
+                        if (!inner.memoryData) inner.memoryData = [];
+                        inner.memoryData[addr] = din;
+                    }
+                    const data = (inner.memoryData && inner.memoryData.length > addr) ? inner.memoryData[addr] : 0;
+                    const outObj = {};
+                    for (let i = 0; i < 8; i++) outObj[`out${i}`] = (data & (1 << i)) ? 1 : 0;
+                    nVal = outObj;
                 } else if (inner.type.startsWith('OUT-') || inner.type.startsWith('PROBE-')) {
                     const bits = parseInt(inner.type.split('-')[1]) || 1;
                     if (bits === 1) {
