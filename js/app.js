@@ -148,7 +148,20 @@ window.onload = () => {
     // [AUDIT: v1.24.79 | SEC_ARCH_LEAD] - Polyfilled instance memory for V8 hierarchical state retention, eradicating O(N) tick penalties and enforcing engine parity.
     // [AUDIT: v1.24.80 | SEC_ARCH_LEAD] - V8 bus resolution architecture updated to match Wasm TTL logic (1 > 0 > Z) and missing memory drivers whitelisted.
     // [AUDIT: v1.24.81 | SEC_ARCH_LEAD] - Injected strict physical boundary masks for Wasm linear memory lookups to prevent OOB traps.
-    window.LOADED_BSIM_VERSION = "1.24.81";
+    // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - Synthesized native Wasm TRISTATE parity, orphaned wire cascading purges, and rigid undo heap limits.
+    window.LOADED_BSIM_VERSION = "1.24.82";
+
+    // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Enforce ring-buffer limits on the History stack to prevent V8 heap exhaustion during macro execution.
+    if (window.History) {
+        const _origPush = History.execute.bind(History);
+        History.execute = function(cmd) {
+            _origPush(cmd);
+            if (History.stack && History.stack.length > 250) {
+                History.stack.shift();
+                History.index--;
+            }
+        };
+    }
 
     // [AUDIT: v1.24.76 | SEC_ARCH_LEAD] - JIT interceptor to prevent aggressive serialization filters from destroying RAM/ROM parametric data and UI dimensions.
     if (window.Sim && typeof Sim._cleanNode === 'function') {

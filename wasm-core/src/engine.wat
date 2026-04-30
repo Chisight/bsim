@@ -183,11 +183,19 @@
                       (if (result i32)
                         (then local.get $val_a)
                         (else 
-                          local.get $opcode i32.const 8 i32.eq
+                          local.get $opcode i32.const 3 i32.eq
                           (if (result i32)
-                            (then local.get $val_a global.set $MEM_OFFSET i32.const 0)
+                            (then
+                              ;; [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - OP 3: Native TRISTATE Evaluation. (If Enable == 1, pass Input, else High-Z).
+                              local.get $val_b i32.const 1 i32.eq
+                              (if (result i32) (then local.get $val_a) (else i32.const 2))
+                            )
                             (else 
-                              local.get $opcode i32.const 11 i32.eq
+                              local.get $opcode i32.const 8 i32.eq
+                              (if (result i32)
+                                (then local.get $val_a global.set $MEM_OFFSET i32.const 0)
+                                (else 
+                                  local.get $opcode i32.const 11 i32.eq
                               (if (result i32)
                                 (then
                                   local.get $val_a i32.const 1 i32.eq
@@ -205,6 +213,7 @@
                               )
                             )
                           )
+                        )
                         )
                       )
                     )
