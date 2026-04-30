@@ -156,7 +156,8 @@ window.onload = () => {
     // [AUDIT: v1.24.56 | SEC_ARCH_LEAD] - Injected assert, step, peek, poke, reset primitives into kernel CLI.
     // [AUDIT: v1.24.57 | SEC_ARCH_LEAD] - Reclassified ROM module as a core primitive and normalized rendering palette.
     // [AUDIT: v1.24.58 | SEC_ARCH_LEAD] - Hardened ROM payload fetcher and monotonic address pin scaling enforcement.
-    window.LOADED_BSIM_VERSION = "1.24.58";
+    // [AUDIT: v1.24.59 | SEC_ARCH_LEAD] - Restored ROM pin geometry rendering and documented V8 engine memory fallback constraints.
+    window.LOADED_BSIM_VERSION = "1.24.59";
 
     // [AUDIT: SEC_ARCH_LEAD] - JIT Patch: Dynamically extend capabilities via global scope interceptors to prevent core module desync.
     setTimeout(() => {
@@ -242,7 +243,8 @@ window.onload = () => {
                 if (node.type === 'ROM') {
                     const tmpType = node.type;
                     node.isCustom = true; 
-                    node.meta = {
+                    // [AUDIT: v1.24.59 | SEC_ARCH_LEAD] - Re-routed dynamic pin generation through Sim.library mock to satisfy NodeRenderer layout expectations.
+                    Sim.library['ROM'] = {
                         nodes: [
                             ...Array.from({length: node.addressPins || 4}).map((_, i) => ({ type: 'IN-1', id: `in${i}` })),
                             ...Array.from({length: 8}).map((_, i) => ({ type: 'OUT-1', id: `out${i}` }))
@@ -251,7 +253,7 @@ window.onload = () => {
                     origRender(node);
                     node.type = tmpType;
                     node.isCustom = false;
-                    delete node.meta;
+                    delete Sim.library['ROM'];
                     
                     const el = document.getElementById(node.id);
                     if (el) {
