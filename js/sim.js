@@ -86,7 +86,8 @@ const Sim = {
         const runQueue = () => {
             const now = performance.now();
             
-            const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
+            // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Synchronized Wasm whitelist to include Memory Primitives for native execution.
+            const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'ROM', 'RAM']);
             const checkPure = (nodes) => nodes.every(n => {
                 if (validWasmTypes.has(n.type)) return true;
                 if (n.isCustom && this.library[n.type]) return checkPure(this.library[n.type].nodes);
@@ -712,7 +713,8 @@ const Sim = {
         // Wasm engine intercept
         if (this.useWasm && window.WasmEngine && WasmEngine.ready) {
             // Synchronized native primitive whitelist
-            const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
+            // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Synchronized Wasm whitelist to include Memory Primitives for native execution.
+            const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'ROM', 'RAM']);
             const checkPure = (nodes) => nodes.every(n => {
                 if (validWasmTypes.has(n.type)) return true;
                 if (n.isCustom && this.library && this.library[n.type]) return checkPure(this.library[n.type].nodes);
@@ -989,7 +991,8 @@ const Sim = {
         // Wait 50ms for the toast to render
         await new Promise(resolve => setTimeout(resolve, 50));
         // validate that the netlist is pure native
-        const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
+        // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Synchronized Wasm whitelist to include Memory Primitives for native execution.
+        const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'ROM', 'RAM']);
         const checkPure = (nodes) => nodes.every(n => {
             if (validWasmTypes.has(n.type)) return true;
             if (n.isCustom && this.library && this.library[n.type]) return checkPure(this.library[n.type].nodes);
@@ -1343,6 +1346,7 @@ const Sim = {
         };
         // [AUDIT: v1.24.53 | SEC_ARCH_LEAD] - Injected ROM native component type to allow bypass of custom chip verifications.
         // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Formally classified RAM as a native primitive to ensure linear memory execution priority.
+        // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Formally registered RAM as a core primitive to prevent macro-substitution logic.
         const NATIVE_TYPES = new Set(['NAND', 'CLOCK', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'JUNCTION', 'TRISTATE', 'DFF', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM', 'RAM']);
         if (this.library[type] && !NATIVE_TYPES.has(type)) { node.isCustom = true; }
         History.execute(new AddNodeCommand(node));
@@ -1815,7 +1819,8 @@ const Sim = {
         else if (pos === 'top-left') { hud.style.top = '15px'; hud.style.left = '15px'; hud.style.right = 'auto'; hud.style.bottom = 'auto'; hud.style.textAlign = 'left'; }
         else if (pos === 'bottom-left') { hud.style.bottom = '15px'; hud.style.left = '15px'; hud.style.right = 'auto'; hud.style.top = 'auto'; hud.style.textAlign = 'left'; }
 
-        const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
+        // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Synchronized Wasm whitelist to include Memory Primitives for native execution.
+        const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'ROM', 'RAM']);
         const checkPure = (nodes) => nodes.every(n => {
             if (validWasmTypes.has(n.type)) return true;
             if (n.isCustom && this.library && this.library[n.type]) return checkPure(this.library[n.type].nodes);

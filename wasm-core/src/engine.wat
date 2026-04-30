@@ -11,9 +11,9 @@
   (global $REGION_A_BASE i32 (i32.const 0))      ;; start of node states
   ;; [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Expanded instruction boundary to 1MB to prevent macro flattening overflows.
   (global $REGION_B_BASE i32 (i32.const 1048576))  ;; start of instructions
-  ;; [AUDIT: v1.24.60 | SEC_ARCH_LEAD] - Injected Region C boundary for contiguous ROM payload memory indexing.
-  (global $REGION_C_BASE i32 (i32.const 2097152))  ;; start of ROM binary payloads
-  (global $MEM_OFFSET (mut i32) (i32.const 0))  ;; [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Dynamic payload pointer for linear memory indexing.
+  ;; [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Injected Region C and Global Offset for native ROM/RAM addressing.
+  (global $REGION_C_BASE i32 (i32.const 2097152)) 
+  (global $MEM_OFFSET (mut i32) (i32.const 0))
 
   ;; -----------------------------------------------------------------------
   ;; ATOMIC PRIMITIVE: $nand
@@ -66,14 +66,8 @@
     (local $val_b i32)        ;; temp input b
     (local $target_addr i32)  ;; where we save the result
     (local $opcode i32)       ;; what we're doing
-    ;; [AUDIT: v1.24.60 | SEC_ARCH_LEAD] - Injected ROM local variables for memory addressing and bit unpacking.
-    (local $raw_a i32)
-    (local $raw_b i32)
-    (local $in_base i32)
-    (local $num_pins i32)
-    (local $addr i32)
-    (local $p i32)
-    (local $data i32)
+    ;; [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - ROM/RAM pipeline locals.
+    (local $raw_a i32) (local $raw_b i32) (local $in_base i32) (local $num_pins i32) (local $addr i32) (local $p i32) (local $data i32)
 
     i32.const 0
     local.set $i

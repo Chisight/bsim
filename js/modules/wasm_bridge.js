@@ -5,7 +5,7 @@ const WasmEngine = {
     REGION_A_OFFSET: 0,
     // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Align JS bridge with expanded 1MB Wasm instruction boundary.
     REGION_B_OFFSET: 262144, // 1048576 bytes / 4 bytes per Int32
-    // [AUDIT: v1.24.60 | SEC_ARCH_LEAD] - Align JS bridge with newly injected 2MB Region C instruction boundary for contiguous memory.
+    // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Defined Region C (Memory Heap) offset for ROM/RAM payloads.
     REGION_C_OFFSET: 524288, // 2097152 bytes / 4 bytes per Int32
     instructionCount: 0,
     idMap: new Map(), // nodeId -> wasmIdx (Region A)
@@ -205,10 +205,8 @@ const WasmEngine = {
 
         // 4. Build the linear execution array
         const OP_NAND = 0; const OP_DFF = 1; const OP_CLOCK = 2; const OP_TRISTATE = 3; const OP_TFF = 4;
-        const OP_ROM = 5; const OP_BUFFER = 6;
-        // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Assigned Opcode 7 for native Wasm Synchronous RAM execution.
-        const OP_RAM = 7;
-        const OP_SET_OFFSET = 8;
+        // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Injected Memory and Offset Opcodes for Kernel Parity.
+        const OP_ROM = 5; const OP_BUFFER = 6; const OP_RAM = 7; const OP_SET_OFFSET = 8;
         const OP_BUS_RESOLVE = 11;
 
         let virtualNodeCount = slot + 10;
