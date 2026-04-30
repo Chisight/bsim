@@ -820,14 +820,22 @@ const DebugTerminal = {
                     }
                 }
                 break;
-            case 'spawn':
-                if (!args[1]) return this.print("Usage: spawn <type> [x] [y]", "err");
+            case 'spawn': {
+                // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Deterministic node spawning via shell inline comments.
+                // [AUDIT: v1.24.48 | SEC_ARCH_LEAD] - Resolved zero-coordinate falsy evaluation bug causing spawn offset drift.
+                if (!args[1]) return this.print("Usage: spawn <type> [x] [y] [# id]", "err");
                 const type = args[1].toUpperCase();
-                const x = parseFloat(args[2]) || parseInt(View.x) + 100 || 0;
-                const y = parseFloat(args[3]) || parseInt(View.y) + 100 || 0;
-                Sim.addNode(type, x, y);
+                const parsedX = parseFloat(args[2]);
+                const parsedY = parseFloat(args[3]);
+                const x = !isNaN(parsedX) ? parsedX : ((window.View ? parseInt(View.x) : 0) + 100);
+                const y = !isNaN(parsedY) ? parsedY : ((window.View ? parseInt(View.y) : 0) + 100);
+                let prefId = null;
+                const hashIdx = args.indexOf('#');
+                if (hashIdx !== -1 && args[hashIdx + 1]) prefId = args[hashIdx + 1];
+                Sim.addNode(type, x, y, prefId || type, prefId);
                 this.print(`Spawned ${type} at ${x}, ${y}`, "ok");
                 break;
+            }
             case 'mkdir':
                 // [AUDIT: v1.24.03 | SEC_ARCH_LEAD] - VFS directory allocation.
                 let pFlag = args.includes('-p');
@@ -943,8 +951,8 @@ const DebugTerminal = {
                 }
                 break;
             }
-            // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Modified lookup behavior to safely map generic aliases to nodes to support scripted automation paths.
             case 'set': {
+                // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Alias-aware node resolution for automated scripting.
                 if (args.length < 3) return this.print("Usage: set <nodeId> <value>", "err");
                 const ctx = this.getContext();
                 let sn = ctx.nodes.find(n => n.id === args[1] || n.id === `node-${args[1]}`);

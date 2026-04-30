@@ -46,6 +46,17 @@ const Sim = {
     useWasm: true,
     _toastTimer: null,
     shortCircuitStrikes: 0,
+    _netlistDirty: false,
+
+    // [AUDIT: v1.24.52 | SEC_ARCH_LEAD] - Manual DOM/Memory synchronization escape hatch.
+    forceLayoutSync() {
+        this.autoSave();
+        this._netlistDirty = true;
+        this.updateWireVisuals();
+        this.seedQueue();
+        this.processQueue();
+        this.toast('Layout Memory Flushed & Resynchronized', 'success');
+    },
 
     // Preferences Logic
     snapNodes: true,
@@ -702,6 +713,12 @@ const Sim = {
                 const execDepth = Math.max(20, this.nodes.length);
                 const seqNodes = WasmEngine.flatNodes ? WasmEngine.flatNodes.filter(n => ['DFF', 'TFF', 'TRISTATE'].includes(n.type)) : [];
                 
+                // [AUDIT: v1.24.52 | SEC_ARCH_LEAD] - V8 Fallback Hook: Evaluate pure-JS Clock dependencies outside Wasm.
+                this.nodes.filter(n => n.type === 'CLOCK').forEach(n => {
+                    this.calculateNextState(n);
+                    WasmEngine.writeState(n.id, n.state);
+                });
+
                 for (let i = 0; i < execDepth; i++) {
                     WasmEngine.executeTick();
                     
@@ -1248,7 +1265,7 @@ const Sim = {
      * @IO: UI_MUTATION
      * @INTENT: Add a new node to the workspace with optional coordinate snapping and collision detection.
      */
-    addNode(type, x = null, y = null, label = null) {
+    addNode(type, x = null, y = null, label = null, preferredId = null) {
         if (x === null) {
             const scene = document.getElementById('scene');
             const sr = scene ? scene.getBoundingClientRect() : { left: 0, top: 0 };
@@ -1259,7 +1276,8 @@ const Sim = {
         }
         if (this.snapNodes) { x = Math.round(x / 20) * 20; y = Math.round(y / 20) * 20; }
         if (this.debugToasts) this.toast(`Added ${type} node`);
-        const newNode = this._finalizeAddNode(type, x, y, label || type);
+        // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Support deterministic ID injection.
+        const newNode = this._finalizeAddNode(type, x, y, label || type, preferredId);
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node added to workspace: ${newNode.id} (${type}).
         return newNode;
     },
@@ -1269,8 +1287,8 @@ const Sim = {
      * @STATE: NODE_INITIALIZATION
      * @INTENT: Construct the internal node object representation and trigger the AddNodeCommand.
      */
-    // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Injected deterministic ID parameterization for deterministic terminal commands.
     _finalizeAddNode(type, x, y, label, preferredId = null) {
+        // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Deterministic node instantiation.
         const id = (preferredId && !this.nodes.some(n => n.id === preferredId)) 
             ? preferredId 
             : 'node-' + Math.random().toString(36).substr(2, 9);

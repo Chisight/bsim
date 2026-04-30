@@ -150,13 +150,13 @@ window.onload = () => {
      * @INTENT: Define the application semantic versioning for runtime compatibility checks.
      */
     // [AUDIT: v1.24.41 | SEC_ARCH_LEAD] - Version increment for polished toast mechanics, dynamic preferences window, and terminal scripting.
-    // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Version increment for LED edit mode regression patch and forced UI nomenclature adjustment.
-    // [AUDIT: v1.24.43 | SEC_ARCH_LEAD] - Version increment for legacy edit mode dispatch interception.
-    // [AUDIT: v1.24.44 | SEC_ARCH_LEAD] - Version increment for context menu nomenclature synchronization (Dots -> LEDs).
-    // [AUDIT: v1.24.45 | SEC_ARCH_LEAD] - Version increment for script shorthand extension support (.bsims).
-    // [AUDIT: v1.24.46 | SEC_ARCH_LEAD] - Version increment for deletion logic encapsulation (Sim.deleteSelection).
-    // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Version increment for deterministic IDs, label-based terminal lookup, and hitbox expansions.
-    window.LOADED_BSIM_VERSION = "1.24.47";
+    // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Version increment for deterministic script ID propagation, interaction hitboxes, and wire deletion patches.
+    // [AUDIT: v1.24.48 | SEC_ARCH_LEAD] - Version increment for zero-coordinate falsy evaluation patch in CLI parser.
+    // [AUDIT: v1.24.49 | SEC_ARCH_LEAD] - Version increment for successful verification of deterministic execution macro-scripts.
+    // [AUDIT: v1.24.50 | SEC_ARCH_LEAD] - Version increment for port geometry restoration and transparent pseudo-element hitbox injection.
+    // [AUDIT: v1.24.51 | SEC_ARCH_LEAD] - Hitbox geometry restoration validated. Wasm logic engine confirmed deterministic.
+    // [AUDIT: v1.24.52 | SEC_ARCH_LEAD] - Version increment for V8 tick fallback parity sync injection and Force Layout Sync utility.
+    window.LOADED_BSIM_VERSION = "1.24.52";
 
     // [AUDIT: SEC_ARCH_LEAD] - Injected passive workspace boundary validation to catch upgrade mismatches.
     window.addEventListener('load', () => {

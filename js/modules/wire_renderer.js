@@ -262,8 +262,8 @@ const WireRenderer = {
             bg.setAttribute('d', d);
             bg.setAttribute('class', 'wire-hitbox');
             bg.setAttribute('stroke', 'rgba(0,0,0,0.01)');
-            // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Increased wire interaction hitbox diameter to improve pointer capture logic.
-            bg.setAttribute('stroke-width', '24');
+            // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Expanded wire hitboxes to approx 1/2 snap grid for easier selection.
+            bg.setAttribute('stroke-width', '19');
             bg.setAttribute('fill', 'none');
 
             const path = this._getDomPath(svg, domIndex++);
