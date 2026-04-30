@@ -150,6 +150,20 @@ const WasmEngine = {
         this.idMap.clear();
         this.instructionCount = 0;
 
+        // [AUDIT: v1.24.78 | SEC_ARCH_LEAD] - Instantiated O(1) hash map and wire adjacency lists for Wasm netlist traversal to eradicate O(N^2) array lookup deadlocks.
+        this._fastNodeMap = new Map();
+        this.flatNodes.forEach(n => this._fastNodeMap.set(n.id, n));
+        
+        this._fastWireAdj = new Map();
+        this.flatWires.forEach(w => {
+            const fKey = w.from.nodeId + ':' + w.from.portId;
+            const tKey = w.to.nodeId + ':' + w.to.portId;
+            if (!this._fastWireAdj.has(fKey)) this._fastWireAdj.set(fKey, []);
+            if (!this._fastWireAdj.has(tKey)) this._fastWireAdj.set(tKey, []);
+            this._fastWireAdj.get(fKey).push(w);
+            this._fastWireAdj.get(tKey).push(w);
+        });
+
         // Expanded Memory Matrix calculation based on flat nodes, not parents
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Ensure memory allocation accounts for 1MB instruction base.
         // [AUDIT: v1.24.60 | SEC_ARCH_LEAD] - Dynamic Region C allocation injected for linear Wasm payload bridging.
@@ -223,7 +237,7 @@ const WasmEngine = {
             let drivers = new Set();
 
             const checkDriver = (nId, pId) => {
-                const node = this.flatNodes.find(n => n.id === nId);
+                const node = this._fastNodeMap.get(nId);
                 if (!node) return;
                 const isInternalIO = (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) && nId.includes(':');
                 if (isInternalIO || node.type === 'JUNCTION') return;
@@ -240,7 +254,7 @@ const WasmEngine = {
                 if (visited.has(stepKey)) return;
                 visited.add(stepKey);
 
-                const node = this.flatNodes.find(n => n.id === currNodeId);
+                const node = this._fastNodeMap.get(currNodeId);
                 if (!node) return;
 
                 // [AUDIT: v1.23.60 | SEC_ARCH_LEAD] - Standardize proxy port mapping for hierarchical netlist traversal.
@@ -261,7 +275,8 @@ const WasmEngine = {
                     }
                 }
 
-                this.flatWires.forEach(w => {
+                const adjWires = this._fastWireAdj.get(stepKey) || [];
+                adjWires.forEach(w => {
                     if (w.to.nodeId === currNodeId && w.to.portId === currPortId) {
                         checkDriver(w.from.nodeId, w.from.portId);
                         trace(w.from.nodeId, w.from.portId);
@@ -344,7 +359,7 @@ const WasmEngine = {
                 if (visited.has(stepKey)) return;
                 visited.add(stepKey);
 
-                const node = this.flatNodes.find(n => n.id === currNodeId);
+                const node = this._fastNodeMap.get(currNodeId);
                 if (!node) return;
 
                 const isInternalIO = (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) && currNodeId.includes(':');
@@ -375,7 +390,8 @@ const WasmEngine = {
                     }
                 }
                 // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Trace wire connections to find drivers.
-                this.flatWires.forEach(w => {
+                const adjWires = this._fastWireAdj.get(stepKey) || [];
+                adjWires.forEach(w => {
                     if (w.to.nodeId === currNodeId && w.to.portId === currPortId) trace(w.from.nodeId, w.from.portId);
                     else if (w.from.nodeId === currNodeId && w.from.portId === currPortId) trace(w.to.nodeId, w.to.portId);
                 });
@@ -420,10 +436,10 @@ const WasmEngine = {
         let sortedNodes = [];
         let queue = [];
         inDegree.forEach((deg, id) => { if (deg === 0) queue.push(id); });
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Execute topological sort.
+        // [AUDIT: v1.24.78 | SEC_ARCH_LEAD] - Execute topological sort utilizing O(1) stack unwinding and constant-time hash map lookups.
         while (queue.length > 0) {
-            const u = queue.shift();
-            const node = this.flatNodes.find(n => n.id === u);
+            const u = queue.pop();
+            const node = this._fastNodeMap.get(u);
             if (node) sortedNodes.push(node);
             adjList.get(u).forEach(v => {
                 inDegree.set(v, inDegree.get(v) - 1);
@@ -696,7 +712,7 @@ const WasmEngine = {
 
         // Auto-resolve sterile proxy nodes to their evaluated hardware drivers
         if (this.flatNodes && this.flatWires) {
-            const startNode = this.flatNodes.find(n => n.id === targetNodeId);
+            const startNode = this._fastNodeMap ? this._fastNodeMap.get(targetNodeId) : this.flatNodes.find(n => n.id === targetNodeId);
             if (startNode && (startNode.type.startsWith('OUT-') || startNode.type.startsWith('PROBE-') || startNode.type === 'JUNCTION')) {
                 let visited = new Set();
                 const trace = (cId, cPort) => {
@@ -704,7 +720,7 @@ const WasmEngine = {
                     if (visited.has(key)) return null;
                     visited.add(key);
 
-                    const cNode = this.flatNodes.find(n => n.id === cId);
+                    const cNode = this._fastNodeMap ? this._fastNodeMap.get(cId) : this.flatNodes.find(n => n.id === cId);
                     if (!cNode) return null;
 
                     // [AUDIT: v1.24.69 | SEC_ARCH_LEAD] - Corrected Trace Logic to allow hierarchical pin reading from RAM buffers in the host UI.
@@ -743,7 +759,8 @@ const WasmEngine = {
                         }
                     }
 
-                    for (let w of this.flatWires) {
+                    const adjWires = this._fastWireAdj ? (this._fastWireAdj.get(key) || []) : this.flatWires.filter(w => (w.to.nodeId === cId && w.to.portId === cPort) || (w.from.nodeId === cId && w.from.portId === cPort));
+                    for (let w of adjWires) {
                         if (w.to.nodeId === cId && w.to.portId === cPort) {
                             const nxt = trace(w.from.nodeId, w.from.portId);
                             if (nxt) return nxt;
