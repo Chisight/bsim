@@ -820,14 +820,19 @@ const DebugTerminal = {
                     }
                 }
                 break;
-            case 'spawn':
-                if (!args[1]) return this.print("Usage: spawn <type> [x] [y]", "err");
+            // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Upgraded spawn command to parse inline hash comments as deterministic target IDs.
+            case 'spawn': {
+                if (!args[1]) return this.print("Usage: spawn <type> [x] [y] [# id]", "err");
                 const type = args[1].toUpperCase();
-                const x = parseFloat(args[2]) || parseInt(View.x) + 100 || 0;
-                const y = parseFloat(args[3]) || parseInt(View.y) + 100 || 0;
-                Sim.addNode(type, x, y);
+                const x = parseFloat(args[2]) || parseInt(window.View ? View.x : 0) + 100 || 0;
+                const y = parseFloat(args[3]) || parseInt(window.View ? View.y : 0) + 100 || 0;
+                let prefId = null;
+                const hashIdx = args.indexOf('#');
+                if (hashIdx !== -1 && args[hashIdx + 1]) prefId = args[hashIdx + 1];
+                Sim.addNode(type, x, y, prefId || type, prefId);
                 this.print(`Spawned ${type} at ${x}, ${y}`, "ok");
                 break;
+            }
             case 'mkdir':
                 // [AUDIT: v1.24.03 | SEC_ARCH_LEAD] - VFS directory allocation.
                 let pFlag = args.includes('-p');

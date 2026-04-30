@@ -1248,7 +1248,8 @@ const Sim = {
      * @IO: UI_MUTATION
      * @INTENT: Add a new node to the workspace with optional coordinate snapping and collision detection.
      */
-    addNode(type, x = null, y = null, label = null) {
+    // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Added deterministic preferredId propagation to component factory for script bindings.
+    addNode(type, x = null, y = null, label = null, preferredId = null) {
         if (x === null) {
             const scene = document.getElementById('scene');
             const sr = scene ? scene.getBoundingClientRect() : { left: 0, top: 0 };
@@ -1259,7 +1260,7 @@ const Sim = {
         }
         if (this.snapNodes) { x = Math.round(x / 20) * 20; y = Math.round(y / 20) * 20; }
         if (this.debugToasts) this.toast(`Added ${type} node`);
-        const newNode = this._finalizeAddNode(type, x, y, label || type);
+        const newNode = this._finalizeAddNode(type, x, y, label || type, preferredId);
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node added to workspace: ${newNode.id} (${type}).
         return newNode;
     },
