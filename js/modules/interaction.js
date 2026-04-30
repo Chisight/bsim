@@ -49,7 +49,7 @@ const InteractionHandler = {
                 nodePrefs = `
                     <div class="menu-item" style="color:var(--accent); font-weight:bold; cursor:default;">Node Prefs:</div>
                     ${(node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.isCustom) ? `
-                    <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-dots'); document.getElementById('context-menu').style.display='none';">↳ Edit Pin Dots</div>
+                    <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-leds'); document.getElementById('context-menu').style.display='none';">↳ Edit Pin LEDs</div>
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-labels'); document.getElementById('context-menu').style.display='none';">↳ Edit Pin Labels</div>
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-both'); document.getElementById('context-menu').style.display='none';">↳ Edit Both (Sync)</div>
                     ` : ''}
