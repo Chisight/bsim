@@ -167,9 +167,10 @@ const WasmEngine = {
         // Expanded Memory Matrix calculation based on flat nodes, not parents
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Ensure memory allocation accounts for 1MB instruction base.
         // [AUDIT: v1.24.60 | SEC_ARCH_LEAD] - Dynamic Region C allocation injected for linear Wasm payload bridging.
+        // [AUDIT: v1.24.83 | SEC_ARCH_LEAD] - Enforce physical powers-of-2 memory chunking to prevent out-of-bounds module bleeding.
         let romPayloadSize = 0;
         this.flatNodes.forEach(n => {
-            if (n.type === 'ROM' || n.type === 'RAM') romPayloadSize += (n.memoryData ? n.memoryData.length : 0);
+            if (n.type === 'ROM' || n.type === 'RAM') romPayloadSize += (1 << (n.addressPins || 4));
         });
         const requiredBytes = 2097152 + (this.flatNodes.length * 256) + romPayloadSize;
         const requiredPages = Math.ceil(requiredBytes / 65536);
@@ -533,24 +534,26 @@ const WasmEngine = {
                 let dataPacking = 0;
                 if (t === 'RAM') {
                     const dinBase = virtualNodeCount;
-                    virtualNodeCount += 8;
+                    // [AUDIT: v1.24.83 | SEC_ARCH_LEAD] - Prevent 24-bit pointer truncation by concatenating WE to the Data-In buffer block (+8).
+                    virtualNodeCount += 9;
                     for (let i = 0; i < 8; i++) {
                         emitOP(dinBase + i, buildBusTree(resolveAllDriverIndices(n.id, `din${i}`)), 0, OP_BUFFER);
                     }
-                    const weIdx = buildBusTree(resolveAllDriverIndices(n.id, 'we'));
-                    dataPacking = dinBase | (weIdx << 24);
+                    emitOP(dinBase + 8, buildBusTree(resolveAllDriverIndices(n.id, 'we')), 0, OP_BUFFER);
+                    dataPacking = dinBase; // Bypass bit-shifting, Wasm will offset by +8 natively
                 }
 
+                const allocSize = 1 << pins;
                 if (n.memoryData) {
-                    const view = new Uint8Array(this.memory.buffer, 2097152 + currentRomOffset, n.memoryData.length);
-                    view.set(n.memoryData);
+                    const view = new Uint8Array(this.memory.buffer, 2097152 + currentRomOffset, allocSize);
+                    view.set(n.memoryData.slice(0, allocSize)); // Safe truncation/expansion
                 }
                 
                 const addrPacking = addrBase | (pins << 24);
                 emitOP(0, currentRomOffset, 0, OP_SET_OFFSET);
                 emitOP(mapped[0], addrPacking, dataPacking, t === 'RAM' ? OP_RAM : OP_ROM);
                 
-                currentRomOffset += (n.memoryData ? n.memoryData.length : 0);
+                currentRomOffset += allocSize;
             } else if (t === 'DFF' || t === 'CLOCK' || t === 'TRISTATE' || t === 'TFF') {
                 let pm = { a: 'a', b: 'b' };
                 if (t === 'DFF') { pm.a = 'd'; pm.b = 'clk'; }

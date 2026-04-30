@@ -153,7 +153,8 @@
                       ;; [AUDIT: v1.24.81 | SEC_ARCH_LEAD] - RAM Address Boundary Clamp enforcement to prevent linear memory host traps.
                       i32.const 1 local.get $num_pins i32.shl i32.const 1 i32.sub local.get $addr i32.and local.set $addr
                       local.get $raw_b i32.const 0xFFFFFF i32.and local.set $in_base
-                      local.get $raw_b i32.const 24 i32.shr_u i32.const 4 i32.mul i32.load i32.const 1 i32.eq
+                      ;; [AUDIT: v1.24.83 | SEC_ARCH_LEAD] - Re-aligned WE evaluation to contiguous +8 memory offset to bypass 32-bit shift truncation.
+                      local.get $in_base i32.const 8 i32.add i32.const 4 i32.mul i32.load i32.const 1 i32.eq
                       (if (then
                         i32.const 0 local.set $data i32.const 0 local.set $p
                         (loop $ram_d_loop
