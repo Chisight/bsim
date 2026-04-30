@@ -1,0 +1,84 @@
+# =========================================================================
+# SCRIPT: RAM SYNCHRONOUS R/W VERIFICATION
+# @ARCH: MEMORY_SUBSYSTEM_STRESS
+# @INTENT: Verify OP_RAM opcode execution in Wasm/V8 engines.
+# =========================================================================
+
+rm all
+clear
+
+# --- 1. HARNESS PROVISIONING ---
+# Inputs: Address (4-bit), Data-In (8-bit), Write-Enable (1-bit)
+spawn IN-4 0 100  # node-addr
+spawn IN-8 0 250  # node-din
+spawn IN-1 0 450  # node-we
+
+# Logic: 8-Bit RAM (Default 4-bit address space)
+spawn RAM 400 200 # mem-core
+
+# Outputs: 8-Bit Data Bus
+spawn OUT-8 800 200 # bus-dout
+
+# --- 2. TOPOLOGICAL WIRING ---
+# Address Bus (A0 - A3)
+wire node-addr out0 mem-core in0
+wire node-addr out1 mem-core in1
+wire node-addr out2 mem-core in2
+wire node-addr out3 mem-core in3
+
+# Data Input Bus (D0 - D7)
+wire node-din out0 mem-core din0
+wire node-din out1 mem-core din1
+wire node-din out2 mem-core din2
+wire node-din out3 mem-core din3
+wire node-din out4 mem-core din4
+wire node-din out5 mem-core din5
+wire node-din out6 mem-core din6
+wire node-din out7 mem-core din7
+
+# Control Line
+wire node-we out0 mem-core we
+
+# Data Output Bus (Q0 - Q7)
+wire mem-core out0 bus-dout in0
+wire mem-core out1 bus-dout in1
+wire mem-core out2 bus-dout in2
+wire mem-core out3 bus-dout in3
+wire mem-core out4 bus-dout in4
+wire mem-core out5 bus-dout in5
+wire mem-core out6 bus-dout in6
+wire mem-core out7 bus-dout in7
+
+# --- 3. TEST VECTORS ---
+
+# PHASE A: Write 0xAA (170) to Address 0x05
+set node-addr 5
+set node-din 170
+set node-we 1
+sim
+# Release Write-Enable to latch
+set node-we 0
+sim
+
+# PHASE B: Write 0xBB (187) to Address 0x0A
+set node-addr 10
+set node-din 187
+set node-we 1
+sim
+set node-we 0
+sim
+
+# PHASE C: Read-Back Verification
+# Verify Address 5 still holds 170
+set node-addr 5
+set node-din 0
+sim
+assert bus-dout out 170
+
+# Verify Address 10 still holds 187
+set node-addr 10
+sim
+assert bus-dout out 187
+
+# --- 4. DIAGNOSTIC SUMMARY ---
+status

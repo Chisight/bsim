@@ -1001,16 +1001,37 @@ const DebugTerminal = {
                 this.print(`Advanced ${ticks} clock cycle(s).`, "ok");
                 break;
             case 'assert': {
-                // [AUDIT: v1.24.56 | SEC_ARCH_LEAD] - Deterministic script halting mechanism.
+                // [AUDIT: v1.24.69 | SEC_ARCH_LEAD] - Hardened Assert primitive with multi-bit Bus-Value aggregation and Wasm linear-memory probing.
                 if (args.length < 4) return this.print("Usage: assert <nodeId> <portId> <value>", "err");
                 const ctx = this.getContext();
                 let sn = ctx.nodes.find(n => n.id === args[1] || n.id === `node-${args[1]}`);
                 if (!sn) sn = ctx.nodes.find(node => node.label === args[1]);
                 if (!sn) return this.print(`Assert failed: Node ${args[1]} not found.`, "err");
+                
                 const expVal = parseInt(args[3]);
-                let actVal = null;
-                if (ctx.simObj && typeof ctx.simObj.getSignal === 'function') actVal = ctx.simObj.getSignal(sn.id, args[2]);
-                if (actVal === undefined || actVal === null) actVal = Array.isArray(sn.state) ? sn.state[parseInt(args[2].replace(/\D/g, '')) || 0] : sn.state;
+                let actVal;
+                
+                const bits = parseInt(sn.type.split('-')[1]) || 1;
+                const isGenericPort = !(/\d/.test(args[2])) && args[2] !== 'clk' && args[2] !== 'we';
+
+                if (bits > 1 && isGenericPort) {
+                    // Aggregate full bus value for multi-bit nodes
+                    let val = 0;
+                    for (let i = 0; i < bits; i++) {
+                        let bit;
+                        if (window.WasmEngine && WasmEngine.ready && !Sim._netlistDirty) {
+                            bit = WasmEngine.readPinState(sn.id, `in${i}`) || WasmEngine.readPinState(sn.id, `out${i}`);
+                        } else {
+                            bit = ctx.simObj.getSignal(sn.id, `in${i}`) || ctx.simObj.getSignal(sn.id, `out${i}`);
+                        }
+                        if (bit === 1) val |= (1 << i);
+                    }
+                    actVal = val;
+                } else {
+                    if (window.WasmEngine && WasmEngine.ready && !Sim._netlistDirty) actVal = WasmEngine.readPinState(sn.id, args[2]);
+                    else actVal = ctx.simObj.getSignal(sn.id, args[2]);
+                }
+
                 if (actVal !== expVal) {
                     this.print(`ASSERTION FAULT: ${sn.id}[${args[2]}] Expected ${expVal}, got ${actVal}`, "err");
                     throw new Error(`Assertion Fault: ${sn.id}[${args[2]}] !== ${expVal}`);
