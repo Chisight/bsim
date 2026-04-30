@@ -534,10 +534,14 @@ const Sim = {
      */
     calculateNextState(node) {
         if (node.isCustom) {
-            const chipDef = this.library[node.type];
+            // [AUDIT: v1.24.79 | SEC_ARCH_LEAD] - Polyfilled instance memory for V8 hierarchical state retention, enforcing engine parity for nested sequential logic.
+            if (!node.meta && this.library[node.type]) {
+                node.meta = JSON.parse(JSON.stringify(this.library[node.type]));
+            }
+            const chipDef = node.meta || this.library[node.type];
             if (!chipDef) return JSON.stringify(node.val);
             const ext = this._assembleChipInputs(chipDef, (portId) => this.getDrivingSignal(node.id, portId));
-            const internalRes = this.simulateInternalCircuit(node.type, ext);
+            const internalRes = this.simulateInternalCircuit(chipDef, ext);
             node.outputs = this._mapChipOutputs(chipDef, internalRes);
             return node.outputs;
         }
@@ -1172,15 +1176,15 @@ const Sim = {
     simulateInternalCircuit(chipTypeOrMeta, externalInputs) {
         // debug message
         if (this.debugToasts) console.debug(`[SimTrace] Executing Sub-Circuit: ${typeof chipTypeOrMeta === 'string' ? chipTypeOrMeta : 'Custom'} | Inputs:`, externalInputs);
-        let meta = typeof chipTypeOrMeta === 'string' ? this.library[chipTypeOrMeta] : chipTypeOrMeta.meta;
-        // if meta not found, return
-        if (!meta) {
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Sub-circuit simulation aborted, metadata missing for ${chipTypeOrMeta}.
-            return {};
-        }
+        
+        // [AUDIT: v1.24.79 | SEC_ARCH_LEAD] - Eradicated O(N) deep-copy instantiation loop. Sub-circuits now mutate persistent instance state memory to support nested sequential logic.
+        let meta = typeof chipTypeOrMeta === 'string' ? this.library[chipTypeOrMeta] : (chipTypeOrMeta.nodes ? chipTypeOrMeta : chipTypeOrMeta.meta);
+        if (!meta) return {};
 
-        // Use a deep copy for simulation to avoid corrupting the library definition
-        meta = JSON.parse(JSON.stringify(meta));
+        // Fallback protection: If evaluating from a raw string reference without instance state, instantiate an ephemeral copy to protect the library blueprint.
+        if (typeof chipTypeOrMeta === 'string') {
+            meta = JSON.parse(JSON.stringify(meta));
+        }
 
         meta.nodes.forEach(inner => {
             if (inner.type.startsWith('IN-')) {
@@ -1250,10 +1254,13 @@ const Sim = {
                 if (inner.type.startsWith('IN-')) return;
                 let nVal = 0;
                 if (inner.isCustom) {
-                    const innerChip = this.library[inner.type];
+                    if (!inner.meta && this.library[inner.type]) {
+                        inner.meta = JSON.parse(JSON.stringify(this.library[inner.type]));
+                    }
+                    const innerChip = inner.meta || this.library[inner.type];
                     if (innerChip) {
                         const ins = this._assembleChipInputs(innerChip, (portId) => getDrive(inner.id, portId));
-                        const rawOuts = this.simulateInternalCircuit(inner.type, ins);
+                        const rawOuts = this.simulateInternalCircuit(innerChip, ins);
                         inner.outputs = this._mapChipOutputs(innerChip, rawOuts);
                         nVal = inner.outputs;
                     }
