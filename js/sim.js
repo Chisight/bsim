@@ -1878,7 +1878,9 @@ const Sim = {
             { label: 'TRISTATE', type: 'TRISTATE' },
             { label: 'INPUT', type: 'INPUT' },
             { label: 'OUTPUT', type: 'OUTPUT' },
-            { label: 'CLOCK', type: 'CLOCK' }
+            { label: 'CLOCK', type: 'CLOCK' },
+            // [AUDIT: v1.24.58 | SEC_ARCH_LEAD] - Injected ROM module into bottom navbar library.
+            { label: 'ROM', type: 'ROM' }
         ];
 
         nativeLib.forEach(it => {

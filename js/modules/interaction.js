@@ -462,6 +462,7 @@ const InteractionHandler = {
                 </div>
                 <div class="menu-item" onclick="Sim.addNode('CLOCK', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">Spawn Clock</div>
                 <div class="menu-item" style="color:#fff; font-weight:bold" onclick="Sim.addNode('NAND', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">Spawn NAND</div>
+                <div class="menu-item" style="color:#ffca28; font-weight:bold" onclick="Sim.addNode('ROM', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">Spawn ROM</div>
                 ${customChipsHtml}
             `;
             
