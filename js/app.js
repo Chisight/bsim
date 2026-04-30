@@ -160,7 +160,8 @@ window.onload = () => {
     // [AUDIT: v1.24.91 | SEC_ARCH_LEAD] - Deployed Two-Phase Commit protocol in Wasm to eliminate sequential hazard race conditions and resolved V8 scheduler deadlocks.
     // [AUDIT: v1.24.92 | SEC_ARCH_LEAD] - Upgraded Wasm to Three-Phase Commit (Shadow Registers) mirroring Verilog non-blocking assignments to eradicate zero-delay cascades.
     // [AUDIT: v1.24.93 | SEC_ARCH_LEAD] - Power analysis switching counters, DWARF-aware Wasm symbol mapper, and hardware-agnostic temporal shims injected.
-    window.LOADED_BSIM_VERSION = "1.24.93";
+    // [AUDIT: v1.24.94 | SEC_ARCH_LEAD] - Expanded Wasm linear memory allocation baseline to safely encompass the 24MB Power Analysis Region E.
+    window.LOADED_BSIM_VERSION = "1.24.94";
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Enforce ring-buffer limits on the History stack to prevent V8 heap exhaustion during macro execution.
     if (window.History) {

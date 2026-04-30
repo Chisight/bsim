@@ -174,7 +174,8 @@ const WasmEngine = {
         this.flatNodes.forEach(n => {
             if (n.type === 'ROM' || n.type === 'RAM') romPayloadSize += (1 << (n.addressPins || 4));
         });
-        const requiredBytes = 16777216 + (this.flatNodes.length * 256) + romPayloadSize;
+        // [AUDIT: v1.24.94 | SEC_ARCH_LEAD] - Shifted allocation baseline to 24MB to encompass Region E power analysis buffers and prevent OOB traps.
+        const requiredBytes = 25165824 + (this.flatNodes.length * 256) + romPayloadSize;
         const requiredPages = Math.ceil(requiredBytes / 65536);
         const currentPages = this.memory.buffer.byteLength / 65536;
 
