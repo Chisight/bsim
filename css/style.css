@@ -202,8 +202,8 @@ nav .sub-menu .menu-item::after { display: none; }
     display: flex; align-items: center; gap: 4px; z-index: 25;
     pointer-events: none;
 }
-.port.input .port-meta { left: 8px; flex-direction: row; }
-.port.output .port-meta { right: 8px; flex-direction: row-reverse; }
+.port.input .port-meta { left: 12px; flex-direction: row; }
+.port.output .port-meta { right: 12px; flex-direction: row-reverse; }
 
 .port-label {
     font-size: 8px; font-weight: 800; font-family: 'JetBrains Mono', monospace;
@@ -214,35 +214,25 @@ nav .sub-menu .menu-item::after { display: none; }
 
 /* Fallback for naked labels (Standard / Custom Chips) */
 .port > .port-label { position: absolute; top: 50%; transform: translateY(-50%); }
-.port.input > .port-label { left: 8px; text-align: left; }
-.port.output > .port-label { right: 8px; text-align: right; }
+.port.input > .port-label { left: 12px; text-align: left; }
+.port.output > .port-label { right: 12px; text-align: right; }
 
 .inline-dot { width: 6px; height: 6px; margin: 0; pointer-events: auto; }
 
-/* [AUDIT: v1.24.50 | SEC_ARCH_LEAD] - Reverted rigid port geometry to prevent layout corruption, injected invisible oversized pseudo-element for hitbox expansion. */
+/* [AUDIT: v1.24.70 | SEC_ARCH_LEAD] - Expanded port hitbox area to roughly 1/2 snap size for improved clickability, preserving visual scaling limits. */
 .port {
-    position: absolute; width: 10px; height: 10px;
-    background: radial-gradient(circle at center, #555 var(--port-size, 40%), transparent calc(var(--port-size, 40%) + 1%));
+    position: absolute; width: 18px; height: 18px;
+    background: radial-gradient(circle at center, #555 var(--port-size, 22%), transparent calc(var(--port-size, 22%) + 1%));
     border-radius: 50%; cursor: crosshair; transform: translateY(-50%); z-index: 110; pointer-events: auto;
 }
-.port::after {
-    content: ''; position: absolute; top: 50%; left: 50%; width: 19px; height: 19px; transform: translate(-50%, -50%); background: transparent; cursor: inherit; z-index: 1;
-}
-
-/* [AUDIT: v1.24.54 | SEC_ARCH_LEAD] - Injected CSS :focus-within pseudo-classes to rigidly persist hierarchical menu visibility during text input focus events. */
-.menu-item:focus-within > .sub-menu {
-    display: flex !important;
-    opacity: 1 !important;
-    pointer-events: auto !important;
-}
-.port:hover { background: radial-gradient(circle at center, var(--accent) var(--port-size, 40%), transparent calc(var(--port-size, 40%) + 1%)); }
-.port.input { left: -5px; }
-.port.output { right: -5px; }
-.port.selected { background: radial-gradient(circle at center, var(--accent) var(--port-size, 40%), rgba(74, 158, 255, 0.25) calc(var(--port-size, 40%) + 1%), rgba(74, 158, 255, 0.25) 100%); }
-.port.snap-hover { background: radial-gradient(circle at center, var(--wire-on) var(--port-size, 40%), rgba(0, 255, 170, 0.35) calc(var(--port-size, 40%) + 1%), rgba(0, 255, 170, 0.15) 100%); transform: translateY(-50%) scale(1.4); transition: transform 0.1s; }
-.port.on { background: radial-gradient(circle at center, var(--wire-on) var(--port-size, 40%), transparent calc(var(--port-size, 40%) + 1%)); }
-.port.off { background: radial-gradient(circle at center, var(--wire-off) var(--port-size, 40%), transparent calc(var(--port-size, 40%) + 1%)); }
-.port.float { background: radial-gradient(circle at center, var(--wire-float) var(--port-size, 40%), transparent calc(var(--port-size, 40%) + 1%)); }
+.port:hover { background: radial-gradient(circle at center, var(--accent) var(--port-size, 22%), transparent calc(var(--port-size, 22%) + 1%)); }
+.port.input { left: -9px; }
+.port.output { right: -9px; }
+.port.selected { background: radial-gradient(circle at center, var(--accent) var(--port-size, 22%), rgba(74, 158, 255, 0.25) calc(var(--port-size, 22%) + 1%), rgba(74, 158, 255, 0.25) 100%); }
+.port.snap-hover { background: radial-gradient(circle at center, var(--wire-on) var(--port-size, 22%), rgba(0, 255, 170, 0.35) calc(var(--port-size, 22%) + 1%), rgba(0, 255, 170, 0.15) 100%); transform: translateY(-50%) scale(1.4); transition: transform 0.1s; }
+.port.on { background: radial-gradient(circle at center, var(--wire-on) var(--port-size, 22%), transparent calc(var(--port-size, 22%) + 1%)); }
+.port.off { background: radial-gradient(circle at center, var(--wire-off) var(--port-size, 22%), transparent calc(var(--port-size, 22%) + 1%)); }
+.port.float { background: radial-gradient(circle at center, var(--wire-float) var(--port-size, 22%), transparent calc(var(--port-size, 22%) + 1%)); }
 
 #selection-marquee {
     position: absolute; border: 1.5px dashed var(--accent); background: rgba(74, 158, 255, 0.1);

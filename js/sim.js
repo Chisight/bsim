@@ -1317,7 +1317,6 @@ const Sim = {
         }
         if (this.snapNodes) { x = Math.round(x / 20) * 20; y = Math.round(y / 20) * 20; }
         if (this.debugToasts) this.toast(`Added ${type} node`);
-        // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Support deterministic ID injection.
         const newNode = this._finalizeAddNode(type, x, y, label || type, preferredId);
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node added to workspace: ${newNode.id} (${type}).
         return newNode;
@@ -1328,8 +1327,8 @@ const Sim = {
      * @STATE: NODE_INITIALIZATION
      * @INTENT: Construct the internal node object representation and trigger the AddNodeCommand.
      */
+    // [AUDIT: v1.24.70 | SEC_ARCH_LEAD] - Deterministic node allocation constraint injected for terminal parity validation.
     _finalizeAddNode(type, x, y, label, preferredId = null) {
-        // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Deterministic node instantiation.
         const id = (preferredId && !this.nodes.some(n => n.id === preferredId)) 
             ? preferredId 
             : 'node-' + Math.random().toString(36).substr(2, 9);
@@ -2419,7 +2418,8 @@ const Sim = {
      */
     applyStyles() {
         // [AUDIT: v1.24.37 | SEC_ARCH_LEAD] - Extended style injection to support global animation muting.
-        const sizeMap = { 'small': '15%', 'medium': '25%', 'large': '35%' };
+        // [AUDIT: v1.24.70 | SEC_ARCH_LEAD] - Retuned scaling percentages to compensate for expanded 18px port hitboxes.
+        const sizeMap = { 'small': '8%', 'medium': '14%', 'large': '19%' };
         document.documentElement.style.setProperty('--port-size', sizeMap[this.portSize || 'medium']);
         
         const dotMap = { 'small': '8px', 'medium': '12px', 'large': '16px' };

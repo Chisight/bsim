@@ -226,9 +226,10 @@ const WasmEngine = {
                 if (!node) return;
                 const isInternalIO = (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) && nId.includes(':');
                 if (isInternalIO || node.type === 'JUNCTION') return;
-                const NATIVE_GATES = new Set(['NAND', 'DFF', 'CLOCK', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM']);
+                // [AUDIT: v1.24.69 | SEC_ARCH_LEAD] - Synchronized Driver Resolution to recognize RAM primitives as valid signal sources for Wasm netlists.
+                const NATIVE_GATES = new Set(['NAND', 'DFF', 'CLOCK', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM', 'RAM']);
                 if (node.type === 'CLOCK' && pId === 'out0') drivers.add(this.getSpecificIdx(nId, pId));
-                if (NATIVE_GATES.has(node.type) && (pId === 'q' || pId === 'nq' || pId === 'out' || (node.type === 'ROM' && pId.startsWith('out')))) drivers.add(this.getSpecificIdx(nId, pId));
+                if (NATIVE_GATES.has(node.type) && (pId === 'q' || pId === 'nq' || pId === 'out' || ((node.type === 'ROM' || node.type === 'RAM') && pId.startsWith('out')))) drivers.add(this.getSpecificIdx(nId, pId));
                 if (node.type.startsWith('IN-') && !nId.includes(':')) drivers.add(this.getSpecificIdx(nId, pId));
             };
             checkDriver(startNodeId, startPortId);
@@ -348,10 +349,11 @@ const WasmEngine = {
                 const isInternalIO = (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) && currNodeId.includes(':');
                 const isPassThrough = node.type === 'JUNCTION' || isInternalIO;
 
+                // [AUDIT: v1.24.69 | SEC_ARCH_LEAD] - Injected RAM output port detection into Kahn's topological sort whitelists.
                 let isOutput = false;
                 if (node.type === 'CLOCK' && currPortId === 'out0') isOutput = true;
-                const NATIVE_GATES = new Set(['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM']);
-                if (NATIVE_GATES.has(node.type) && (currPortId === 'out' || currPortId === 'q' || currPortId === 'nq' || (node.type === 'ROM' && currPortId.startsWith('out')))) isOutput = true;
+                const NATIVE_GATES = new Set(['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM', 'RAM']);
+                if (NATIVE_GATES.has(node.type) && (currPortId === 'out' || currPortId === 'q' || currPortId === 'nq' || ((node.type === 'ROM' || node.type === 'RAM') && currPortId.startsWith('out')))) isOutput = true;
                 if (node.type.startsWith('IN-') && !currNodeId.includes(':')) isOutput = true;
                 // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Identify output nodes for topological sorting.
                 if (isOutput && !isPassThrough) {
@@ -704,9 +706,10 @@ const WasmEngine = {
                     const cNode = this.flatNodes.find(n => n.id === cId);
                     if (!cNode) return null;
 
+                    // [AUDIT: v1.24.69 | SEC_ARCH_LEAD] - Corrected Trace Logic to allow hierarchical pin reading from RAM buffers in the host UI.
                     let isDriver = false;
                     if (cNode.type === 'CLOCK' && cPort === 'out0') isDriver = true;
-                    if (['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM'].includes(cNode.type) && (cPort === 'out' || cPort === 'q' || cPort === 'nq' || (cNode.type === 'ROM' && cPort.startsWith('out')))) isDriver = true;
+                    if (['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM', 'RAM'].includes(cNode.type) && (cPort === 'out' || cPort === 'q' || cPort === 'nq' || ((cNode.type === 'ROM' || cNode.type === 'RAM') && cPort.startsWith('out')))) isDriver = true;
                     if (cNode.type.startsWith('IN-') && !cId.includes(':') && cPort.startsWith('out')) isDriver = true;
 
                     if (isDriver) return { id: cId, port: cPort };
