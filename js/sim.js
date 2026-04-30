@@ -46,6 +46,17 @@ const Sim = {
     useWasm: true,
     _toastTimer: null,
     shortCircuitStrikes: 0,
+    _netlistDirty: false,
+
+    // [AUDIT: v1.24.52 | SEC_ARCH_LEAD] - Manual DOM/Memory synchronization escape hatch.
+    forceLayoutSync() {
+        this.autoSave();
+        this._netlistDirty = true;
+        this.updateWireVisuals();
+        this.seedQueue();
+        this.processQueue();
+        this.toast('Layout Memory Flushed & Resynchronized', 'success');
+    },
 
     // Preferences Logic
     snapNodes: true,
@@ -702,6 +713,12 @@ const Sim = {
                 const execDepth = Math.max(20, this.nodes.length);
                 const seqNodes = WasmEngine.flatNodes ? WasmEngine.flatNodes.filter(n => ['DFF', 'TFF', 'TRISTATE'].includes(n.type)) : [];
                 
+                // [AUDIT: v1.24.52 | SEC_ARCH_LEAD] - V8 Fallback Hook: Evaluate pure-JS Clock dependencies outside Wasm.
+                this.nodes.filter(n => n.type === 'CLOCK').forEach(n => {
+                    this.calculateNextState(n);
+                    WasmEngine.writeState(n.id, n.state);
+                });
+
                 for (let i = 0; i < execDepth; i++) {
                     WasmEngine.executeTick();
                     

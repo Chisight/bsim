@@ -154,7 +154,9 @@ window.onload = () => {
     // [AUDIT: v1.24.48 | SEC_ARCH_LEAD] - Version increment for zero-coordinate falsy evaluation patch in CLI parser.
     // [AUDIT: v1.24.49 | SEC_ARCH_LEAD] - Version increment for successful verification of deterministic execution macro-scripts.
     // [AUDIT: v1.24.50 | SEC_ARCH_LEAD] - Version increment for port geometry restoration and transparent pseudo-element hitbox injection.
-    window.LOADED_BSIM_VERSION = "1.24.50";
+    // [AUDIT: v1.24.51 | SEC_ARCH_LEAD] - Hitbox geometry restoration validated. Wasm logic engine confirmed deterministic.
+    // [AUDIT: v1.24.52 | SEC_ARCH_LEAD] - Version increment for V8 tick fallback parity sync injection and Force Layout Sync utility.
+    window.LOADED_BSIM_VERSION = "1.24.52";
 
     // [AUDIT: SEC_ARCH_LEAD] - Injected passive workspace boundary validation to catch upgrade mismatches.
     window.addEventListener('load', () => {
