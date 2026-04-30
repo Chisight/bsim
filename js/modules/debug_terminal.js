@@ -411,7 +411,8 @@ const DebugTerminal = {
             if (parts.length === 1) {
                 // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Expand autocomplete index for new kernel CLI toolkit.
                 // [AUDIT: v1.24.56 | SEC_ARCH_LEAD] - Injected assert, step, peek, poke, reset primitives.
-                const cmds = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv', 'mkdir', 'tick', 'step', 'clock', 'force', 'unforce', 'watch', 'dump', 'cp', 'touch', 'find', 'bom', 'path', 'assert', 'peek', 'poke', 'reset'];
+                // [AUDIT: v1.24.93 | SEC_ARCH_LEAD] - Injected power, symbols, and timing analysis primitives.
+                const cmds = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv', 'mkdir', 'tick', 'step', 'clock', 'force', 'unforce', 'watch', 'dump', 'cp', 'touch', 'find', 'bom', 'path', 'assert', 'peek', 'poke', 'reset', 'power', 'symbols', 'timing'];
                 matches = cmds.filter(c => c.startsWith(prefix));
             } else if (cmd === 'cd' || cmd === 'ls' || cmd === 'tree' || cmd === 'rm' || cmd === 'mkdir') {
                 // [AUDIT: v1.24.03 | SEC_ARCH_LEAD] - Dynamic VFS path autocomplete with trailing slash parsing.
@@ -1076,6 +1077,43 @@ const DebugTerminal = {
                 sn.memoryData[addr] = val & 0xFF;
                 if (ctx.simObj) { ctx.simObj.seedQueue(); ctx.simObj.processQueue(); ctx.simObj.autoSave(); }
                 this.print(`Flashed 0x${addr.toString(16).padStart(4, '0').toUpperCase()} -> 0x${(val & 0xFF).toString(16).padStart(2, '0').toUpperCase()}`, "ok");
+                break;
+            }
+            case 'timing': {
+                if (args.length < 2) return this.print("Usage: timing <node_name> (e.g., 7nm, 28nm, ideal)", "err");
+                const nodeMap = { '7nm': 10, '28nm': 40, 'ideal': 0 };
+                if (nodeMap[args[1]] === undefined) return this.print(`Unknown fabrication node: ${args[1]}`, "err");
+                Sim.timing = { node: args[1], delay: nodeMap[args[1]] };
+                this.print(`Temporal discretization layer configured to ${args[1]} (${nodeMap[args[1]]}ps gate delay).`, "ok");
+                break;
+            }
+            case 'power': {
+                const ctx = this.getContext();
+                let totalToggles = 0;
+                const pwrFactor = (Sim.timing && Sim.timing.delay > 0) ? (Sim.timing.delay / 10) : 1;
+                ctx.nodes.forEach(n => {
+                    let t = n.toggles || 0;
+                    if (window.WasmEngine && WasmEngine.ready && !Sim._netlistDirty) {
+                        t = WasmEngine.getToggleCount(n.id);
+                    }
+                    totalToggles += t;
+                });
+                const estPower = (totalToggles * pwrFactor * 0.05).toFixed(2);
+                this.print(`--- POWER ANALYSIS (${Sim.timing ? Sim.timing.node : 'ideal'}) ---`, "warn");
+                this.print(`Total Gate Switching Activity: ${totalToggles} toggles`, "sys");
+                this.print(`Estimated Dynamic Power: ${estPower} pJ`, "ok");
+                break;
+            }
+            case 'symbols': {
+                if (!window.WasmEngine || !WasmEngine.ready || Sim._netlistDirty) {
+                    return this.print("DWARF Symbol Mapper requires active, compiled Wasm Engine.", "err");
+                }
+                this.print(`--- DWARF WASM SYMBOL MAP ---`, "warn");
+                WasmEngine.idMap.forEach((idx, id) => {
+                    const offset = Array.isArray(idx) ? idx[0] : idx;
+                    const tCount = WasmEngine.getToggleCount(id);
+                    this.print(`[0x${(offset * 4).toString(16).padStart(6, '0').toUpperCase()}] -> ${id} | Toggles: ${tCount}`, "sys");
+                });
                 break;
             }
             case 'reset': {
