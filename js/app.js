@@ -154,7 +154,8 @@ window.onload = () => {
     // [AUDIT: v1.24.85 | SEC_ARCH_LEAD] - Resolved missing closing s-expression blocks in Wasm execution cascade.
     // [AUDIT: v1.24.86 | SEC_ARCH_LEAD] - Synthesized native Wasm sequential logic (DFF/TFF) and resolved mapped array pointer corruption.
     // [AUDIT: v1.24.87 | SEC_ARCH_LEAD] - Finalized Wasm kernel AST parenthesis alignment to resolve unexpected EOF compilation trap.
-    window.LOADED_BSIM_VERSION = "1.24.87";
+    // [AUDIT: v1.24.88 | SEC_ARCH_LEAD] - Hardened Wasm operand fetch pipeline to prevent OOB traps and mitigated Region C heap collision.
+    window.LOADED_BSIM_VERSION = "1.24.88";
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Enforce ring-buffer limits on the History stack to prevent V8 heap exhaustion during macro execution.
     if (window.History) {
