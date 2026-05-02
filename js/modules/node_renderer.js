@@ -117,11 +117,11 @@ const NodeRenderer = {
             } else if (node.type === 'RAM') {
                 /**
                  */
-                // [AUDIT: v1.24.97 | SEC_ARCH_LEAD] - Explicit parametric bounds and mapped port I/O rendering for memory modules.
+                // [AUDIT: v1.25.49 | SEC_ARCH_LEAD] - Restructured RAM parametric bounds to eliminate I/O overlap and enforce linear bus stacking.
                 const aBits = node.addressPins || 4;
                 const dBits = 8;
                 
-                const leftPins = aBits + (node.type === 'RAM' ? 1 : 0); 
+                const leftPins = aBits + 1 + dBits;
                 const rightPins = dBits;
                 const maxPins = Math.max(leftPins, rightPins);
                 const heightCalc = (maxPins * 20 + 30);
@@ -139,17 +139,19 @@ const NodeRenderer = {
                 }
                 
                 if (node.type === 'RAM') {
-                    const ctrlY = aBits * 20 + 24;
+                    const ctrlIdx = node.flipPolarity ? aBits : (leftPins - 1 - aBits);
+                    const ctrlY = ctrlIdx * 20 + 24;
                     portsHtml += `<div class="port input" data-port="we" style="top:${ctrlY}px" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'we')"><span class="port-label">WE</span></div>`;
                 }
 
                 for (let i = 0; i < dBits; i++) {
-                    const visualIdx = node.flipPolarity ? i : (dBits - 1) - i;
-                    const tStyle = `top:calc(24px + ${visualIdx * 20}px)`;
-                    portsHtml += `<div class="port output" data-port="out${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${i}')"><span class="port-label">D${i}</span></div>`;
+                    const outIdx = node.flipPolarity ? i : (dBits - 1) - i;
+                    const outStyle = `top:calc(24px + ${outIdx * 20}px)`;
+                    portsHtml += `<div class="port output" data-port="out${i}" style="${outStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${i}')"><span class="port-label">D${i}</span></div>`;
                     
                     if (node.type === 'RAM') {
-                        portsHtml += `<div class="port input" data-port="din${i}" style="left:-6px; top:calc(24px + ${visualIdx * 20}px)" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'din${i}')"><span class="port-label" style="left:14px; text-align:left;">DI${i}</span></div>`;
+                        const dinIdx = node.flipPolarity ? (aBits + 1 + i) : (aBits + 1 + dBits - 1 - i);
+                        portsHtml += `<div class="port input" data-port="din${i}" style="left:-6px; top:calc(24px + ${dinIdx * 20}px)" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'din${i}')"><span class="port-label" style="left:14px; text-align:left;">DI${i}</span></div>`;
                     }
                 }
             } else if (node.isCustom) {

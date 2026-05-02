@@ -1,6 +1,6 @@
 /**
- * Simulator Core v1.23.90 (Modular Professional)
- * FIXED: Eradicated pseudo-element dimension snapping and rigidly clamped pin-container bounding offsets.
+ * Simulator Core v1.25.49 (Modular Professional)
+ * [AUDIT: v1.25.49 | SEC_ARCH_LEAD] - Eradicated layout collision bounds for RAM parametric scaling to restore address pin reachability.
  */
 const Sim = {
     nodes: [],
@@ -1457,25 +1457,36 @@ const Sim = {
             const py = n.portY !== undefined ? n.portY : 24;
             const ph = n.portH !== undefined ? n.portH : (n.customHeight || parseInt(el.style.height) || 64) - 30;
             
-            // [AUDIT: v1.25.36 | SEC_ARCH_LEAD] - Intercepted RAM port layout mutation to prevent asymmetric array collapse and preserve hardware bus parity.
+            // [AUDIT: v1.25.49 | SEC_ARCH_LEAD] - Rewritten RAM port matrix traversal to decouple read/write bus strides and eliminate collision clipping.
             if (n.type === 'RAM') {
                 const aBits = n.addressPins || 4;
                 const dBits = 8;
-                const maxPins = Math.max(aBits + 1, dBits);
-                const stride = maxPins > 1 ? ph / (maxPins - 1) : 0;
+                const leftPins = aBits + 1 + dBits;
+                const rightPins = dBits;
+                const strideL = leftPins > 1 ? ph / (leftPins - 1) : 0;
+                const strideR = rightPins > 1 ? ph / (rightPins - 1) : 0;
                 
-                const getVIdx = (pid) => {
-                    if (!pid) return 0;
-                    if (pid.startsWith('in')) return n.flipPolarity ? parseInt(pid.replace('in','')) : (aBits - 1 - parseInt(pid.replace('in','')));
-                    if (pid === 'we') return aBits;
-                    if (pid.startsWith('din')) return n.flipPolarity ? parseInt(pid.replace('din','')) : (dBits - 1 - parseInt(pid.replace('din','')));
-                    if (pid.startsWith('out')) return n.flipPolarity ? parseInt(pid.replace('out','')) : (dBits - 1 - parseInt(pid.replace('out','')));
-                    return 0;
+                const applyPin = (p) => {
+                    const pid = p.dataset.port;
+                    if (!pid) return;
+                    if (pid.startsWith('out')) {
+                        const idx = parseInt(pid.replace('out',''));
+                        const vIdx = n.flipPolarity ? idx : (rightPins - 1 - idx);
+                        p.style.top = (py + vIdx * strideR) + 'px';
+                    } else if (pid.startsWith('din')) {
+                        const idx = parseInt(pid.replace('din',''));
+                        const vIdx = n.flipPolarity ? (aBits + 1 + idx) : (aBits + 1 + dBits - 1 - idx);
+                        p.style.top = (py + vIdx * strideL) + 'px';
+                    } else if (pid === 'we') {
+                        p.style.top = (py + aBits * strideL) + 'px';
+                    } else if (pid.startsWith('in')) {
+                        const idx = parseInt(pid.replace('in',''));
+                        const vIdx = n.flipPolarity ? idx : (aBits - 1 - idx);
+                        p.style.top = (py + vIdx * strideL) + 'px';
+                    }
                 };
 
-                el.querySelectorAll('.port').forEach(p => {
-                    p.style.top = (py + getVIdx(p.dataset.port) * stride) + 'px';
-                });
+                el.querySelectorAll('.port').forEach(applyPin);
             } else {
                 const alignPorts = (selector) => {
                     const ports = Array.from(el.querySelectorAll(selector));
