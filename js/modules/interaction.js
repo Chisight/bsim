@@ -221,12 +221,18 @@ const InteractionHandler = {
             
             const html = `
                 <div style="display:flex; flex-direction:column; gap:15px; text-align:left;">
-                    <label style="color:#aaa; font-size:12px;">Address Pins: 
+                    <label style="color:#aaa; font-size:12px;">Address Pins (Bus Width): 
                         <input type="number" id="mem-addr" value="${currentAddr}" min="1" max="24" style="width:100%; background:#111; border:1px solid #334; color:#0f0; padding:5px; margin-top:5px; box-sizing:border-box;">
                     </label>
-                    <label style="color:#aaa; font-size:12px;">Binary File URL: 
-                        <input type="text" id="mem-url" value="${currentUrl}" placeholder="/path/to/rom.bin" style="width:100%; background:#111; border:1px solid #334; color:#0f0; padding:5px; margin-top:5px; box-sizing:border-box;">
-                    </label>
+                    <div style="padding:10px; border:1px solid #334; border-radius:4px; background:#181820;">
+                        <label style="color:#aaa; font-size:12px; font-weight:bold;">1. Local Binary File (.bin): 
+                            <input type="file" id="mem-file" accept=".bin,.hex" style="width:100%; margin-top:8px; font-size:11px; color:#0f0;">
+                        </label>
+                        <div style="text-align:center; color:#556; font-size:10px; text-transform:uppercase; margin:8px 0;">— OR —</div>
+                        <label style="color:#aaa; font-size:12px; font-weight:bold;">2. Remote Payload URL: 
+                            <input type="text" id="mem-url" value="${currentUrl}" placeholder="https://domain.com/rom.bin" style="width:100%; background:#111; border:1px solid #334; color:#0f0; padding:5px; margin-top:8px; box-sizing:border-box;">
+                        </label>
+                    </div>
                 </div>
             `;
 
@@ -250,19 +256,31 @@ const InteractionHandler = {
             btnOk.onclick = async () => {
                 const aBits = parseInt(document.getElementById('mem-addr').value);
                 const url = document.getElementById('mem-url').value.trim();
+                const fileInput = document.getElementById('mem-file');
+                
                 if (!isNaN(aBits)) {
                     node.addressPins = aBits;
-                    node.dataUrl = url;
-                    if (url) {
-                        try {
-                            Sim.toast('Fetching memory data...', 'info');
+                    
+                    // [AUDIT: v1.25.02 | SEC_ARCH_LEAD] - Priority execution for local file payloads over remote URL string.
+                    try {
+                        if (fileInput && fileInput.files.length > 0) {
+                            Sim.toast('Reading local memory file...', 'info');
+                            const file = fileInput.files[0];
+                            const buffer = await file.arrayBuffer();
+                            node.memoryData = Array.from(new Uint8Array(buffer));
+                            node.dataUrl = file.name;
+                            Sim.toast('Local memory payload flashed directly to heap.', 'success');
+                        } else if (url) {
+                            node.dataUrl = url;
+                            Sim.toast('Fetching memory data via network...', 'info');
                             const res = await fetch(url);
+                            if (!res.ok) throw new Error('HTTP ' + res.status);
                             const buffer = await res.arrayBuffer();
                             node.memoryData = Array.from(new Uint8Array(buffer));
-                            Sim.toast('Memory payload flashed.', 'success');
-                        } catch(e) {
-                            Sim.toast('Network fault during fetch.', 'danger');
+                            Sim.toast('Network payload flashed.', 'success');
                         }
+                    } catch(e) {
+                        Sim.toast('Memory flash aborted: ' + e.message, 'danger');
                     }
                     if (typeof NodeRenderer !== 'undefined') {
                         const el = document.getElementById(node.id);
