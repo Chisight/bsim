@@ -124,14 +124,12 @@ window.onload = () => {
     // [AUDIT: v1.25.27 | SEC_ARCH_LEAD] - Encapsulated native primitives inside a collapsible hierarchical directory.
     // [AUDIT: v1.25.28 | SEC_ARCH_LEAD] - Synchronized nomenclature to 'primatives' (lowercase) across UI and terminal.
     // [AUDIT: v1.25.29 | SEC_ARCH_LEAD] - Reverted to 'primitives' (correct spelling) after user-initiated correction.
-    window.LOADED_BSIM_VERSION = "1.25.29";
+    // [AUDIT: v1.25.30 | SEC_ARCH_LEAD] - Replaced nested dropdowns with inline accordion expansion to cure sub-menu boundary clipping.
+    window.LOADED_BSIM_VERSION = "1.25.30";
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Native integration finalized in history.js and sim.js.
-
     // [AUDIT: v1.23.96 | SEC_ARCH_LEAD] - Engine Parity Check: Assert parity between V8 and Wasm execution states on boot.
-
     // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - JIT Patches Purged: Remote Import and High-Fidelity Export natively integrated into ProjectManager.
-
     // [AUDIT: SEC_ARCH_LEAD] - Injected passive workspace boundary validation to catch upgrade mismatches.
     window.addEventListener('load', () => {
         setTimeout(() => {

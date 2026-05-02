@@ -23,6 +23,11 @@
 ::-webkit-scrollbar-thumb { background: #333344; border-radius: 10px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
+/* [AUDIT: v1.25.28 | SEC_ARCH_LEAD] - Configured targeted CSS zoom variable for structural UI elements to preserve absolute workspace coordinates. */
+#top-nav, #bottom-nav, #sidebar, #tab-bar, #ui-hud, #prefs-window, #context-menu, #ui-overlay, .ui-toast, #popup-editor-wrap {
+    zoom: var(--ui-scale, 1);
+}
+
 body, html {
     /* [AUDIT: v1.25.21 | SEC_ARCH_LEAD] - Injected dynamic viewport height (dvh) to prevent mobile browser chrome from clipping the footer logic library. */
     margin: 0; padding: 0; height: 100vh; height: 100dvh; width: 100vw;

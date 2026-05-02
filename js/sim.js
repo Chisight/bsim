@@ -387,7 +387,8 @@ const Sim = {
                     library: safeLib, directories: this.directories || [], workspaceStack: wsStack, activeEditingChip: this.activeEditingChip,
                     tabs: safeTabs, activeTabId: this.activeTabId,
                     // [AUDIT: v1.24.37 | SEC_ARCH_LEAD] - Append extended UI preferences payload including animation overrides.
-                    prefs: { snapNodes: this.snapNodes, snapWires: this.snapWires, confirmDelete: this.confirmDelete, showStats: this.showStats, showTooltips: this.showTooltips, tutorialMode: this.tutorialMode, hudPos: this.hudPos, toastPos: this.toastPos, disableAnimations: this.disableAnimations, portSize: this.portSize, dotSize: this.dotSize } 
+                    // [AUDIT: v1.25.28 | SEC_ARCH_LEAD] - Included parametric UI scaling value in persistence bundle.
+                    prefs: { snapNodes: this.snapNodes, snapWires: this.snapWires, confirmDelete: this.confirmDelete, showStats: this.showStats, showTooltips: this.showTooltips, tutorialMode: this.tutorialMode, hudPos: this.hudPos, toastPos: this.toastPos, disableAnimations: this.disableAnimations, portSize: this.portSize, dotSize: this.dotSize, uiScale: this.uiScale } 
                 };
                 localStorage.setItem('bsim_autosave', JSON.stringify(project));
                 // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: AutoSave operation finalized.
@@ -2374,6 +2375,7 @@ const Sim = {
                 <label style="display:flex; justify-content:space-between; align-items:center;"><span style="color:var(--wire-on)">Debug Notifications</span><input type="checkbox" ${this.debugToasts ? 'checked' : ''} onchange="Sim.debugToasts=this.checked; Sim.autoSave();"></label>
                 <label style="display:flex; justify-content:space-between; align-items:center;"><span style="color:#ffca28">Disable UI Animations</span><input type="checkbox" ${this.disableAnimations ? 'checked' : ''} onchange="Sim.disableAnimations=this.checked; Sim.applyStyles(); Sim.autoSave();"></label>
                 <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">HUD Position: <select onchange="Sim.hudPos=this.value; Sim.updateHUD(); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px; padding:2px;"><option value="top-right" ${this.hudPos==='top-right'?'selected':''}>Top-Right</option><option value="top-left" ${this.hudPos==='top-left'?'selected':''}>Top-Left</option><option value="bottom-left" ${this.hudPos==='bottom-left'?'selected':''}>Bottom-Left</option></select></div>
+                <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">UI Scale (%): <div style="display:flex; gap:5px; align-items:center;"><input type="range" min="50" max="200" value="${this.uiScale || 100}" oninput="this.nextElementSibling.value=this.value; Sim.uiScale=parseInt(this.value); Sim.applyStyles(); Sim.autoSave();" style="width:70px;"><input type="number" min="50" max="200" value="${this.uiScale || 100}" oninput="this.previousElementSibling.value=this.value; Sim.uiScale=parseInt(this.value); Sim.applyStyles(); Sim.autoSave();" style="width:40px; background:#111; color:#fff; border:1px solid #334; text-align:center; font-family:'JetBrains Mono', monospace;"></div></div>
                 <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">Port Size: <select onchange="Sim.portSize=this.value; Sim.applyStyles(); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px; padding:2px;"><option value="small" ${this.portSize==='small'?'selected':''}>Small</option><option value="medium" ${this.portSize==='medium'||!this.portSize?'selected':''}>Medium</option><option value="large" ${this.portSize==='large'?'selected':''}>Large</option></select></div>
                 <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">Indicator LED Size: <select onchange="Sim.dotSize=this.value; Sim.applyStyles(); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px; padding:2px;"><option value="small" ${this.dotSize==='small'?'selected':''}>Small (8px)</option><option value="medium" ${this.dotSize==='medium'||!this.dotSize?'selected':''}>Medium (12px)</option><option value="large" ${this.dotSize==='large'?'selected':''}>Large (16px)</option></select></div>
                 <div style="height:1px; background:#333; margin:8px 0 4px 0;"></div>
@@ -2530,6 +2532,9 @@ const Sim = {
     applyStyles() {
         // [AUDIT: v1.24.37 | SEC_ARCH_LEAD] - Extended style injection to support global animation muting.
         // [AUDIT: v1.24.70 | SEC_ARCH_LEAD] - Retuned scaling percentages to compensate for expanded 18px port hitboxes.
+        // [AUDIT: v1.25.28 | SEC_ARCH_LEAD] - Injected global UI scaling CSS variable for dynamic viewport adjustments.
+        document.documentElement.style.setProperty('--ui-scale', (this.uiScale || 100) / 100);
+
         const sizeMap = { 'small': '8%', 'medium': '14%', 'large': '19%' };
         document.documentElement.style.setProperty('--port-size', sizeMap[this.portSize || 'medium']);
         

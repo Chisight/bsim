@@ -579,16 +579,17 @@ const InteractionHandler = {
                     groups[f].push(name);
                 });
                 
+                // [AUDIT: v1.25.30 | SEC_ARCH_LEAD] - Replaced nested absolute sub-menus with inline collapsible trees to prevent CSS overflow clipping.
                 let chipsList = '';
                 Object.keys(groups).sort().forEach(folder => {
                     if (folder !== '') {
-                        chipsList += `<div class="menu-item has-sub" style="color:#aaa;">📁 ${folder}<div class="sub-menu">`;
+                        chipsList += `<div class="menu-item" style="color:#aaa; display:flex; justify-content:space-between; align-items:center;" onclick="event.stopPropagation(); const n=this.nextElementSibling; const d=(n.style.display==='none'); n.style.display=d?'block':'none'; this.lastElementChild.innerText=d?'▾':'▸';"><span>📁 ${folder}</span><span style="font-size:10px; opacity:0.5; pointer-events:none;">▸</span></div><div style="display:none; margin-left:8px; border-left:1px solid #334; padding-left:4px; background:rgba(0,0,0,0.15);">`;
                     }
                     groups[folder].forEach(c => {
                         chipsList += `<div class="menu-item" onclick="Sim.addNode('${c}', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">${c}</div>`;
                     });
                     if (folder !== '') {
-                        chipsList += `</div></div>`;
+                        chipsList += `</div>`;
                     }
                 });
 
