@@ -829,6 +829,19 @@ const Sim = {
                                 this.updateNodeVisual(n);
                             }
                         }
+                    } else if ((n.type === 'ROM' || n.type === 'RAM') && !n.isCustom) {
+                        // [AUDIT: v1.25.07 | SEC_ARCH_LEAD] - Hardware memory extraction parity implemented for DOM node visual synchronization.
+                        const newVal = WasmEngine.readState(n.id);
+                        if (newVal && newVal.length === 8) {
+                            const outObj = {};
+                            for (let i = 0; i < 8; i++) outObj[`out${i}`] = newVal[i];
+                            if (!fastEqual(n.val, outObj) || n._forcePropagate) {
+                                n._forcePropagate = false;
+                                n.val = outObj;
+                                changed = true;
+                                this.updateNodeVisual(n);
+                            }
+                        }
                     }
                 });
 

@@ -166,7 +166,8 @@ window.onload = () => {
     // [AUDIT: v1.25.04 | SEC_ARCH_LEAD] - Relegated RAM/ROM binary upload to the component context dropdown to prevent interaction overlap.
     // [AUDIT: v1.25.05 | SEC_ARCH_LEAD] - Enforced 16MB spatial bounds clamping on memory payload ingestion to prevent Wasm heap overflow attacks.
     // [AUDIT: v1.25.06 | SEC_ARCH_LEAD] - Injected debug telemetry framework for RAM/ROM payload diagnostics via terminal broadcast.
-    window.LOADED_BSIM_VERSION = "1.25.06";
+    // [AUDIT: v1.25.07 | SEC_ARCH_LEAD] - Restored Wasm DOM parity extraction and Kahn topological trace routing for Volatile Memory (RAM).
+    window.LOADED_BSIM_VERSION = "1.25.07";
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Native integration finalized in history.js and sim.js.
     
