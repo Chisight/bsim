@@ -178,7 +178,10 @@ window.onload = () => {
     // [AUDIT: v1.25.18 | SEC_ARCH_LEAD] - Re-enabled native Wasm hardware acceleration for memory primitives.
     // [AUDIT: v1.25.19 | SEC_ARCH_LEAD] - Fixed Wasm compiler omission for multi-slot primitives and hardened runtime purity checks.
     // [AUDIT: v1.25.20 | SEC_ARCH_LEAD] - Centralized purity checks to Sim.isPureNative and eradicated local closure shadowing.
-    window.LOADED_BSIM_VERSION = "1.25.20";
+    // [AUDIT: v1.25.21 | SEC_ARCH_LEAD] - Implemented dynamic viewport bounds (100dvh) for mobile footer visibility and constrained custom macro sub-menus with Y-axis scrolling.
+    // [AUDIT: v1.25.22 | SEC_ARCH_LEAD] - Exposed Native Ground (0) primitive to UI and hardened signal driver map for Wasm netlist.
+    // [AUDIT: v1.25.23 | SEC_ARCH_LEAD] - Replaced macro moving modal with hierarchical context sub-menu and inline DOM mutator.
+    window.LOADED_BSIM_VERSION = "1.25.23";
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Native integration finalized in history.js and sim.js.
     
