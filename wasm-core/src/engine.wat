@@ -319,7 +319,16 @@
                                             )
                                           )
                                         )
-                                        (else local.get $target_addr i32.load)
+                                        (else 
+                                          local.get $opcode i32.const 9 i32.eq
+                                          (if (result i32)
+                                            (then
+                                              ;; [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Opcode 9: CONST_0 (Writes 0 to target slot)
+                                              i32.const 0
+                                            )
+                                            (else local.get $target_addr i32.load)
+                                          )
+                                        )
                                       )
                                     )
                                   )

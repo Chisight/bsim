@@ -108,7 +108,8 @@ const Sim = {
             const now = performance.now();
             
             // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Synchronized Wasm whitelist to include Memory Primitives for native execution.
-            const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'ROM', 'RAM']);
+            // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Whitelisted '0' primitive for Wasm execution.
+            const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'ROM', 'RAM', '0']);
             const checkPure = (nodes) => nodes.every(n => {
                 if (validWasmTypes.has(n.type)) return true;
                 if (n.isCustom && this.library[n.type]) return checkPure(this.library[n.type].nodes);
@@ -602,6 +603,13 @@ const Sim = {
             case 'CLOCK': return node.state;
             // JUNCTION
             case 'JUNCTION': return this.getDrivingSignal(node.id, 'j');
+            /**
+             * [AUDIT: v1.25.14 | SEC_ARCH_LEAD]
+             * @ARCH: V8_FALLBACK
+             * @STATE: CONSTANT_GROUND
+             * @INTENT: Ensure Constant Ground (0) primitives are zero-initialized in the V8 simulation heap.
+             */
+            case '0': return 0;
             // TRISTATE
             case 'TRISTATE': {
                 const data = this.getDrivingSignal(node.id, 'in');
@@ -1418,7 +1426,8 @@ const Sim = {
         // [AUDIT: v1.24.53 | SEC_ARCH_LEAD] - Injected ROM native component type to allow bypass of custom chip verifications.
         // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Formally classified RAM as a native primitive to ensure linear memory execution priority.
         // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Formally registered RAM as a core primitive to prevent macro-substitution logic.
-        const NATIVE_TYPES = new Set(['NAND', 'CLOCK', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'JUNCTION', 'TRISTATE', 'DFF', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM', 'RAM']);
+        // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Registered '0' as native primitive.
+        const NATIVE_TYPES = new Set(['NAND', 'CLOCK', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'JUNCTION', 'TRISTATE', 'DFF', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM', 'RAM', '0']);
         if (this.library[type] && !NATIVE_TYPES.has(type)) { node.isCustom = true; }
         History.execute(new AddNodeCommand(node));
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node command dispatched for ${node.id}.

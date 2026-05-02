@@ -22,7 +22,13 @@ const NodeRenderer = {
         if (node.type.startsWith('PROBE-')) div.classList.add('probe-hex');
         
         const bits = parseInt(node.type.split('-')[1]) || 1;
-        if (bits >= 4) {
+        // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Refined IN-8 UI spatial defaults for alignment consistency.
+        if (node.type === 'IN-8') {
+            div.style.width = '100px';
+            div.style.minWidth = '100px';
+            div.style.height = '150px';
+            div.style.minHeight = '150px';
+        } else if (bits >= 4) {
             div.style.height = (bits * 18 + 25) + 'px';
             div.style.minHeight = (bits * 18 + 25) + 'px';
             div.style.width = '90px';
