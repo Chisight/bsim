@@ -164,7 +164,8 @@ window.onload = () => {
     // [AUDIT: v1.24.95 | SEC_ARCH_LEAD] - Deployed Asynchronous Worker Kernel, Wasm SIMD Vectorization, and Combinatorial Oscillation Watchdog.
     // [AUDIT: v1.24.96 | SEC_ARCH_LEAD] - Parity Recovery: Reverted to non-shared memory to bypass Cross-Origin Isolation requirements for local deployment.
     // [AUDIT: v1.24.97 | SEC_ARCH_LEAD] - Natively mapped explicit spatial boundaries and state mutation matrices for memory primitives.
-    window.LOADED_BSIM_VERSION = "1.24.97";
+    // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Integrated architectural stability ports from experimental multi-Wasm branch.
+    window.LOADED_BSIM_VERSION = "1.24.98";
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Enforce ring-buffer limits on the History stack to prevent V8 heap exhaustion during macro execution.
     if (window.History) {

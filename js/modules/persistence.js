@@ -403,6 +403,22 @@ const ProjectManager = {
         };
         img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgStr.replace(/var\(--wire-on\)/g, '#00ffaa').replace(/var\(--wire-off\)/g, '#883333'))));
     }
+    /**
+     * @IO: REMOTE_IMPORT
+     * @INTENT: Fetch a .bsim project from a remote URL and ingest it into the local autosave slot.
+     */
+    async importFromUrl(url) {
+        try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            const data = await res.json();
+            localStorage.setItem('bsim_autosave', JSON.stringify(data));
+            location.reload();
+        } catch (e) {
+            console.error('[FATAL] Remote import failed:', e);
+            if (window.Sim && typeof Sim.toast === 'function') Sim.toast('Failed to load project from URL.', 'error');
+        }
+    }
 };
 
 window.ProjectManager = ProjectManager;

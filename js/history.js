@@ -5,7 +5,8 @@
 const History = {
     stack: [],
     index: -1,
-    max: 50,
+    // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Standardized history stack depth to 250 to prevent V8 heap exhaustion while maintaining usability.
+    max: 250,
 
     /**
      * @ARCH: COMMAND_PATTERN_MANAGER
