@@ -1992,6 +1992,10 @@ const Sim = {
         const lib = document.getElementById('chip-lib');
         if (!lib) return;
 
+        // [AUDIT: v1.25.48 | SEC_ARCH_LEAD] - Capture hierarchical folder collapse state prior to UI flush to preserve workspace layout.
+        const collapsedFolders = new Set();
+        lib.querySelectorAll('.lib-folder.collapsed .folder-title').forEach(el => collapsedFolders.add(el.innerText.replace('📁 ', '').trim()));
+
         // 3. Inject Chips (Native first, then Custom Library)
         lib.innerHTML = '';
 
@@ -2010,7 +2014,8 @@ const Sim = {
         // [AUDIT: v1.25.27 | SEC_ARCH_LEAD] - Encapsulated native primitives inside a collapsible hierarchical directory.
         // [AUDIT: v1.25.29 | SEC_ARCH_LEAD] - Reverted nomenclature to 'primitives' to resolve previous user-initiated misspelling.
         const primFolder = document.createElement('div');
-        primFolder.className = 'lib-folder';
+        // [AUDIT: v1.25.48 | SEC_ARCH_LEAD] - Restore native primitive folder collapse state.
+        primFolder.className = 'lib-folder' + (collapsedFolders.has('primitives') ? ' collapsed' : '');
         primFolder.innerHTML = `<span class="folder-title" onclick="this.parentElement.classList.toggle('collapsed')">📁 primitives</span><div class="folder-contents"></div>`;
         lib.appendChild(primFolder);
         const primContainer = primFolder.querySelector('.folder-contents');
@@ -2053,7 +2058,8 @@ const Sim = {
             let container = lib;
             if (folder !== '') {
                 const fDiv = document.createElement('div');
-                fDiv.className = 'lib-folder';
+                // [AUDIT: v1.25.48 | SEC_ARCH_LEAD] - Restore custom macro folder collapse state.
+                fDiv.className = 'lib-folder' + (collapsedFolders.has(folder) ? ' collapsed' : '');
                 fDiv.innerHTML = `<span class="folder-title" onclick="this.parentElement.classList.toggle('collapsed')">📁 ${folder}</span><div class="folder-contents"></div>`;
                 lib.appendChild(fDiv);
                 container = fDiv.querySelector('.folder-contents');
