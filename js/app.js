@@ -121,73 +121,13 @@ window.onload = () => {
      * @STATE: BSIM_METADATA
      * @INTENT: Define the application semantic versioning for runtime compatibility checks.
      */
-    // [AUDIT: v1.24.52 | SEC_ARCH_LEAD] - Version increment for V8 tick fallback parity sync injection and Force Layout Sync utility.
-    // [AUDIT: v1.24.53 | SEC_ARCH_LEAD] - Implemented WebRTC High-Fidelity capture, URL-based workspace imports, and parametric ROM memory module.
-    // [AUDIT: v1.24.54 | SEC_ARCH_LEAD] - Deployed topological pseudo-class assertions to rigidly pin hierarchical menu visibility during text input focus.
-    // [AUDIT: v1.24.55 | SEC_ARCH_LEAD] - Resolved scheduler deadlock suppressing CLOCK node propagation in pure WebAssembly netlists.
-    // [AUDIT: v1.24.56 | SEC_ARCH_LEAD] - Injected assert, step, peek, poke, reset primitives into kernel CLI.
-    // [AUDIT: v1.24.57 | SEC_ARCH_LEAD] - Reclassified ROM module as a core primitive and normalized rendering palette.
-    // [AUDIT: v1.24.58 | SEC_ARCH_LEAD] - Hardened ROM payload fetcher and monotonic address pin scaling enforcement.
-    // [AUDIT: v1.24.59 | SEC_ARCH_LEAD] - Restored ROM pin geometry rendering and documented V8 engine memory fallback constraints.
-    // [AUDIT: v1.24.60 | SEC_ARCH_LEAD] - Synthesized Wasm Kernel extensions for native memory addressing and execution parity.
-    // [AUDIT: v1.24.61 | SEC_ARCH_LEAD] - Enabled right-click dynamic UI editing for ROM components to match macro behavior.
-    // [AUDIT: v1.24.62 | SEC_ARCH_LEAD] - Version increment for ROM UI persistence and label customization support.
-    // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Integrated RAM 8-Bit primitive with Synchronous Write path and Wasm store8 support.
-    // [AUDIT: v1.24.64 | SEC_ARCH_LEAD] - Enabled interactive icon scaling and parametric RAM R/W pin rendering.
-    // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Finalized Wasm/V8 bridge parity for RAM/ROM primitives and updated opcode dispatch.
-    // [AUDIT: v1.24.67 | SEC_ARCH_LEAD] - Deprecated legacy context menu extensions for ROM chips; unified UI under Node Prefs.
-    // [AUDIT: v1.24.68 | SEC_ARCH_LEAD] - Purged global contextmenu listener causing illegal menu appends under the Delete entry.
-    // [AUDIT: v1.24.69 | SEC_ARCH_LEAD] - Synchronized RAM driver resolution and hardened terminal Assertions with Wasm memory probing.
-    // [AUDIT: v1.24.70 | SEC_ARCH_LEAD] - Refined Assert primitive to use getDrivingSignal for input port fallbacks.
-    // [AUDIT: v1.24.71 | SEC_ARCH_LEAD] - Hardened persistence layer with deep state sanitization and global context purging.
-    // [AUDIT: v1.24.72 | SEC_ARCH_LEAD] - Expanded hitboxes, deterministic naming resolution, and exact wire deletion tracking.
-    // [AUDIT: v1.24.73 | SEC_ARCH_LEAD] - Native RAM/ROM flattening safeguards, internal simulation evaluation, and dynamic assertions.
-    // [AUDIT: v1.24.74 | SEC_ARCH_LEAD] - Repaired nested sub-menu dropdown rendering and synchronized version metadata.
-    // [AUDIT: v1.24.75 | SEC_ARCH_LEAD] - Navbar sub-menu persistence locks and safe exception-handling for wire deletion parameters.
-    // [AUDIT: v1.24.76 | SEC_ARCH_LEAD] - Polyfilled bounding boxes for marquee scaling and hardened serialization for memory buffers.
-    // [AUDIT: v1.24.77 | SEC_ARCH_LEAD] - Atomic wire splitting via unified history stack, and paste midpoint coordinate preservation.
-    // [AUDIT: v1.24.78 | SEC_ARCH_LEAD] - Algorithmic reduction of netlist resolution from O(N^2*W) to O(N+W) via map indexing and stack popping.
-    // [AUDIT: v1.24.79 | SEC_ARCH_LEAD] - Polyfilled instance memory for V8 hierarchical state retention, eradicating O(N) tick penalties and enforcing engine parity.
-    // [AUDIT: v1.24.80 | SEC_ARCH_LEAD] - V8 bus resolution architecture updated to match Wasm TTL logic (1 > 0 > Z) and missing memory drivers whitelisted.
-    // [AUDIT: v1.24.81 | SEC_ARCH_LEAD] - Injected strict physical boundary masks for Wasm linear memory lookups to prevent OOB traps.
-    // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - Synthesized native Wasm TRISTATE parity, orphaned wire cascading purges, and rigid undo heap limits.
-    // [AUDIT: v1.24.83 | SEC_ARCH_LEAD] - Eradicated 24-bit pointer truncation in RAM Write-Enable packing and secured Region C memory block boundaries.
-    // [AUDIT: v1.24.84 | SEC_ARCH_LEAD] - Repaired Wasm kernel parenthesis syntax error in nested opcode dispatch block.
-    // [AUDIT: v1.24.85 | SEC_ARCH_LEAD] - Resolved missing closing s-expression blocks in Wasm execution cascade.
-    // [AUDIT: v1.24.86 | SEC_ARCH_LEAD] - Synthesized native Wasm sequential logic (DFF/TFF) and resolved mapped array pointer corruption.
-    // [AUDIT: v1.24.87 | SEC_ARCH_LEAD] - Finalized Wasm kernel AST parenthesis alignment to resolve unexpected EOF compilation trap.
-    // [AUDIT: v1.24.88 | SEC_ARCH_LEAD] - Hardened Wasm operand fetch pipeline to prevent OOB traps and mitigated Region C heap collision.
-    // [AUDIT: v1.24.89 | SEC_ARCH_LEAD] - Isolated NQ memory offsets for Wasm sequential components and purged redundant V8 polling loops.
-    // [AUDIT: v1.24.90 | SEC_ARCH_LEAD] - Synchronized Wasm volatile memory back to Host arrays and purged JSON serialization from the simulation hot path.
-    // [AUDIT: v1.24.91 | SEC_ARCH_LEAD] - Deployed Two-Phase Commit protocol in Wasm to eliminate sequential hazard race conditions and resolved V8 scheduler deadlocks.
-    // [AUDIT: v1.25.01 | SEC_ARCH_LEAD] - Rolled back SharedArrayBuffer mutex to bypass Cross-Origin Isolation (COI) security faults on unconfigured servers.
-    // [AUDIT: v1.25.02 | SEC_ARCH_LEAD] - Disambiguated global URL ingestion and implemented native Local File APIs for direct RAM/ROM binary payloads.
-    // [AUDIT: v1.25.03 | SEC_ARCH_LEAD] - Inverted MSB/LSB visual pin rendering for memory primitives to enforce top-to-bottom spatial hierarchy.
-    // [AUDIT: v1.25.04 | SEC_ARCH_LEAD] - Relegated RAM/ROM binary upload to the component context dropdown to prevent interaction overlap.
-    // [AUDIT: v1.25.05 | SEC_ARCH_LEAD] - Enforced 16MB spatial bounds clamping on memory payload ingestion to prevent Wasm heap overflow attacks.
-    // [AUDIT: v1.25.06 | SEC_ARCH_LEAD] - Injected debug telemetry framework for RAM/ROM payload diagnostics via terminal broadcast.
-    // [AUDIT: v1.25.07 | SEC_ARCH_LEAD] - Restored Wasm DOM parity extraction and Kahn topological trace routing for Volatile Memory (RAM).
-    // [AUDIT: v1.25.08 | SEC_ARCH_LEAD] - Disabled memory payload auto-scaling; implemented strict bounds clamping and HTTP Range network optimization.
-    // [AUDIT: v1.25.09 | SEC_ARCH_LEAD] - Resolved Temporal Dead Zone (TDZ) initialization fault during Wasm scalar extraction.
-    // [AUDIT: v1.25.10 | SEC_ARCH_LEAD] - Resolved unreachable code path in spatial coordinate extraction routine.
-    // [AUDIT: v1.25.11 | SEC_ARCH_LEAD] - Implemented hard cache-busting on ingress scripts to resolve remote client state desynchronization.
-    // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Corrected version sequence and synchronized baseline architectural primitives including Ground (0) and RAM sync.
-    // [AUDIT: v1.25.15 | SEC_ARCH_LEAD] - Forced V8 engine fallback for memory primitives and enforced rigid array boundary padding.
-    // [AUDIT: v1.25.16 | SEC_ARCH_LEAD] - Injected 10px high-resolution layout grid.
-    // [AUDIT: v1.25.17 | SEC_ARCH_LEAD] - Auto-scaled RAM/ROM address bus to dynamically encompass context-menu binary payloads.
-    // [AUDIT: v1.25.18 | SEC_ARCH_LEAD] - Re-enabled native Wasm hardware acceleration for memory primitives.
-    // [AUDIT: v1.25.19 | SEC_ARCH_LEAD] - Fixed Wasm compiler omission for multi-slot primitives and hardened runtime purity checks.
-    // [AUDIT: v1.25.20 | SEC_ARCH_LEAD] - Centralized purity checks to Sim.isPureNative and eradicated local closure shadowing.
-    // [AUDIT: v1.25.21 | SEC_ARCH_LEAD] - Implemented dynamic viewport bounds (100dvh) for mobile footer visibility and constrained custom macro sub-menus with Y-axis scrolling.
-    // [AUDIT: v1.25.22 | SEC_ARCH_LEAD] - Exposed Native Ground (0) primitive to UI and hardened signal driver map for Wasm netlist.
-    // [AUDIT: v1.25.23 | SEC_ARCH_LEAD] - Replaced macro moving modal with hierarchical context sub-menu and inline DOM mutator.
-    // [AUDIT: v1.25.24 | SEC_ARCH_LEAD] - Scaled mobile touch targets for menu items and chips via dedicated media query.
-    // [AUDIT: v1.25.25 | SEC_ARCH_LEAD] - Implemented VFS symbolic linking and mapped library directories to the workspace home.
-    // [AUDIT: v1.25.26 | SEC_ARCH_LEAD] - Refactored symlink command parser to conform to the POSIX ln -s signature.
-    window.LOADED_BSIM_VERSION = "1.25.26";
+    // [AUDIT: v1.25.27 | SEC_ARCH_LEAD] - Encapsulated native primitives inside a collapsible hierarchical directory.
+    // [AUDIT: v1.25.28 | SEC_ARCH_LEAD] - Synchronized nomenclature to 'primatives' (lowercase) across UI and terminal.
+    // [AUDIT: v1.25.29 | SEC_ARCH_LEAD] - Reverted to 'primitives' (correct spelling) after user-initiated correction.
+    window.LOADED_BSIM_VERSION = "1.25.29";
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Native integration finalized in history.js and sim.js.
-    
+
     // [AUDIT: v1.23.96 | SEC_ARCH_LEAD] - Engine Parity Check: Assert parity between V8 and Wasm execution states on boot.
 
     // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - JIT Patches Purged: Remote Import and High-Fidelity Export natively integrated into ProjectManager.

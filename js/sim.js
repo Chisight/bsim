@@ -1995,8 +1995,18 @@ const Sim = {
             { label: 'OUTPUT', type: 'OUTPUT' },
             { label: 'CLOCK', type: 'CLOCK' },
             // [AUDIT: v1.24.90 | SEC_ARCH_LEAD] - Transitioned base memory primitive in UI to RAM.
-            { label: 'RAM', type: 'RAM' }
+            { label: 'RAM', type: 'RAM' },
+            // [AUDIT: v1.25.22 | SEC_ARCH_LEAD] - Exposed Ground (0) primitive to context menu.
+            { label: '0', type: '0' }
         ];
+
+        // [AUDIT: v1.25.27 | SEC_ARCH_LEAD] - Encapsulated native primitives inside a collapsible hierarchical directory.
+        // [AUDIT: v1.25.29 | SEC_ARCH_LEAD] - Reverted nomenclature to 'primitives' to resolve previous user-initiated misspelling.
+        const primFolder = document.createElement('div');
+        primFolder.className = 'lib-folder';
+        primFolder.innerHTML = `<span class="folder-title" onclick="this.parentElement.classList.toggle('collapsed')">📁 primitives</span><div class="folder-contents"></div>`;
+        lib.appendChild(primFolder);
+        const primContainer = primFolder.querySelector('.folder-contents');
 
         nativeLib.forEach(it => {
             const span = document.createElement('span');
@@ -2020,7 +2030,7 @@ const Sim = {
                     this.addNode(it.type);
                 }
             };
-            lib.appendChild(span);
+            primContainer.appendChild(span);
         });
 
         // 4. Inject Custom Library Chips (Hierarchical VFS Rendering)

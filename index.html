@@ -6,22 +6,26 @@
     <title>bSim</title>
     <link rel="icon" type="image/svg+xml" href="assets/bSim-logo-nand.svg">
     <link rel="stylesheet" href="css/style.css">
-    <script>window.EXPECTED_BSIM_VERSION = "1.25.26";</script>
+    <script>window.EXPECTED_BSIM_VERSION = "1.25.29";</script>
 </head>
 
 <body oncontextmenu="return false;">
     <div id="top-reveal" class="edge-reveal top">▼</div>
     <nav id="top-nav">
         <div class="nav-brand" style="display: flex; align-items: center;">
-            <button id="mobile-menu-toggle" style="display:none; background:none; border:none; color:#0f0; font-size:24px; cursor:pointer; margin-right:10px;" onclick="document.getElementById('sidebar').classList.toggle('mobile-open')">☰</button>
+            <button id="mobile-menu-toggle"
+                style="display:none; background:none; border:none; color:#0f0; font-size:24px; cursor:pointer; margin-right:10px;"
+                onclick="document.getElementById('sidebar').classList.toggle('mobile-open')">☰</button>
             <img src="assets/bSim-logo-big.svg" alt="bSim Logo"
                 style="height: 31.25px; margin-right: 8px; transition: transform 0.2s ease;">
-            <span style="font-size:10px; color:var(--wire-on); padding-top: 4px;">v1.25.26</span>
+            <span style="font-size:10px; color:var(--wire-on); padding-top: 4px;">v1.25.29</span>
         </div>
 
         <style>
             @media (max-width: 768px) {
-                #mobile-menu-toggle { display: block !important; }
+                #mobile-menu-toggle {
+                    display: block !important;
+                }
             }
         </style>
 
@@ -31,13 +35,18 @@
                 <div class="menu-item" onclick="Sim.uiNewChip()">Clear Board</div>
                 <div class="menu-item" onclick="ProjectManager.importProject()">Load .bsim</div>
                 <div class="menu-item" onclick="toggleSubMenu(this, event)">Import Workspace URL
-                    <div class="sub-menu" style="padding: 8px; width: 150px; cursor: default;" onclick="event.stopPropagation()">
-                        <div style="font-size: 10px; color: #888; margin-bottom: 4px; text-transform: uppercase; font-weight: bold;">.BSIM URL:</div>
+                    <div class="sub-menu" style="padding: 8px; width: 150px; cursor: default;"
+                        onclick="event.stopPropagation()">
+                        <div
+                            style="font-size: 10px; color: #888; margin-bottom: 4px; text-transform: uppercase; font-weight: bold;">
+                            .BSIM URL:</div>
                         <input type="text" id="import-url-val" placeholder="https://"
                             style="width: 100%; box-sizing: border-box; background: #111; color: #0f5; border: 1px solid #334; padding: 6px; font-size: 11px; margin-bottom: 6px; outline: none; border-radius: 4px; font-family: 'JetBrains Mono', monospace;"
                             onkeydown="if(event.key === 'Enter') { ProjectManager.importFromUrl(this.value); this.blur(); this.parentElement.style.display='none'; }">
-                        <div class="menu-item" style="text-align: center; background: #252530; border-radius: 4px; padding: 6px; color: #fff; font-weight: bold;"
-                            onclick="ProjectManager.importFromUrl(document.getElementById('import-url-val').value); this.parentElement.style.display='none';">Load URL</div>
+                        <div class="menu-item"
+                            style="text-align: center; background: #252530; border-radius: 4px; padding: 6px; color: #fff; font-weight: bold;"
+                            onclick="ProjectManager.importFromUrl(document.getElementById('import-url-val').value); this.parentElement.style.display='none';">
+                            Load URL</div>
                     </div>
                 </div>
                 <div class="menu-item" onclick="Sim.forceLayoutSync()" style="color:#0af;">Force Layout Sync</div>
@@ -180,15 +189,15 @@
 
     <!-- Core Engine -->
     <script src="js/synthesizer.js"></script>
-    <script src="js/sim.js?v=1.25.26"></script>
-    <script src="js/app.js?v=1.25.26"></script>
+    <script src="js/sim.js?v=1.25.29"></script>
+    <script src="js/app.js?v=1.25.29"></script>
 
     <script>
         // [AUDIT: v1.24.75 | SEC_ARCH_LEAD] - Unified menu state locking for persistent input focus without breaking CSS hover cascade.
         function toggleSubMenu(el, e) {
             const sm = el.querySelector('.sub-menu');
             const isVisible = sm.style.display === 'flex' || sm.style.display === 'block';
-            
+
             // Reset all sub-menus and keep-open locks not in the active chain
             document.querySelectorAll('.sub-menu').forEach(s => {
                 if (!s.contains(sm) && s !== sm) s.style.display = '';
@@ -196,7 +205,7 @@
             document.querySelectorAll('.keep-open').forEach(k => {
                 if (!k.contains(sm)) k.classList.remove('keep-open');
             });
-            
+
             if (!isVisible) {
                 sm.style.display = 'flex';
                 // Walk up the DOM tree and lock all ancestor .has-sub elements open
@@ -209,7 +218,7 @@
                     }
                     current = current.parentElement;
                 }
-                
+
                 // Focus the text input if this menu has one
                 const input = sm.querySelector('input');
                 if (input) setTimeout(() => input.focus(), 10);
@@ -218,7 +227,7 @@
                 const parent = el.closest('.has-sub');
                 if (parent) parent.classList.remove('keep-open');
             }
-            
+
             e.stopPropagation();
         }
 
@@ -226,7 +235,7 @@
         document.addEventListener('click', (e) => {
             // Don't close if we're clicking inside an input box inside a sub-menu
             if (e.target.tagName === 'INPUT' && e.target.closest('.sub-menu')) return;
-            
+
             document.querySelectorAll('.sub-menu').forEach(s => s.style.display = '');
             document.querySelectorAll('.keep-open').forEach(el => el.classList.remove('keep-open'));
         });
