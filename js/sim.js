@@ -5,7 +5,7 @@
 const Sim = {
     nodes: [],
     wires: [],
-    
+
     isPureNative() {
         return Engine.isPureNative(this.nodes, this.library);
     },
@@ -27,7 +27,7 @@ const Sim = {
     _toastTimer: null,
     shortCircuitStrikes: 0,
     _netlistDirty: false,
-    
+
     // [AUDIT: v1.25.40 | SEC_ARCH_LEAD] - Relocated fastEqual utility to prevent JIT de-optimization and recreation during high-frequency evaluation ticks.
     _fastEqual(a, b) {
         return Engine.fastEqual(a, b);
@@ -120,7 +120,7 @@ const Sim = {
         this.wakeQueue = () => { if (!running) { running = true; requestAnimationFrame(runQueue); } };
         const runQueue = () => {
             const now = performance.now();
-            
+
             // [AUDIT: v1.25.20 | SEC_ARCH_LEAD] - Transitioned to centralized purity validation.
             const isPureNative = Sim.isPureNative();
 
@@ -189,13 +189,13 @@ const Sim = {
      */
     deleteSelection() {
         if (this.selection.size === 0) return;
-        
+
         // [AUDIT: v1.24.46 | SEC_ARCH_LEAD] - Exposing centralized deletion interface for terminal 'rm all' parity.
         this.selection.forEach(id => {
             const n = this.nodes.find(x => x.id === id);
             if (n) History.execute(new DeleteNodeCommand(n));
         });
-        
+
         this.selection.clear();
         if (typeof this.updateWireVisuals === 'function') this.updateWireVisuals();
         this.autoSave();
@@ -274,10 +274,10 @@ const Sim = {
      */
     // [AUDIT: v1.24.70 | SEC_ARCH_LEAD] - Deterministic node allocation constraint injected for terminal parity validation.
     _finalizeAddNode(type, x, y, label, preferredId = null) {
-        const id = (preferredId && !this.nodes.some(n => n.id === preferredId)) 
-            ? preferredId 
+        const id = (preferredId && !this.nodes.some(n => n.id === preferredId))
+            ? preferredId
             : 'node-' + Math.random().toString(36).substr(2, 9);
-            
+
         const node = {
             id: id,
             type, x, y, label: label || type, val: 0,
@@ -295,7 +295,7 @@ const Sim = {
         // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Formally registered RAM as a core primitive to prevent macro-substitution logic.
         // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Registered '0' as native primitive.
         const NATIVE_TYPES = new Set(['NAND', 'CLOCK', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'JUNCTION', 'TRISTATE', 'DFF', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'RAM', '0']);
-        if (this.library[type] && !NATIVE_TYPES.has(type)) { 
+        if (this.library[type] && !NATIVE_TYPES.has(type)) {
             // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Established cyclical dependency scanner to avert recursion faults.
             if (this.activeEditingChip) {
                 const checkCycle = (target, check) => {
@@ -308,7 +308,7 @@ const Sim = {
                     return null;
                 }
             }
-            node.isCustom = true; 
+            node.isCustom = true;
         }
         History.execute(new AddNodeCommand(node));
         return node;
@@ -346,7 +346,7 @@ const Sim = {
      */
     updateNodeVisual(n) {
         const el = document.getElementById(n.id); if (!el) return;
-        
+
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Apply saved geometric properties dynamically on visual update.
         if (n.customWidth) el.style.width = n.customWidth + 'px';
         if (n.customHeight) el.style.height = n.customHeight + 'px';
@@ -355,7 +355,7 @@ const Sim = {
         if (n.portY !== undefined || n.portH !== undefined) {
             const py = n.portY !== undefined ? n.portY : 24;
             const ph = n.portH !== undefined ? n.portH : (n.customHeight || parseInt(el.style.height) || 64) - 30;
-            
+
             // [AUDIT: v1.25.49 | SEC_ARCH_LEAD] - Rewritten RAM port matrix traversal to decouple read/write bus strides and eliminate collision clipping.
             if (n.type === 'RAM') {
                 const aBits = n.addressPins || 4;
@@ -365,23 +365,23 @@ const Sim = {
                 const maxPins = Math.max(leftPins, rightPins);
                 const strideL = leftPins > 1 ? ph / (leftPins - 1) : 0;
                 const strideR = rightPins > 1 ? ph / (rightPins - 1) : 0;
-                
+
                 const applyPin = (p) => {
                     const pid = p.dataset.port;
                     if (!pid) return;
                     if (pid.startsWith('out')) {
-                        const idx = parseInt(pid.replace('out',''));
+                        const idx = parseInt(pid.replace('out', ''));
                         const vIdx = (dBits - 1) - idx; // MSB at top
                         p.style.top = (py + vIdx * strideR) + 'px';
                     } else if (pid.startsWith('din')) {
-                        const idx = parseInt(pid.replace('din',''));
+                        const idx = parseInt(pid.replace('din', ''));
                         const vIdx = (dBits - 1) - idx; // MSB at top
                         p.style.top = (py + vIdx * strideR) + 'px';
                     } else if (pid === 'we') {
                         // WE is placed at the end of the left side (address block)
                         p.style.top = (py + aBits * strideL) + 'px';
                     } else if (pid.startsWith('in')) {
-                        const idx = parseInt(pid.replace('in',''));
+                        const idx = parseInt(pid.replace('in', ''));
                         const vIdx = (aBits - 1) - idx; // MSB at top
                         p.style.top = (py + vIdx * strideL) + 'px';
                     }
@@ -432,7 +432,7 @@ const Sim = {
 
             // LSB is at index 0
             const val = paddedArr.reduce((acc, b, i) => acc | ((b === 1 ? 1 : 0) << i), 0);
-            
+
             if (!this._domCacheMap) this._domCacheMap = new Map();
             let cache = this._domCacheMap.get(n.id);
             if (cache && cache.dec && !document.body.contains(cache.dec)) {
@@ -447,11 +447,11 @@ const Sim = {
                 };
                 this._domCacheMap.set(n.id, cache);
             }
-            
+
             if (cache.dec) cache.dec.innerText = `D: ${val}`;
             if (cache.hex) cache.hex.innerText = `H: ${val.toString(16).toUpperCase().padStart(Math.ceil(bits / 4), '0')}`;
             if (cache.bin) cache.bin.innerText = `B: ${val.toString(2).padStart(bits, '0')}`;
-            
+
             if (cache.dots) {
                 cache.dots.forEach(dot => {
                     const bIdx = parseInt(dot.getAttribute('data-bit'));
@@ -484,7 +484,7 @@ const Sim = {
                 if (n.infoW !== undefined) infoCont.style.width = n.infoW + 'px';
                 if (n.infoH !== undefined) infoCont.style.height = n.infoH + 'px';
             }
-            
+
             // Strip legacy property to prevent future save crashes
             if (n._domCache) delete n._domCache;
         }
@@ -517,7 +517,7 @@ const Sim = {
             if (arm) {
                 // If the simulation is running, rotate the arm based on current tick count or state
                 // Using node.id and state to create a deterministic but "moving" rotation
-                const angle = (n.state === 1) ? 180 : 90; 
+                const angle = (n.state === 1) ? 180 : 90;
                 arm.style.transform = `rotate(${angle}deg)`;
             }
         }
@@ -532,20 +532,20 @@ const Sim = {
         ports.forEach(p => {
             const pid = p.dataset.port;
             let drive = null;
-            
+
             if (p.classList.contains('output') && !p.classList.contains('input')) {
                 drive = this.getSignal(n.id, pid);
             } else {
                 drive = this.getDrivingSignal(n.id, pid);
             }
-            
+
             p.classList.toggle('on', drive === 1);
             p.classList.toggle('off', drive === 0);
             p.classList.toggle('float', drive === null || drive === 'Z');
         });
 
         if (n._oscillating) el.classList.add('oscillating');
-        
+
         // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Emit state transitions to terminal watchers.
         if (window.DebugTerminal && DebugTerminal._watchers && DebugTerminal._watchers.has(n.id)) {
             const currentStr = JSON.stringify(n.val);
@@ -554,7 +554,7 @@ const Sim = {
                 n._lastWatchVal = currentStr;
             }
         }
-        
+
     },
 
     /**
@@ -649,7 +649,7 @@ const Sim = {
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for full simulation reset.
      */
-    seedQueue() { 
+    seedQueue() {
         return Engine.seedQueue(this);
     },
     /**
@@ -657,27 +657,27 @@ const Sim = {
     // [AUDIT: v1.25.46 | SEC_ARCH_LEAD] - Injected global macro renaming mechanism to assert topological consistency across all workspaces, historical stacks, and nested dependencies.
     renameMacroGlobally(oldName, newName) {
         if (!this.library || !this.library[oldName] || this.library[newName]) return false;
-        
+
         this.library[newName] = this.library[oldName];
         delete this.library[oldName];
-        
+
         const propagate = (nodes) => {
             if (!nodes) return;
             nodes.forEach(n => {
                 if (n.type === oldName) n.type = newName;
             });
         };
-        
+
         propagate(this.nodes);
         if (this.tabs) this.tabs.forEach(t => propagate(t.nodes));
         if (this.workspaceStack) this.workspaceStack.forEach(ws => propagate(ws.nodes));
-        
+
         Object.values(this.library).forEach(macro => propagate(macro.nodes));
-        
+
         // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Integrated hardware validation hook to verify pin parity post-rename mutation.
         const ioNodes = this.library[newName].nodes.filter(n => n.type.startsWith('IN-') || n.type.startsWith('OUT-') || n.type.startsWith('PROBE-'));
         if (ioNodes.length === 0 && this.nodes.some(n => n.type === newName)) console.warn(`[Hardware Validation] Warning: Renamed chip '${newName}' lacks IO pins.`);
-        
+
         this._netlistDirty = true;
         if (typeof this.updateLibraryUI === 'function') this.updateLibraryUI();
         if (typeof this.updateTabsUI === 'function') this.updateTabsUI();
@@ -697,7 +697,7 @@ const Sim = {
         }
         const originNode = this.nodes.find(n => n.id === nodeId);
         if (!originNode || !originNode.type.startsWith('IN-')) return;
-        
+
         let targets = [originNode];
         if (e && e.shiftKey && this.selection.has(nodeId)) {
             targets = this.nodes.filter(n => this.selection.has(n.id) && n.type.startsWith('IN-'));
@@ -734,24 +734,24 @@ const Sim = {
     updateHUD() {
         let hud = document.getElementById('ui-hud');
         if (!this.showStats) { if (hud) hud.remove(); return; }
-        if (!hud) { 
-            hud = document.createElement('div'); 
-            hud.id = 'ui-hud'; 
+        if (!hud) {
+            hud = document.createElement('div');
+            hud.id = 'ui-hud';
             const ws = document.getElementById('workspace');
-            if (ws) ws.appendChild(hud); else document.body.appendChild(hud); 
+            if (ws) ws.appendChild(hud); else document.body.appendChild(hud);
         }
 
         const pos = this.hudPos || 'top-right';
         hud.style.position = 'absolute';
         hud.style.padding = '10px 15px'; hud.style.fontFamily = 'var(--font)'; hud.style.fontSize = '10px'; hud.style.pointerEvents = 'none'; hud.style.zIndex = '500'; hud.style.color = 'rgba(0, 255, 170, 0.6)'; hud.style.background = 'rgba(0,0,0,0.3)'; hud.style.borderRadius = '6px'; hud.style.backdropFilter = 'blur(2px)';
-        
+
         if (pos === 'top-right') { hud.style.top = '15px'; hud.style.right = '20px'; hud.style.left = 'auto'; hud.style.bottom = 'auto'; hud.style.textAlign = 'right'; }
         else if (pos === 'top-left') { hud.style.top = '15px'; hud.style.left = '15px'; hud.style.right = 'auto'; hud.style.bottom = 'auto'; hud.style.textAlign = 'left'; }
         else if (pos === 'bottom-left') { hud.style.bottom = '15px'; hud.style.left = '15px'; hud.style.right = 'auto'; hud.style.top = 'auto'; hud.style.textAlign = 'left'; }
 
         // [AUDIT: v1.25.20 | SEC_ARCH_LEAD] - Transitioned to centralized purity validation.
         const isPureNative = this.isPureNative();
-        
+
         let engineStatus = '';
         if (this.useWasm) {
             if (window.WasmEngine && WasmEngine.ready && isPureNative) {
@@ -762,7 +762,7 @@ const Sim = {
         } else {
             engineStatus = '<span style="color:#ffaa00">V8 JAVASCRIPT</span>';
         }
-        
+
         hud.innerHTML = `GATES: ${this.nodes.length} | WIRES: ${this.wires.length}<br>CHIP : ${this.activeEditingChip || 'MAIN'}<br>ENGINE: ${engineStatus}<br>POS  : <span id="hud-coords" style="color:#0f5">0, 0</span>`;
     },
 
@@ -813,7 +813,7 @@ const Sim = {
             const prevChip = this.activeEditingChip;
             this.uiExitChipEdit();
             this.uiEditChip(name, true);
-            
+
             this.toast(`Saved ${prevChip}. Switched to ${name}.`, 'success', 5000);
             const toastEl = document.getElementById('ui-toast-el');
             if (toastEl) {
@@ -878,7 +878,7 @@ const Sim = {
         this.tabs.forEach(t => { if (checkNodes(t.nodes)) inUse = true; });
         this.workspaceStack.forEach(ws => { if (checkNodes(ws.nodes)) inUse = true; });
         Object.keys(this.library).forEach(k => { if (k !== name && checkNodes(this.library[k].nodes)) inUse = true; });
-        
+
         if (inUse) {
             this.toast(`Deletion blocked: Chip '${name}' is actively instanced.`, 'danger');
             return;
@@ -947,7 +947,7 @@ const Sim = {
         w = document.createElement('div');
         w.id = 'prefs-window';
         w.style.cssText = 'position:fixed; top:80px; right:40px; width:360px; max-height:80vh; background:rgba(15,15,20,0.95); border:1px solid #334; border-radius:8px; z-index:9500; display:flex; flex-direction:column; box-shadow:0 15px 40px rgba(0,0,0,0.8); backdrop-filter:blur(10px); resize:both; overflow:hidden;';
-        
+
         w.innerHTML = `
             <div id="prefs-head" style="background:#111; padding:8px 12px; color:#888; cursor:move; display:flex; justify-content:space-between; align-items:center; border-bottom:1px solid #222; font-family:'JetBrains Mono', monospace; font-size:12px; flex-shrink:0;">
                 <div style="font-weight:bold; color:#00ffaa; pointer-events:none;">PREFERENCES</div>
@@ -963,12 +963,12 @@ const Sim = {
                 <label style="display:flex; justify-content:space-between; align-items:center;"><span>Show Notifications</span><input type="checkbox" ${this.showToasts ? 'checked' : ''} onchange="Sim.showToasts=this.checked; Sim.autoSave();"></label>
                 <label style="display:flex; justify-content:space-between; align-items:center;"><span style="color:var(--wire-on)">Debug Notifications</span><input type="checkbox" ${this.debugToasts ? 'checked' : ''} onchange="Sim.debugToasts=this.checked; Sim.autoSave();"></label>
                 <label style="display:flex; justify-content:space-between; align-items:center;"><span style="color:#ffca28">Disable UI Animations</span><input type="checkbox" ${this.disableAnimations ? 'checked' : ''} onchange="Sim.disableAnimations=this.checked; Sim.applyStyles(); Sim.autoSave();"></label>
-                <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">HUD Position: <select onchange="Sim.hudPos=this.value; Sim.updateHUD(); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px; padding:2px;"><option value="top-right" ${this.hudPos==='top-right'?'selected':''}>Top-Right</option><option value="top-left" ${this.hudPos==='top-left'?'selected':''}>Top-Left</option><option value="bottom-left" ${this.hudPos==='bottom-left'?'selected':''}>Bottom-Left</option></select></div>
+                <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">HUD Position: <select onchange="Sim.hudPos=this.value; Sim.updateHUD(); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px; padding:2px;"><option value="top-right" ${this.hudPos === 'top-right' ? 'selected' : ''}>Top-Right</option><option value="top-left" ${this.hudPos === 'top-left' ? 'selected' : ''}>Top-Left</option><option value="bottom-left" ${this.hudPos === 'bottom-left' ? 'selected' : ''}>Bottom-Left</option></select></div>
                 <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">UI Scale (%): <div style="display:flex; gap:5px; align-items:center;"><input type="range" min="50" max="200" value="${this.uiScale || 100}" oninput="this.nextElementSibling.value=this.value; Sim.uiScale=parseInt(this.value); Sim.applyStyles(); Sim.autoSave();" style="width:70px;"><input type="number" min="50" max="200" value="${this.uiScale || 100}" oninput="this.previousElementSibling.value=this.value; Sim.uiScale=parseInt(this.value); Sim.applyStyles(); Sim.autoSave();" style="width:40px; background:#111; color:#fff; border:1px solid #334; text-align:center; font-family:'JetBrains Mono', monospace;"></div></div>
-                <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">Port Size: <select onchange="Sim.portSize=this.value; Sim.applyStyles(); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px; padding:2px;"><option value="small" ${this.portSize==='small'?'selected':''}>Small</option><option value="medium" ${this.portSize==='medium'||!this.portSize?'selected':''}>Medium</option><option value="large" ${this.portSize==='large'?'selected':''}>Large</option></select></div>
-                <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">Indicator LED Size: <select onchange="Sim.dotSize=this.value; Sim.applyStyles(); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px; padding:2px;"><option value="small" ${this.dotSize==='small'?'selected':''}>Small (8px)</option><option value="medium" ${this.dotSize==='medium'||!this.dotSize?'selected':''}>Medium (12px)</option><option value="large" ${this.dotSize==='large'?'selected':''}>Large (16px)</option></select></div>
+                <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">Port Size: <select onchange="Sim.portSize=this.value; Sim.applyStyles(); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px; padding:2px;"><option value="small" ${this.portSize === 'small' ? 'selected' : ''}>Small</option><option value="medium" ${this.portSize === 'medium' || !this.portSize ? 'selected' : ''}>Medium</option><option value="large" ${this.portSize === 'large' ? 'selected' : ''}>Large</option></select></div>
+                <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">Indicator LED Size: <select onchange="Sim.dotSize=this.value; Sim.applyStyles(); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px; padding:2px;"><option value="small" ${this.dotSize === 'small' ? 'selected' : ''}>Small (8px)</option><option value="medium" ${this.dotSize === 'medium' || !this.dotSize ? 'selected' : ''}>Medium (12px)</option><option value="large" ${this.dotSize === 'large' ? 'selected' : ''}>Large (16px)</option></select></div>
                 <div style="height:1px; background:#333; margin:8px 0 4px 0;"></div>
-                <label style="display:flex; align-items:center; justify-content:space-between; gap:10px;"><span style="font-weight:bold; color:var(--wire-on);">Execution Engine:</span><select onchange="Sim.setEngine(this.value); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #444; padding:4px 8px; border-radius:4px; outline:none; cursor:pointer; font-family:'JetBrains Mono', monospace; font-size:11px;"><option value="wasm" ${this.useWasm?'selected':''}>WASM (High Performance)</option><option value="v8" ${!this.useWasm?'selected':''}>V8 JavaScript (Fallback)</option></select></label>
+                <label style="display:flex; align-items:center; justify-content:space-between; gap:10px;"><span style="font-weight:bold; color:var(--wire-on);">Execution Engine:</span><select onchange="Sim.setEngine(this.value); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #444; padding:4px 8px; border-radius:4px; outline:none; cursor:pointer; font-family:'JetBrains Mono', monospace; font-size:11px;"><option value="wasm" ${this.useWasm ? 'selected' : ''}>WASM (High Performance)</option><option value="v8" ${!this.useWasm ? 'selected' : ''}>V8 JavaScript (Fallback)</option></select></label>
             </div>
         `;
         document.body.appendChild(w);
@@ -1059,7 +1059,7 @@ const Sim = {
                 History.index = newTab.historyIndex !== undefined ? newTab.historyIndex : -1;
                 History.updateButtons();
             }
-            
+
             // [AUDIT: v1.24.11 | SEC_ARCH_LEAD] - Restore persisted split-pane editor context on tab switch.
             if (newTab.activeSplitChip) {
                 this.uiSplitEditor(newTab.splitDirection || 'right', newTab.activeSplitChip, true);
@@ -1108,10 +1108,10 @@ const Sim = {
 
         const sizeMap = { 'small': '8%', 'medium': '14%', 'large': '19%' };
         document.documentElement.style.setProperty('--port-size', sizeMap[this.portSize || 'medium']);
-        
+
         const dotMap = { 'small': '8px', 'medium': '12px', 'large': '16px' };
         document.documentElement.style.setProperty('--dot-size', dotMap[this.dotSize || 'medium']);
-        
+
         document.body.classList.toggle('no-animations', !!this.disableAnimations);
     },
     /**
@@ -1153,19 +1153,19 @@ const Sim = {
         const el = document.getElementById(nodeId);
         if (!node || !el) return;
         this.activeNodeEdit = { node, mode, og: { w: node.customWidth, h: node.customHeight, px: node.pinX, py: node.pinY, pw: node.pinW, ph: node.pinH, ix: node.infoX, iy: node.infoY, iw: node.infoW, ih: node.infoH, lx: node.labelX, ly: node.labelY, lw: node.labelW, lh: node.labelH, portY: node.portY, portH: node.portH, portLabelX: node.portLabelX } };
-        
+
         // [AUDIT: SEC_ARCH_LEAD] - Lock global wiring interactions to prevent misclicks during layout mutation.
         document.body.classList.add('edit-mode-active');
-        
+
         // [AUDIT: v1.24.36 | SEC_ARCH_LEAD] - Isolated base outline rendering to prevent multi-box rendering glitches on inner wrappers.
         if (mode === 'icon') el.style.outline = '2px dashed #00ffaa';
-        
+
         const pinCont = el.querySelector('.pin-container');
         const infoCont = el.querySelector('.visual-extra');
         const lblCont = el.querySelector('.gate-label');
         // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Renamed pin-dots to pin-leds to fix nomenclature as instructed.
         let target = (mode === 'pins' || mode === 'pin-leds') ? pinCont : (mode === 'info' ? infoCont : (mode === 'label' ? lblCont : el));
-        
+
         // [AUDIT: v1.24.34 | SEC_ARCH_LEAD] - Dynamic proxy generation for port geometry mutations.
         if (mode === 'pin-labels' || mode === 'pin-both' || mode === 'ports') {
             let proxy = el.querySelector('.port-edit-proxy');
@@ -1186,7 +1186,7 @@ const Sim = {
             target = proxy;
         }
         if (!target) return;
-        
+
         // [AUDIT: v1.24.26 | SEC_ARCH_LEAD] - Injected edit mode dispatch handling for gate label components.
         // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Adapted edit mode dispatch handling for pin-leds components.
         if (mode === 'pins' || mode === 'pin-leds' || mode === 'info' || mode === 'label' || mode === 'pin-labels' || mode === 'pin-both' || mode === 'ports') {
@@ -1211,7 +1211,7 @@ const Sim = {
             target.style.outline = (mode === 'pin-labels' || mode === 'pin-both' || mode === 'ports') ? '2px dotted #ffca28' : '2px dashed #ff00aa';
             target.style.cursor = 'move';
             target.style.transform = 'none'; // Release absolute centering lock for dragging
-            
+
             // [AUDIT: v1.24.35 | SEC_ARCH_LEAD] - Cursor mapping overriding for symmetric layout stretching.
             this._editHover = (ev) => {
                 const rect = target.getBoundingClientRect();
@@ -1224,7 +1224,7 @@ const Sim = {
                 const hRight = hx > target.offsetWidth - thX;
                 const hTop = hy < thY;
                 const hBottom = hy > target.offsetHeight - thY;
-                
+
                 // [AUDIT: v1.25.33 | SEC_ARCH_LEAD] - Injected distinct cursor locks for horizontal label dragging vs vertical port scaling.
                 if (mode === 'pin-labels') target.style.cursor = 'ew-resize';
                 else if (mode === 'pin-both' || mode === 'ports') target.style.cursor = 'ns-resize';
@@ -1243,13 +1243,13 @@ const Sim = {
             if (e.button !== 0) return;
             e.preventDefault();
             e.stopPropagation();
-            
+
             // [AUDIT: SEC_ARCH_LEAD] - Proportional grab-zone calculation to guarantee a central translation zone.
             const rect = target.getBoundingClientRect();
             const scale = View.scale || 1;
             const clickX = (e.clientX - rect.left) / scale;
             const clickY = (e.clientY - rect.top) / scale;
-            
+
             const thX = Math.min(12, target.offsetWidth / 3);
             const thY = Math.min(12, target.offsetHeight / 3);
             const rLeft = clickX < thX;
@@ -1259,7 +1259,7 @@ const Sim = {
             // [AUDIT: v1.24.38 | SEC_ARCH_LEAD] - Unified translation and scaling boolean logic to prevent dead zones on proxy.
             // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Adapted scaling hitboxes for renamed pin-leds target.
             const isResizing = (mode === 'pin-labels' || mode === 'pin-both' || mode === 'ports') ? (rLeft || rRight || rTop || rBottom) : ((mode === 'pins' || mode === 'pin-leds' || mode === 'info' || mode === 'label') && (rLeft || rRight || rTop || rBottom));
-            
+
             const startX = e.clientX;
             const startY = e.clientY;
             const isInfo = mode === 'info';
@@ -1279,17 +1279,17 @@ const Sim = {
                 const scale = View.scale || 1;
                 const dx = (m.clientX - startX) / scale;
                 const dy = (m.clientY - startY) / scale;
-                
+
                 if (mode === 'icon') {
                     node.customWidth = Math.max(40, startNodeW + dx);
                     node.customHeight = Math.max(40, startNodeH + dy);
                     el.style.width = node.customWidth + 'px';
                     el.style.height = node.customHeight + 'px';
                     Sim.updateWireVisuals();
-                // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Restored missing target condition for pin-leds scaling and translation propagation to fix regression.
+                    // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Restored missing target condition for pin-leds scaling and translation propagation to fix regression.
                 } else if (mode === 'pins' || mode === 'pin-leds' || mode === 'info' || mode === 'label' || mode === 'pin-labels' || mode === 'pin-both' || mode === 'ports') {
                     let cX = startPinX, cY = startPinY, cW = startPinW, cH = startPinH;
-                    if (isResizing || m.shiftKey) { 
+                    if (isResizing || m.shiftKey) {
                         // [AUDIT: v1.24.27 | SEC_ARCH_LEAD] - Adjusted scaling constraints for label geometries to permit overhangs and font scaling.
                         if (rLeft) {
                             const nextX = mode === 'label' ? startPinX + dx : Math.max(0, startPinX + dx);
@@ -1302,7 +1302,7 @@ const Sim = {
 
                         if (mode === 'pin-labels' || mode === 'pin-both' || mode === 'ports') {
                             // [AUDIT: v1.24.38 | SEC_ARCH_LEAD] - Isolated 1D vertical geometric mutations for port proxies absorbing horizontal input without translation.
-                            cX = startPinX; 
+                            cX = startPinX;
                             cW = startPinW;
                             if (rTop) {
                                 const nextY = startPinY + dy;
@@ -1322,7 +1322,7 @@ const Sim = {
                         } else if (rBottom) {
                             cH = Math.max(10, mode === 'label' ? Math.min(startNodeH, startPinH + dy) : Math.min(startNodeH - startPinY, startPinH + dy));
                         }
-                    } else { 
+                    } else {
                         // Move from Center
                         const curW = startPinW || target.offsetWidth || 16;
                         const curH = startPinH || target.offsetHeight || 16;
@@ -1331,7 +1331,7 @@ const Sim = {
                         cX = mode === 'label' ? startPinX + dx : Math.max(0, Math.min(maxW, startPinX + dx));
                         cY = mode === 'label' ? startPinY + dy : Math.max(0, Math.min(maxH, startPinY + dy));
                     }
-                    
+
                     if (mode === 'info') {
                         node.infoX = cX; node.infoY = cY; node.infoW = cW; node.infoH = cH;
                     } else if (mode === 'label') {
@@ -1349,7 +1349,7 @@ const Sim = {
                     } else {
                         node.pinX = cX; node.pinY = cY; node.pinW = cW; node.pinH = cH;
                     }
-                    
+
                     if (mode === 'pin-labels' || mode === 'pin-both' || mode === 'ports') {
                         Sim.updateNodeVisual(node);
                         Sim.updateWireVisuals();
@@ -1367,7 +1367,7 @@ const Sim = {
             document.addEventListener('mousemove', onMove);
             document.addEventListener('mouseup', onUp);
         };
-        
+
         target.addEventListener('mousedown', this._editModeDown);
         this.toast(`Edit Mode: ${mode === 'pins' ? 'Drag to move, Shift+Drag to resize' : 'Drag bottom-right to scale'}. Double-click board to save.`, 'info', 0);
     },
@@ -1378,7 +1378,7 @@ const Sim = {
         document.body.classList.remove('edit-mode-active');
         const state = this.activeNodeEdit;
         this.activeNodeEdit = null;
-        
+
         const el = document.getElementById(state.node.id);
         const pinCont = el?.querySelector('.pin-container');
         const infoCont = el?.querySelector('.visual-extra');
@@ -1386,12 +1386,12 @@ const Sim = {
         // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Updated node edit exit hook for LED nomenclature sync.
         let target = state.mode === 'pins' || state.mode === 'pin-leds' ? pinCont : (state.mode === 'info' ? infoCont : (state.mode === 'label' ? lblCont : el));
         if (state.mode === 'pin-labels' || state.mode === 'pin-both' || state.mode === 'ports') target = el?.querySelector('.port-edit-proxy');
-        
+
         if (target && this._editModeDown) {
             target.removeEventListener('mousedown', this._editModeDown);
             if (this._editHover) target.removeEventListener('mousemove', this._editHover);
         }
-        
+
         if (el) { el.style.outline = ''; el.style.cursor = ''; }
         if (pinCont) { pinCont.classList.remove('editing-pins'); pinCont.style.outline = ''; pinCont.style.cursor = ''; }
         if (infoCont) { infoCont.classList.remove('editing-pins'); infoCont.style.outline = ''; infoCont.style.cursor = ''; }
@@ -1407,7 +1407,7 @@ const Sim = {
             Sim.updateNodeVisual(state.node);
             Sim.updateWireVisuals();
         }
-        
+
         this.toast('Layout saved. ', 'success', 5000);
         const tEl = document.getElementById('ui-toast-el');
         if (tEl) {
@@ -1447,7 +1447,7 @@ const Sim = {
             if (!input) return;
             const dims = input.split(',').map(n => parseInt(n.trim()));
             if (dims.length !== 2 || isNaN(dims[0]) || isNaN(dims[1])) return this.toast('Invalid format. Use W,H', 'danger');
-            
+
             // Apply to active nodes on the board
             this.nodes.forEach(n => {
                 if (n.type === name) {
@@ -1475,27 +1475,27 @@ const Sim = {
         const n = this.nodes.find(node => node.id === id);
         if (!n || !n.type.startsWith('IN-')) return;
         const bits = parseInt(n.type.split('-')[1]) || 1;
-        
+
         let currentNum = 0;
         if (bits === 1) {
             currentNum = n.val;
         } else {
             for (let i = 0; i < bits; i++) currentNum |= (n.state[i] ? 1 : 0) << i;
         }
-        
+
         let prefill = currentNum.toString(10);
         if (format === 'H') prefill = currentNum.toString(16).toUpperCase().padStart(Math.ceil(bits / 4), '0');
         else if (format === 'B') prefill = currentNum.toString(2).padStart(bits, '0');
-        
+
         const input = document.createElement('input');
         input.type = 'text';
         input.value = prefill;
         input.style.cssText = 'width: 100%; height: 100%; box-sizing: border-box; background: #222; color: #fff; border: 1px solid #00ffaa; font-family: "JetBrains Mono", monospace; font-size: inherit; text-align: center; outline: none; border-radius: 2px;';
-        
+
         const ogText = target.innerText;
         target.innerText = '';
         target.appendChild(input);
-        
+
         const commit = () => {
             if (!target.contains(input)) return;
             const cleanVal = input.value.trim();
@@ -1619,16 +1619,16 @@ const Sim = {
         const targetChip = overrideChip || this.activeEditingChip;
         if (!targetChip) return;
         const tab = document.querySelector(`.tab[onclick*="${this.activeTabId}"]`);
-        
+
         let splitFrame = document.getElementById('split-editor-frame');
         let popupWrap = document.getElementById('popup-editor-wrap');
-        
+
         if (splitFrame) splitFrame.remove();
         if (popupWrap) popupWrap.remove();
-        
+
         const main = document.getElementById('main');
         main.classList.remove('workspace-split', 'split-left', 'split-right');
-        
+
         const chipUrl = `?chip=${encodeURIComponent(targetChip)}`;
 
         if (direction === 'popup') {
@@ -1636,7 +1636,7 @@ const Sim = {
             popupWrap.id = 'popup-editor-wrap';
             // [AUDIT: v1.24.40 | SEC_ARCH_LEAD] - Expanded popup editor wrapper with granular edge-resize hitboxes and window control toggles.
             popupWrap.style.cssText = 'position: fixed; top: 100px; left: 100px; width: 600px; height: 400px; background: rgba(10, 10, 15, 0.95); backdrop-filter: blur(8px); border: 1px solid #334; border-radius: 6px; display: flex; flex-direction: column; z-index: 9000; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.8);';
-            
+
             popupWrap.innerHTML = `
                 <div id="popup-editor-head" style="background: #111; padding: 6px 10px; color: #888; cursor: move; display: flex; justify-content: space-between; align-items: center; user-select: none; border-bottom: 1px solid #222; font-family: 'JetBrains Mono', monospace; font-size: 12px; flex-shrink: 0; height: 28px; box-sizing: border-box;">
                     <div style="font-weight:bold; color:#ffca28; pointer-events:none;">CHIP EDITOR: ${targetChip}</div>
@@ -1657,7 +1657,7 @@ const Sim = {
                 <iframe src="${chipUrl}" style="flex:1; border:none; width:100%; height:100%; background:var(--bg);"></iframe>
             `;
             document.body.appendChild(popupWrap);
-            
+
             // [AUDIT: v1.24.16 | SEC_ARCH_LEAD] - Hardened popup editor drag state against iframe input swallowing.
             let isDragging = false, isResizing = false, resizeDir = '', startX, startY, initX, initY, initW, initH;
             const head = popupWrap.querySelector('#popup-editor-head');
@@ -1726,7 +1726,7 @@ const Sim = {
 
             if (tab) tab.classList.add('has-split');
             this.toast(`Popup editor spawned for ${targetChip}`, 'success');
-            
+
         } else {
             splitFrame = document.createElement('div');
             splitFrame.id = 'split-editor-frame';
@@ -1738,7 +1738,7 @@ const Sim = {
                 </div>
                 <iframe src="${chipUrl}" style="flex:1; border:none; width:100%; height:100%; background:var(--bg);"></iframe>
             `;
-            
+
             main.classList.add('workspace-split');
             if (direction === 'left') {
                 main.classList.add('split-left');
@@ -1781,7 +1781,7 @@ const Sim = {
             NodeRenderer.renderNode(n);
         });
         this.wires = parent.wires;
-        
+
         if (window.History) {
             History.stack = parent.historyStack || [];
             History.index = parent.historyIndex !== undefined ? parent.historyIndex : -1;

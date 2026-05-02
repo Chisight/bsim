@@ -161,10 +161,10 @@ const Engine = {
             const addr = [];
             for (let i = 0; i < aBits; i++) addr.push(this.getDrivingSignal(sim, node.id, `in${i}`));
             if (addr.some(b => b === 'Z' || b === null)) return node.val || {};
-            
+
             const addrVal = parseInt(addr.reverse().join(''), 2);
             const we = this.getDrivingSignal(sim, node.id, 'we');
-            
+
             if (we === 1) {
                 if (!node.memoryData) node.memoryData = new Array(Math.pow(2, aBits)).fill(0);
                 const din = [];
@@ -291,7 +291,7 @@ const Engine = {
         // Wasm engine intercept
         if (sim.useWasm && window.WasmEngine && WasmEngine.ready) {
             const isPureNative = this.isPureNative(sim.nodes, sim.library);
-            
+
             if (isPureNative) {
                 let changed = false;
                 if (sim._netlistDirty) {
@@ -392,7 +392,7 @@ const Engine = {
                                 rawInnerState[inner.id] = outVal;
                             }
                         });
-                        
+
                         const mappedOuts = this._mapChipOutputs(sim.library[n.type], rawInnerState);
                         if (JSON.stringify(n.outputs) !== JSON.stringify(mappedOuts) || n._forcePropagate) {
                             n.outputs = mappedOuts;
@@ -515,7 +515,7 @@ const Engine = {
             sim.eventQueue.clear();
             if (typeof sim.toast === 'function') sim.toast('Simulation halted: Unstable oscillation detected.', 'danger');
         }
-        
+
         if (iterations > 0 && window.WireRenderer) WireRenderer.drawWires();
     },
 
