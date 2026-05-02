@@ -123,11 +123,12 @@ window.onload = () => {
     // [AUDIT: v1.25.39 | SEC_ARCH_LEAD] - Executed global codebase sanitation; purged deprecated ROM primitive and archived stale taxonomy/audit metadata to ARCHIVE_BLOAT.md.
     // [AUDIT: v1.25.40 | SEC_ARCH_LEAD] - Relocated high-frequency fastEqual utility to Sim object prototype to prevent hot-path recompilation overhead.
     // [AUDIT: v1.25.41 | SEC_ARCH_LEAD] - Executed architectural stability directives: zero-copy parity alignment, depth-bound trace guards, and deterministic evaluation.
-    // [AUDIT: v1.25.42 | SEC_ARCH_LEAD] - Patched Virtual File System boundary guards to permit workspace initialization and destruction within the home directory.
+    // [AUDIT: v1.25.42 | SEC_ARCH_LEAD] - Deployed command execution debouncer to mitigate upstream lag-induced duplicate inputs.
     // [AUDIT: v1.25.43 | SEC_ARCH_LEAD] - Instituted UI synchronization, multi-bit bus parsing guards, and strict VFS allocation limits.
     // [AUDIT: v1.25.44 | SEC_ARCH_LEAD] - Enforced Wasm memory expansion limits, optimized pin state retrieval, and standardized viewport panning.
     // [AUDIT: v1.25.45 | SEC_ARCH_LEAD] - Aligned Ground primitive nomenclature: renamed port label from GND to 0.
-    window.LOADED_BSIM_VERSION = "1.25.45";
+    // [AUDIT: v1.25.46 | SEC_ARCH_LEAD] - Implemented global netlist propagation for hierarchical macro renaming to avert stale reference traps.
+    window.LOADED_BSIM_VERSION = "1.25.46";
 
     // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Purged legacy JIT DOM interceptor in favor of native parametric coordinate generation.
 

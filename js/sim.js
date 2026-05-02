@@ -1812,6 +1812,33 @@ const Sim = {
     },
     /**
      */
+    // [AUDIT: v1.25.46 | SEC_ARCH_LEAD] - Injected global macro renaming mechanism to assert topological consistency across all workspaces, historical stacks, and nested dependencies.
+    renameMacroGlobally(oldName, newName) {
+        if (!this.library || !this.library[oldName] || this.library[newName]) return false;
+        
+        this.library[newName] = this.library[oldName];
+        delete this.library[oldName];
+        
+        const propagate = (nodes) => {
+            if (!nodes) return;
+            nodes.forEach(n => {
+                if (n.type === oldName) n.type = newName;
+            });
+        };
+        
+        propagate(this.nodes);
+        if (this.tabs) this.tabs.forEach(t => propagate(t.nodes));
+        if (this.workspaceStack) this.workspaceStack.forEach(ws => propagate(ws.nodes));
+        
+        Object.values(this.library).forEach(macro => propagate(macro.nodes));
+        
+        this._netlistDirty = true;
+        if (typeof this.updateLibraryUI === 'function') this.updateLibraryUI();
+        if (typeof this.updateTabsUI === 'function') this.updateTabsUI();
+        this.autoSave();
+        return true;
+    },
+
     toggleBit(e, nodeId, bitIndex) {
         // [AUDIT: SEC_ARCH_LEAD] - Prevent input toggling while in layout mutation mode.
         if (document.body.classList.contains('edit-mode-active')) return;

@@ -441,7 +441,8 @@ const DebugTerminal = {
                 // [AUDIT: v1.24.93 | SEC_ARCH_LEAD] - Injected power, symbols, and timing analysis primitives.
                 // [AUDIT: v1.25.25 | SEC_ARCH_LEAD] - Registered simlink command for virtual directory linking.
                 // [AUDIT: v1.25.26 | SEC_ARCH_LEAD] - Converted to POSIX standard 'ln' command alias.
-                const cmds = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv', 'mkdir', 'tick', 'step', 'clock', 'force', 'unforce', 'watch', 'dump', 'cp', 'touch', 'find', 'bom', 'path', 'assert', 'peek', 'poke', 'reset', 'power', 'symbols', 'timing', 'ln'];
+                // [AUDIT: v1.25.46 | SEC_ARCH_LEAD] - Registered rename command for global macro topological updates.
+                const cmds = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv', 'mkdir', 'tick', 'step', 'clock', 'force', 'unforce', 'watch', 'dump', 'cp', 'touch', 'find', 'bom', 'path', 'assert', 'peek', 'poke', 'reset', 'power', 'symbols', 'timing', 'ln', 'rename'];
                 matches = cmds.filter(c => c.startsWith(prefix));
             } else if (cmd === 'cd' || cmd === 'ls' || cmd === 'tree' || cmd === 'rm' || cmd === 'mkdir') {
                 // [AUDIT: v1.24.03 | SEC_ARCH_LEAD] - Dynamic VFS path autocomplete with trailing slash parsing.
@@ -671,6 +672,16 @@ const DebugTerminal = {
                 if (promptDir === '') promptDir = '/';
                 document.getElementById('dt-prompt-cwd').innerText = promptDir;
                 break;
+            case 'rename': {
+                // [AUDIT: v1.25.46 | SEC_ARCH_LEAD] - CLI hook for global macro netlist propagation.
+                if (args.length < 3) return this.print("Usage: rename <oldName> <newName>", "err");
+                if (!Sim.library[args[1]]) return this.print(`Source '${args[1]}' not found.`, "err");
+                if (Sim.library[args[2]]) return this.print(`Destination '${args[2]}' already exists.`, "err");
+                
+                Sim.renameMacroGlobally(args[1], args[2]);
+                this.print(`Renamed '${args[1]}' to '${args[2]}' globally.`, "ok");
+                break;
+            }
             case 'mv': {
                 // [AUDIT: v1.24.05 | SEC_ARCH_LEAD] - Enforced block scope for case statement to resolve lexical declaration collisions.
                 if (args.length < 3) return this.print("Usage: mv <chip> <folder>", "err");
@@ -1460,7 +1471,8 @@ const DebugTerminal = {
     },
 
     findClosestCommand(input) {
-        const commands = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv', 'mkdir', 'tick', 'step', 'clock', 'force', 'unforce', 'watch', 'dump', 'cp', 'touch', 'find', 'bom', 'path', 'assert', 'peek', 'poke', 'reset', 'power', 'symbols', 'timing', 'ln'];
+        // [AUDIT: v1.25.46 | SEC_ARCH_LEAD] - Added rename to Levenshtein distance resolver matrix.
+        const commands = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv', 'mkdir', 'tick', 'step', 'clock', 'force', 'unforce', 'watch', 'dump', 'cp', 'touch', 'find', 'bom', 'path', 'assert', 'peek', 'poke', 'reset', 'power', 'symbols', 'timing', 'ln', 'rename'];
         return commands
             .map(cmd => ({ cmd, distance: this.levenshtein(input, cmd) }))
             .filter(res => res.distance <= 2)
