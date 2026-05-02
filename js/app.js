@@ -175,7 +175,10 @@ window.onload = () => {
     // [AUDIT: v1.25.15 | SEC_ARCH_LEAD] - Forced V8 engine fallback for memory primitives and enforced rigid array boundary padding.
     // [AUDIT: v1.25.16 | SEC_ARCH_LEAD] - Injected 10px high-resolution layout grid.
     // [AUDIT: v1.25.17 | SEC_ARCH_LEAD] - Auto-scaled RAM/ROM address bus to dynamically encompass context-menu binary payloads.
-    window.LOADED_BSIM_VERSION = "1.25.17";
+    // [AUDIT: v1.25.18 | SEC_ARCH_LEAD] - Re-enabled native Wasm hardware acceleration for memory primitives.
+    // [AUDIT: v1.25.19 | SEC_ARCH_LEAD] - Fixed Wasm compiler omission for multi-slot primitives and hardened runtime purity checks.
+    // [AUDIT: v1.25.20 | SEC_ARCH_LEAD] - Centralized purity checks to Sim.isPureNative and eradicated local closure shadowing.
+    window.LOADED_BSIM_VERSION = "1.25.20";
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Native integration finalized in history.js and sim.js.
     
