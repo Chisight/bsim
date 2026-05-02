@@ -109,7 +109,8 @@ const Sim = {
             
             // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Synchronized Wasm whitelist to include Memory Primitives for native execution.
             // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Whitelisted '0' primitive for Wasm execution.
-            const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'ROM', 'RAM', '0']);
+            // [AUDIT: v1.25.15 | SEC_ARCH_LEAD] - Excluded ROM and RAM from Wasm whitelist due to missing kernel opcodes; forcing V8 parity fallback.
+            const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', '0']);
             const checkPure = (nodes) => nodes.every(n => {
                 if (validWasmTypes.has(n.type)) return true;
                 if (n.isCustom && this.library[n.type]) return checkPure(this.library[n.type].nodes);
@@ -763,7 +764,8 @@ const Sim = {
         if (this.useWasm && window.WasmEngine && WasmEngine.ready) {
             // Synchronized native primitive whitelist
             // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Synchronized Wasm whitelist to include Memory Primitives for native execution.
-            const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'ROM', 'RAM']);
+            // [AUDIT: v1.25.15 | SEC_ARCH_LEAD] - Excluded ROM and RAM from Wasm whitelist due to missing kernel opcodes; forcing V8 parity fallback.
+            const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
             const checkPure = (nodes) => nodes.every(n => {
                 if (validWasmTypes.has(n.type)) return true;
                 if (n.isCustom && this.library && this.library[n.type]) return checkPure(this.library[n.type].nodes);
@@ -1056,7 +1058,8 @@ const Sim = {
         await new Promise(resolve => setTimeout(resolve, 50));
         // validate that the netlist is pure native
         // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Synchronized Wasm whitelist to include Memory Primitives for native execution.
-        const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'ROM', 'RAM']);
+        // [AUDIT: v1.25.15 | SEC_ARCH_LEAD] - Excluded ROM and RAM from Wasm whitelist due to missing kernel opcodes; forcing V8 parity fallback.
+        const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
         const checkPure = (nodes) => nodes.every(n => {
             if (validWasmTypes.has(n.type)) return true;
             if (n.isCustom && this.library && this.library[n.type]) return checkPure(this.library[n.type].nodes);
@@ -1395,7 +1398,8 @@ const Sim = {
             // Offset if already occupied
             while (this.nodes.some(n => Math.abs(n.x - x) < 20 && Math.abs(n.y - y) < 20)) { x += 20; y += 20; }
         }
-        if (this.snapNodes) { x = Math.round(x / 20) * 20; y = Math.round(y / 20) * 20; }
+        // [AUDIT: v1.25.16 | SEC_ARCH_LEAD] - Increased grid resolution to 10px to accommodate diverse port geometries and eliminate layout micro-offsets.
+        if (this.snapNodes) { x = Math.round(x / 10) * 10; y = Math.round(y / 10) * 10; }
         if (this.debugToasts) this.toast(`Added ${type} node`);
         const newNode = this._finalizeAddNode(type, x, y, label || type, preferredId);
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node added to workspace: ${newNode.id} (${type}).
@@ -1918,7 +1922,8 @@ const Sim = {
         else if (pos === 'bottom-left') { hud.style.bottom = '15px'; hud.style.left = '15px'; hud.style.right = 'auto'; hud.style.top = 'auto'; hud.style.textAlign = 'left'; }
 
         // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Synchronized Wasm whitelist to include Memory Primitives for native execution.
-        const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'ROM', 'RAM']);
+        // [AUDIT: v1.25.15 | SEC_ARCH_LEAD] - Excluded ROM and RAM from Wasm whitelist due to missing kernel opcodes; forcing V8 parity fallback.
+        const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
         const checkPure = (nodes) => nodes.every(n => {
             if (validWasmTypes.has(n.type)) return true;
             if (n.isCustom && this.library && this.library[n.type]) return checkPure(this.library[n.type].nodes);

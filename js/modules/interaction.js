@@ -114,18 +114,23 @@ const InteractionHandler = {
             let snapDx = dx;
             let snapDy = dy;
             
-            // Calculate global snapped delta from the anchor node to keep group formation rigid
+            // [AUDIT: v1.25.16 | SEC_ARCH_LEAD] - Enforced individual absolute grid snapping (10px resolution) to cure accumulated floating-point drift and micro-offsets.
             if (Sim.snapNodes && dragSet.length > 0) {
                 const lead = dragSet[0];
-                const nx = Math.round((lead.ox + dx) / 20) * 20;
-                const ny = Math.round((lead.oy + dy) / 20) * 20;
+                const nx = Math.round((lead.ox + dx) / 10) * 10;
+                const ny = Math.round((lead.oy + dy) / 10) * 10;
                 snapDx = nx - lead.ox;
                 snapDy = ny - lead.oy;
             }
 
             dragSet.forEach(item => {
-                item.node.x = item.ox + snapDx;
-                item.node.y = item.oy + snapDy;
+                if (Sim.snapNodes) {
+                    item.node.x = Math.round((item.ox + snapDx) / 10) * 10;
+                    item.node.y = Math.round((item.oy + snapDy) / 10) * 10;
+                } else {
+                    item.node.x = item.ox + snapDx;
+                    item.node.y = item.oy + snapDy;
+                }
                 Sim.updateNodePosition(item.node, item.div);
             });
             
@@ -274,9 +279,11 @@ const InteractionHandler = {
                         const MAX_BYTES = Math.pow(2, aBits);
                         if (fileInput && fileInput.files.length > 0) {
                             Sim.toast('Reading local memory file...', 'info');
+// [AUDIT: v1.25.15 | SEC_ARCH_LEAD] - Pad memory payload to hardware boundary to prevent out-of-bounds evaluation faults.
                             const file = fileInput.files[0];
                             const buffer = await file.arrayBuffer();
-                            const safeView = new Uint8Array(buffer).subarray(0, MAX_BYTES);
+                            const safeView = new Uint8Array(MAX_BYTES);
+                            safeView.set(new Uint8Array(buffer).subarray(0, MAX_BYTES));
                             node.memoryData = Array.from(safeView);
                             node.dataUrl = file.name;
                             // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Mark netlist dirty to force Wasm heap synchronization on next tick.
@@ -293,10 +300,12 @@ const InteractionHandler = {
                             node.dataUrl = url;
                             Sim.toast('Fetching memory data via network...', 'info');
                             // [AUDIT: v1.25.08 | SEC_ARCH_LEAD] - Implemented HTTP Range requests to preserve network bandwidth and prevent heap overflow.
+// [AUDIT: v1.25.15 | SEC_ARCH_LEAD] - Pad remote memory payload to hardware boundary to prevent out-of-bounds evaluation faults.
                             const res = await fetch(url, { headers: { 'Range': `bytes=0-${MAX_BYTES - 1}` } });
                             if (!res.ok && res.status !== 206) throw new Error('HTTP ' + res.status);
                             const buffer = await res.arrayBuffer();
-                            const safeView = new Uint8Array(buffer).subarray(0, MAX_BYTES);
+                            const safeView = new Uint8Array(MAX_BYTES);
+                            safeView.set(new Uint8Array(buffer).subarray(0, MAX_BYTES));
                             node.memoryData = Array.from(safeView);
                             // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Mark netlist dirty to force Wasm heap synchronization on next tick.
                             Sim._netlistDirty = true;
@@ -387,12 +396,16 @@ const InteractionHandler = {
             if (ev.target.files.length > 0) {
                 try {
                     const file = ev.target.files[0];
-                    // [AUDIT: v1.25.08 | SEC_ARCH_LEAD] - Enforced hardware-defined spatial bounds clamping based on active address bus width.
-                    const prevPins = node.addressPins || 4;
-                    const MAX_BYTES = Math.pow(2, prevPins);
-                    
+                    // [AUDIT: v1.25.17 | SEC_ARCH_LEAD] - Auto-scale address bus width to accommodate uploaded payload size without truncation.
+                    let requiredPins = Math.max(4, Math.ceil(Math.log2(file.size || 1)));
+                    if (requiredPins > 24) requiredPins = 24; // Clamp to 16MB physical limit
+                    node.addressPins = requiredPins;
+                    const MAX_BYTES = Math.pow(2, requiredPins);
+
+// [AUDIT: v1.25.15 | SEC_ARCH_LEAD] - Pad memory payload to hardware boundary to prevent out-of-bounds evaluation faults.
                     const buffer = await file.arrayBuffer();
-                    const safeView = new Uint8Array(buffer).subarray(0, MAX_BYTES);
+                    const safeView = new Uint8Array(MAX_BYTES);
+                    safeView.set(new Uint8Array(buffer).subarray(0, MAX_BYTES));
                     node.memoryData = Array.from(safeView);
                     node.dataUrl = file.name;
                     // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Mark netlist dirty to force Wasm heap synchronization on next tick.
@@ -406,14 +419,14 @@ const InteractionHandler = {
                     }
                     
                     // [AUDIT: v1.25.06 | SEC_ARCH_LEAD] - Injected hardware-level diagnostic telemetry for direct context-menu payload ingestion.
-                    const logMsg = `[MEM_CTRL] Context Flash: ${node.type} [${node.id}] <- ${file.name} (${safeView.byteLength} bytes) | Constrained to ${prevPins}-bit Bus`;
+                    const logMsg = `[MEM_CTRL] Context Flash: ${node.type} [${node.id}] <- ${file.name} (${safeView.byteLength} bytes) | Auto-scaled to ${requiredPins}-bit Bus`;
                     if (window.DebugTerminal && typeof window.DebugTerminal.log === 'function') window.DebugTerminal.log(logMsg, 'sys');
                     console.info(logMsg);
                     
                     if (file.size > MAX_BYTES) {
-                        Sim.toast(`Payload truncated to ${MAX_BYTES} bytes to fit ${prevPins}-bit bus.`, 'warning');
+                        Sim.toast(`Payload truncated to 16MB architectural limit.`, 'warning');
                     } else {
-                        Sim.toast(`${node.type} payload flashed from ${file.name}.`, 'success');
+                        Sim.toast(`${node.type} flashed. Bus auto-scaled to ${requiredPins} pins.`, 'success');
                     }
                     Sim.autoSave();
                     // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - EXIT_TRACE: Memory buffer mounted and netlist marked dirty for Wasm sync.
@@ -759,7 +772,10 @@ const InteractionHandler = {
                 const mx = (e.clientX - mSr.left) / View.scale;
                 const my = (e.clientY - mSr.top) / View.scale;
                 let val = state.isVertical ? my : mx;
-                if (Sim.snapWires) val = Math.round(val / 20) * 20;
+                
+                // [AUDIT: v1.25.17 | SEC_ARCH_LEAD] - Excised magnetic wire snapping due to user feedback; reverted to simple 10px grid alignment.
+                if (Sim.snapWires) val = Math.round(val / 10) * 10;
+                
                 if (state.isVertical) state.wire.midY = val; else state.wire.midX = val;
                 WireRenderer.drawWires();
                 return;
