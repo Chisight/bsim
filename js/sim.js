@@ -65,16 +65,17 @@ const Sim = {
         this.toast('Layout Memory Flushed & Resynchronized', 'success');
     },
 
-    // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Main-Thread Safe Atomic Mutex replacing synchronous Atomics.wait to prevent V8 pipeline crashes.
-    _topologyLock: new Int32Array(new SharedArrayBuffer(4)),
+    // [AUDIT: v1.25.12 | SEC_ARCH_LEAD] - Hard purge of SharedArrayBuffer mutex. Reverted to boolean spin-lock to definitively bypass COI security faults.
+    _topologyLock: false,
     async mutateTopology(mutationFn) {
-        while (Atomics.compareExchange(this._topologyLock, 0, 0, 1) !== 0) {
+        while (this._topologyLock) {
             await new Promise(resolve => setTimeout(resolve, 5));
         }
+        this._topologyLock = true;
         try {
             mutationFn();
         } finally {
-            Atomics.store(this._topologyLock, 0, 0);
+            this._topologyLock = false;
         }
     },
 
