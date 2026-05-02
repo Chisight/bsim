@@ -277,8 +277,15 @@ const InteractionHandler = {
                             const file = fileInput.files[0];
                             if (file.size > MAX_BYTES) throw new Error('Payload exceeds 16MB hardware limit.');
                             const buffer = await file.arrayBuffer();
-                            node.memoryData = Array.from(new Uint8Array(buffer).subarray(0, MAX_BYTES));
+                            const safeView = new Uint8Array(buffer).subarray(0, MAX_BYTES);
+                            node.memoryData = Array.from(safeView);
                             node.dataUrl = file.name;
+                            
+                            // [AUDIT: v1.25.06 | SEC_ARCH_LEAD] - Injected hardware-level diagnostic telemetry for local RAM/ROM payload ingestion.
+                            const logMsg = `[MEM_CTRL] Local Flash: ${node.type} [${node.id}] <- ${file.name} (${safeView.byteLength} bytes)`;
+                            if (window.DebugTerminal && typeof window.DebugTerminal.log === 'function') window.DebugTerminal.log(logMsg, 'sys');
+                            console.info(logMsg);
+                            
                             Sim.toast('Local memory payload flashed directly to heap.', 'success');
                         } else if (url) {
                             node.dataUrl = url;
@@ -289,7 +296,14 @@ const InteractionHandler = {
                             if (contentLength && parseInt(contentLength) > MAX_BYTES) throw new Error('Remote payload exceeds 16MB hardware limit.');
                             const buffer = await res.arrayBuffer();
                             if (buffer.byteLength > MAX_BYTES) throw new Error('Remote payload exceeds 16MB hardware limit.');
-                            node.memoryData = Array.from(new Uint8Array(buffer).subarray(0, MAX_BYTES));
+                            const safeView = new Uint8Array(buffer).subarray(0, MAX_BYTES);
+                            node.memoryData = Array.from(safeView);
+                            
+                            // [AUDIT: v1.25.06 | SEC_ARCH_LEAD] - Injected hardware-level diagnostic telemetry for remote RAM/ROM payload ingestion.
+                            const logMsg = `[MEM_CTRL] Remote Flash: ${node.type} [${node.id}] <- ${url} (${safeView.byteLength} bytes)`;
+                            if (window.DebugTerminal && typeof window.DebugTerminal.log === 'function') window.DebugTerminal.log(logMsg, 'sys');
+                            console.info(logMsg);
+                            
                             Sim.toast('Network payload flashed.', 'success');
                         }
                     } catch(e) {
@@ -381,7 +395,8 @@ const InteractionHandler = {
                     node.dataUrl = file.name;
                     
                     const reqPins = Math.max(1, Math.ceil(Math.log2(safeView.byteLength)));
-                    if (reqPins > (node.addressPins || 4)) node.addressPins = reqPins;
+                    const prevPins = node.addressPins || 4;
+                    if (reqPins > prevPins) node.addressPins = reqPins;
                     
                     if (window.NodeRenderer) {
                         const el = document.getElementById(nodeId);
@@ -389,6 +404,12 @@ const InteractionHandler = {
                         NodeRenderer.renderNode(node);
                         Sim.updateWireVisuals();
                     }
+                    
+                    // [AUDIT: v1.25.06 | SEC_ARCH_LEAD] - Injected hardware-level diagnostic telemetry for direct context-menu payload ingestion.
+                    const logMsg = `[MEM_CTRL] Context Flash: ${node.type} [${node.id}] <- ${file.name} (${safeView.byteLength} bytes) | Address Bus: ${prevPins} -> ${node.addressPins}`;
+                    if (window.DebugTerminal && typeof window.DebugTerminal.log === 'function') window.DebugTerminal.log(logMsg, 'sys');
+                    console.info(logMsg);
+                    
                     Sim.toast(`${node.type} payload flashed from ${file.name}.`, 'success');
                     Sim.autoSave();
                 } catch (err) {
