@@ -2064,9 +2064,25 @@ const Sim = {
                     menu.style.left = e.clientX + 'px';
                     menu.style.top = e.clientY + 'px';
 
+                    // [AUDIT: v1.25.23 | SEC_ARCH_LEAD] - Injected hierarchical folder context sub-menu for rapid macro sorting via inline DOM mutation.
+                    const existingFolders = Object.keys(groups).filter(f => f !== '').map(f => 
+                        `<div class="menu-item" onclick="Sim.library['${name}'].folder='${f}'; Sim.updateLibraryUI(); Sim.autoSave(); document.getElementById('context-menu').style.display='none';">📁 ${f}</div>`
+                    ).join('');
+                    
+                    const moveMenu = `
+                        <div class="menu-item has-sub keep-open" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color='#4a9eff'" onmouseout="this.style.color='#aaa'">
+                            Move
+                            <div class="sub-menu">
+                                ${existingFolders}
+                                <div class="menu-item" style="color:#00ffaa;" onclick="event.stopPropagation(); this.innerHTML='<input type=&quot;text&quot; placeholder=&quot;New Folder...&quot; style=&quot;width:100%;box-sizing:border-box;background:#111;color:#fff;border:1px solid #00ffaa;font-size:10px;padding:4px;outline:none;&quot; onclick=&quot;event.stopPropagation()&quot; onkeydown=&quot;if(event.key===\\'Enter\\'){ Sim.library[\\'${name}\\'].folder=this.value.trim(); Sim.updateLibraryUI(); Sim.autoSave(); document.getElementById(\\'context-menu\\').style.display=\\'none\\'; } else if(event.key===\\'Escape\\'){ document.getElementById(\\'context-menu\\').style.display=\\'none\\'; }&quot; onblur=&quot;if(this.value.trim()!==\\'\\'){ Sim.library[\\'${name}\\'].folder=this.value.trim(); Sim.updateLibraryUI(); Sim.autoSave(); } document.getElementById(\\'context-menu\\').style.display=\\'none\\';&quot;>'; this.querySelector('input').focus();">↳ New Folder...</div>
+                                <div class="menu-item" style="color:#ff4757; border-top:1px solid #334; margin-top:4px; padding-top:4px;" onclick="Sim.library['${name}'].folder=''; Sim.updateLibraryUI(); Sim.autoSave(); document.getElementById('context-menu').style.display='none';">✖ Root</div>
+                            </div>
+                        </div>
+                    `;
+
                     menu.innerHTML = '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.uiEditChip(\'' + name + '\')">Edit Internals</div>' +
                         '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.modal(\'Rename Chip\',\'New name:\',\'prompt\',nn=>{if(nn && !Sim.library[nn]){Sim.library[nn]=Sim.library[\'' + name + '\']; delete Sim.library[\'' + name + '\']; Sim.nodes.forEach(n=>{if(n.type===\'' + name + '\')n.type=nn;}); Sim.updateLibraryUI(); Sim.autoSave(); }},\'' + name + '\')">Rename</div>' +
-                        '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.modal(\'Move Chip\',\'New Folder Path:\',\'prompt\',f=>{if(f!==null){Sim.library[\'' + name + '\'].folder=f; Sim.updateLibraryUI(); Sim.autoSave(); }},\'' + (Sim.library[name].folder||'') + '\')">Move</div>' +
+                        moveMenu +
                         '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#ff4757; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#ff6b81\'" onmouseout="this.style.color=\'#ff4757\'" onclick="if(Sim.activeEditingChip===\'' + name + '\') Sim.uiExitChipEdit(); Sim.uiDeleteChip(\'' + name + '\')">Delete</div>';
                         
                     // [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Smart boundary collision detection for library items.
