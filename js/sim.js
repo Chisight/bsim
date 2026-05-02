@@ -829,6 +829,24 @@ const Sim = {
                                 this.updateNodeVisual(n);
                             }
                         }
+                    } else if ((n.type === 'ROM' || n.type === 'RAM') && !n.isCustom) {
+                        // [AUDIT: v1.25.07 | SEC_ARCH_LEAD] - Hardware memory extraction parity implemented for DOM node visual synchronization.
+                        const newVal = WasmEngine.readState(n.id);
+                        if (newVal && newVal.length === 8) {
+                            const outObj = {};
+                            let isDiff = !n.val || n._forcePropagate;
+                            for (let i = 0; i < 8; i++) {
+                                outObj[`out${i}`] = newVal[i];
+                                if (!isDiff && n.val[`out${i}`] !== newVal[i]) isDiff = true;
+                            }
+                            // [AUDIT: v1.25.09 | SEC_ARCH_LEAD] - Purged undefined fastEqual reference; implemented zero-dependency inline differential verification.
+                            if (isDiff) {
+                                n._forcePropagate = false;
+                                n.val = outObj;
+                                changed = true;
+                                this.updateNodeVisual(n);
+                            }
+                        }
                     }
                 });
 

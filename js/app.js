@@ -165,7 +165,11 @@ window.onload = () => {
     // [AUDIT: v1.25.03 | SEC_ARCH_LEAD] - Inverted MSB/LSB visual pin rendering for memory primitives to enforce top-to-bottom spatial hierarchy.
     // [AUDIT: v1.25.04 | SEC_ARCH_LEAD] - Relegated RAM/ROM binary upload to the component context dropdown to prevent interaction overlap.
     // [AUDIT: v1.25.05 | SEC_ARCH_LEAD] - Enforced 16MB spatial bounds clamping on memory payload ingestion to prevent Wasm heap overflow attacks.
-    window.LOADED_BSIM_VERSION = "1.25.05";
+    // [AUDIT: v1.25.06 | SEC_ARCH_LEAD] - Injected debug telemetry framework for RAM/ROM payload diagnostics via terminal broadcast.
+    // [AUDIT: v1.25.07 | SEC_ARCH_LEAD] - Restored Wasm DOM parity extraction and Kahn topological trace routing for Volatile Memory (RAM).
+    // [AUDIT: v1.25.08 | SEC_ARCH_LEAD] - Disabled memory payload auto-scaling; implemented strict bounds clamping and HTTP Range network optimization.
+    // [AUDIT: v1.25.09 | SEC_ARCH_LEAD] - Resolved Temporal Dead Zone (TDZ) initialization fault during Wasm scalar extraction.
+    window.LOADED_BSIM_VERSION = "1.25.09";
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Native integration finalized in history.js and sim.js.
     

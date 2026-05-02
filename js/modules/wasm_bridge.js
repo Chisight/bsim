@@ -427,9 +427,14 @@ const WasmEngine = {
             if (['NAND', 'AND', 'OR', 'XOR', 'NOR', 'XNOR'].includes(t)) inputPorts = ['a', 'b'];
             else if (t === 'NOT') inputPorts = ['a'];
             else if (t === 'TRISTATE') inputPorts = ['in', 'en'];
-            else if (t === 'ROM') {
+            // [AUDIT: v1.25.07 | SEC_ARCH_LEAD] - Injected RAM into Kahn's topological dependency whitelist to resolve instruction out-of-order execution faults.
+            else if (t === 'ROM' || t === 'RAM') {
                 const pins = receiverNode.addressPins || 4;
                 for (let i = 0; i < pins; i++) inputPorts.push(`in${i}`);
+                if (t === 'RAM') {
+                    for (let i = 0; i < 8; i++) inputPorts.push(`din${i}`);
+                    inputPorts.push('we');
+                }
             }
             else if (t.startsWith('OUT-') || t.startsWith('PROBE-')) {
                 const bits = parseInt(t.split('-')[1]) || 1;
