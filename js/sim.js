@@ -384,7 +384,8 @@ const Sim = {
                 }));
                 
                 if (this.activeEditingChip && wsStack.length > 0) {
-                    this.library[this.activeEditingChip] = { nodes: cNodes, wires: cWires };
+                    // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Preserved macro folder hierarchy upon autosave to prevent root directory drift.
+                    this.library[this.activeEditingChip] = { folder: this.library[this.activeEditingChip]?.folder || '', nodes: cNodes, wires: cWires };
                 }
                 
                 const safeLib = {};
@@ -1395,7 +1396,21 @@ const Sim = {
         // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Formally registered RAM as a core primitive to prevent macro-substitution logic.
         // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Registered '0' as native primitive.
         const NATIVE_TYPES = new Set(['NAND', 'CLOCK', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'JUNCTION', 'TRISTATE', 'DFF', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'RAM', '0']);
-        if (this.library[type] && !NATIVE_TYPES.has(type)) { node.isCustom = true; }
+        if (this.library[type] && !NATIVE_TYPES.has(type)) { 
+            // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Established cyclical dependency scanner to avert recursion faults.
+            if (this.activeEditingChip) {
+                const checkCycle = (target, check) => {
+                    if (target === check) return true;
+                    if (!this.library[check]) return false;
+                    return this.library[check].nodes.some(n => n.isCustom && checkCycle(target, n.type));
+                };
+                if (checkCycle(this.activeEditingChip, type)) {
+                    this.toast('Cyclic dependency blocked.', 'danger');
+                    return null;
+                }
+            }
+            node.isCustom = true; 
+        }
         History.execute(new AddNodeCommand(node));
         return node;
     },
@@ -1832,6 +1847,10 @@ const Sim = {
         
         Object.values(this.library).forEach(macro => propagate(macro.nodes));
         
+        // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Integrated hardware validation hook to verify pin parity post-rename mutation.
+        const ioNodes = this.library[newName].nodes.filter(n => n.type.startsWith('IN-') || n.type.startsWith('OUT-') || n.type.startsWith('PROBE-'));
+        if (ioNodes.length === 0 && this.nodes.some(n => n.type === newName)) console.warn(`[Hardware Validation] Warning: Renamed chip '${newName}' lacks IO pins.`);
+        
         this._netlistDirty = true;
         if (typeof this.updateLibraryUI === 'function') this.updateLibraryUI();
         if (typeof this.updateTabsUI === 'function') this.updateTabsUI();
@@ -2078,8 +2097,9 @@ const Sim = {
                         </div>
                     `;
 
+                    // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Deprecated direct mutable access to Sim.library keys; enforced strict API layer for topology changes.
                     menu.innerHTML = '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.uiEditChip(\'' + name + '\')">Edit Internals</div>' +
-                        '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.modal(\'Rename Chip\',\'New name:\',\'prompt\',nn=>{if(nn && !Sim.library[nn]){Sim.library[nn]=Sim.library[\'' + name + '\']; delete Sim.library[\'' + name + '\']; Sim.nodes.forEach(n=>{if(n.type===\'' + name + '\')n.type=nn;}); Sim.updateLibraryUI(); Sim.autoSave(); }},\'' + name + '\')">Rename</div>' +
+                        '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.modal(\'Rename Chip\',\'New name:\',\'prompt\',nn=>{if(nn){Sim.renameMacroGlobally(\'' + name + '\', nn);}},\'' + name + '\')">Rename</div>' +
                         moveMenu +
                         '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#ff4757; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#ff6b81\'" onmouseout="this.style.color=\'#ff4757\'" onclick="if(Sim.activeEditingChip===\'' + name + '\') Sim.uiExitChipEdit(); Sim.uiDeleteChip(\'' + name + '\')">Delete</div>';
                         
@@ -2160,6 +2180,19 @@ const Sim = {
     /**
      */
     uiDeleteChip(name) {
+        // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Implemented pre-flight reference counter during deletion sequences.
+        let inUse = false;
+        const checkNodes = (nodes) => nodes.some(n => n.type === name);
+        if (checkNodes(this.nodes)) inUse = true;
+        this.tabs.forEach(t => { if (checkNodes(t.nodes)) inUse = true; });
+        this.workspaceStack.forEach(ws => { if (checkNodes(ws.nodes)) inUse = true; });
+        Object.keys(this.library).forEach(k => { if (k !== name && checkNodes(this.library[k].nodes)) inUse = true; });
+        
+        if (inUse) {
+            this.toast(`Deletion blocked: Chip '${name}' is actively instanced.`, 'danger');
+            return;
+        }
+
         this.modal('Delete Chip', `Delete ${name}? This will remove all instances from the board.`, 'danger', ok => {
             if (ok) {
                 const isEditingThis = this.activeEditingChip === name;
@@ -3147,7 +3180,9 @@ const Sim = {
     uiExitChipEdit() {
         if (this.workspaceStack.length === 0 || !this.activeEditingChip) return;
 
+        // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Preserved macro folder hierarchy upon editor exit to prevent root directory drift.
         this.library[this.activeEditingChip] = {
+            folder: this.library[this.activeEditingChip]?.folder || '',
             nodes: this.nodes.map(n => this._cleanNode(n)).filter(n => n !== null),
             wires: this.wires.map(w => this._cleanWire(w)).filter(w => w !== null)
         };

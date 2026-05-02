@@ -128,7 +128,8 @@ window.onload = () => {
     // [AUDIT: v1.25.44 | SEC_ARCH_LEAD] - Enforced Wasm memory expansion limits, optimized pin state retrieval, and standardized viewport panning.
     // [AUDIT: v1.25.45 | SEC_ARCH_LEAD] - Aligned Ground primitive nomenclature: renamed port label from GND to 0.
     // [AUDIT: v1.25.46 | SEC_ARCH_LEAD] - Implemented global netlist propagation for hierarchical macro renaming to avert stale reference traps.
-    window.LOADED_BSIM_VERSION = "1.25.46";
+    // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Hardened macro lifecycle with cyclical dependency scanners, pre-flight deletion reference counters, and strict topology APIs.
+    window.LOADED_BSIM_VERSION = "1.25.47";
 
     // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Purged legacy JIT DOM interceptor in favor of native parametric coordinate generation.
 

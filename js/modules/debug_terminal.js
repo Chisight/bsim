@@ -684,6 +684,17 @@ const DebugTerminal = {
             }
             case 'mv': {
                 // [AUDIT: v1.24.05 | SEC_ARCH_LEAD] - Enforced block scope for case statement to resolve lexical declaration collisions.
+                // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - VFS mv utility expanded to implicitly invoke global macro renaming algorithms.
+                let srcArg = args[1];
+                let dstArg = args[2];
+                if (srcArg && dstArg && this.cwd.startsWith('/etc/lib/custom')) {
+                    const sName = srcArg.replace(/\/$/, '');
+                    const dName = dstArg.replace(/\/$/, '');
+                    if (Sim.library[sName] && !Sim.library[dName]) {
+                        Sim.renameMacroGlobally(sName, dName);
+                        return this.print(`mv: renamed '${sName}' to '${dName}' globally.`, "ok");
+                    }
+                }
                 if (args.length < 3) return this.print("Usage: mv <chip> <folder>", "err");
                 const targetChip = args[1];
                 let mvFolder = args[2];
