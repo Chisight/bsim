@@ -6,6 +6,12 @@ const DebugTerminal = {
     visible: false,
     cwd: '/home/bsim', // Virtual File System Root
     
+    // [AUDIT: v1.25.25 | SEC_ARCH_LEAD] - Injected default VFS symlink mapping to surface library components in the home workspace.
+    symlinks: {
+        '/home/bsim/primitives': '/etc/lib/primitives',
+        '/home/bsim/custom': '/etc/lib/custom'
+    },
+    
     RECIPES: {
         'NOT': {
             deps: [],
@@ -247,7 +253,22 @@ const DebugTerminal = {
             if (p === '..') res.pop();
             else if (p !== '.') res.push(p);
         }
-        return '/' + res.join('/');
+        let resolved = '/' + res.join('/');
+        
+        // [AUDIT: v1.25.25 | SEC_ARCH_LEAD] - Iterative symlink resolution engine injected to map virtual aliases to physical memory paths.
+        let maxDepth = 5;
+        while (maxDepth-- > 0 && this.symlinks) {
+            let changed = false;
+            for (const [link, src] of Object.entries(this.symlinks)) {
+                if (resolved === link || resolved.startsWith(link + '/')) {
+                    resolved = src + resolved.substring(link.length);
+                    changed = true;
+                    break;
+                }
+            }
+            if (!changed) break;
+        }
+        return resolved;
     },
 
     isValidDir(path) {
@@ -272,6 +293,14 @@ const DebugTerminal = {
         else if (path === '/etc/lib') dirs = ['primitives', 'custom'];
         else if (path === '/home/bsim') {
             Sim.tabs.forEach((t, i) => dirs.push(`tab-${i+1}`));
+            // [AUDIT: v1.25.25 | SEC_ARCH_LEAD] - Append virtual symlinks to directory listings for autocomplete parity.
+            if (this.symlinks) {
+                Object.keys(this.symlinks).forEach(k => {
+                    if (k.startsWith('/home/bsim/') && k.split('/').length === 4) {
+                        dirs.push(k.split('/').pop());
+                    }
+                });
+            }
         }
         else if (path === '/etc/lib/primitives') {
             files = ['NAND', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'CLOCK'].map(n => `[Gate] ${n}`);
@@ -412,7 +441,9 @@ const DebugTerminal = {
                 // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Expand autocomplete index for new kernel CLI toolkit.
                 // [AUDIT: v1.24.56 | SEC_ARCH_LEAD] - Injected assert, step, peek, poke, reset primitives.
                 // [AUDIT: v1.24.93 | SEC_ARCH_LEAD] - Injected power, symbols, and timing analysis primitives.
-                const cmds = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv', 'mkdir', 'tick', 'step', 'clock', 'force', 'unforce', 'watch', 'dump', 'cp', 'touch', 'find', 'bom', 'path', 'assert', 'peek', 'poke', 'reset', 'power', 'symbols', 'timing'];
+                // [AUDIT: v1.25.25 | SEC_ARCH_LEAD] - Registered simlink command for virtual directory linking.
+                // [AUDIT: v1.25.26 | SEC_ARCH_LEAD] - Converted to POSIX standard 'ln' command alias.
+                const cmds = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv', 'mkdir', 'tick', 'step', 'clock', 'force', 'unforce', 'watch', 'dump', 'cp', 'touch', 'find', 'bom', 'path', 'assert', 'peek', 'poke', 'reset', 'power', 'symbols', 'timing', 'ln'];
                 matches = cmds.filter(c => c.startsWith(prefix));
             } else if (cmd === 'cd' || cmd === 'ls' || cmd === 'tree' || cmd === 'rm' || cmd === 'mkdir') {
                 // [AUDIT: v1.24.03 | SEC_ARCH_LEAD] - Dynamic VFS path autocomplete with trailing slash parsing.
@@ -626,6 +657,8 @@ const DebugTerminal = {
                 this.print("  - ls [-l]     : List workspace nodes or VFS contents.", "sys");
                 this.print("  - spawn <t>   : Add a node (e.g., spawn NAND 100 100).", "sys");
                 this.print("  - rm <id>     : Delete nodes or directories.", "sys");
+                // [AUDIT: v1.25.26 | SEC_ARCH_LEAD] - Exposed ln command parameter documentation.
+                this.print("  - ln -s <t> <l>: Create virtual directory symlink (e.g., ln -s /etc/lib ./lib).", "sys");
                 this.print("  - set <id> <v>: Set input node value.", "sys");
                 this.print("  - wire ...    : Connect two ports.", "sys");
                 this.print("  - synth <g>   : Compile logic from NANDs.", "sys");
@@ -749,12 +782,21 @@ const DebugTerminal = {
                     if (found === 0) this.print("Directory empty.", "sys");
                     return;
                 } else if (targetPath === '/home/bsim') {
-                    this.print(`--- WORKSPACES ---`, "warn");
+                    this.print(`--- WORKSPACES & LINKS ---`, "warn");
                     Sim.tabs.forEach((t, i) => {
                         const alias = `tab-${i+1}`;
                         const tag = t.id === Sim.activeTabId ? '<span style="color:#ffca28">*</span>' : ' ';
                         this.print(`${tag} [Dir] <span style="color:#0af; font-weight:bold;">${alias}/</span> <span style="color:#667">(id: ${t.id}, name: ${t.name})</span>`, "ok");
                     });
+                    // [AUDIT: v1.25.25 | SEC_ARCH_LEAD] - Appended active virtual symlinks to home directory readout.
+                    if (this.symlinks) {
+                        Object.entries(this.symlinks).forEach(([link, src]) => {
+                            if (link.startsWith('/home/bsim/') && link.split('/').length === 4) {
+                                const name = link.split('/').pop();
+                                this.print(`  [Lnk] <span style="color:#0ff; font-weight:bold;">${name}@</span> <span style="color:#667">-> ${src}</span>`, "ok");
+                            }
+                        });
+                    }
                     return;
                 }
 
@@ -833,6 +875,23 @@ const DebugTerminal = {
                 if (hashIdx !== -1 && args[hashIdx + 1]) prefId = args[hashIdx + 1];
                 Sim.addNode(type, x, y, prefId || type, prefId);
                 this.print(`Spawned ${type} at ${x}, ${y}`, "ok");
+                break;
+            }
+            case 'ln': {
+                // [AUDIT: v1.25.26 | SEC_ARCH_LEAD] - Standardized virtual symlink evaluator to match POSIX ln -s signature.
+                let tgtArg = args[1];
+                let lnkArg = args[2];
+                if (args[1] === '-s') {
+                    tgtArg = args[2];
+                    lnkArg = args[3];
+                }
+                if (!tgtArg || !lnkArg) return this.print("Usage: ln -s <target> <link_name>", "err");
+                const tgt = this.resolvePath(tgtArg);
+                const lnk = this.resolvePath(lnkArg);
+                if (!this.isValidDir(tgt)) return this.print(`ln: target '${tgt}' is not a valid directory`, "err");
+                if (!this.symlinks) this.symlinks = {};
+                this.symlinks[lnk] = tgt;
+                this.print(`Created symlink: ${lnk} -> ${tgt}`, "ok");
                 break;
             }
             case 'mkdir':
@@ -1386,7 +1445,7 @@ const DebugTerminal = {
     },
 
     findClosestCommand(input) {
-        const commands = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv', 'mkdir', 'tick', 'step', 'clock', 'force', 'unforce', 'watch', 'dump', 'cp', 'touch', 'find', 'bom', 'path', 'assert', 'peek', 'poke', 'reset', 'power', 'symbols', 'timing'];
+        const commands = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv', 'mkdir', 'tick', 'step', 'clock', 'force', 'unforce', 'watch', 'dump', 'cp', 'touch', 'find', 'bom', 'path', 'assert', 'peek', 'poke', 'reset', 'power', 'symbols', 'timing', 'ln'];
         return commands
             .map(cmd => ({ cmd, distance: this.levenshtein(input, cmd) }))
             .filter(res => res.distance <= 2)

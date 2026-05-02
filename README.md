@@ -1,7 +1,7 @@
-# bSim v1.25.24 - Professional Modular Logic Simulator
+# bSim v1.25.26 - Professional Modular Logic Simulator
 
 > [!IMPORTANT]
-> **Architectural Status v1.25.24**: This version represents the stable hardened baseline. Significant engine hardening has been implemented to resolve memory synchronization faults, register core architectural primitives like Constant Ground (0), and scale mobile touch targets for professional accessibility.
+> **Architectural Status v1.25.26**: This version represents the stable hardened baseline. Significant engine hardening has been implemented to resolve memory synchronization faults, register core architectural primitives like Constant Ground (0), and standardize virtual symbolic linking via the POSIX `ln -s` command.
 
 **bSim** is a high-performance, modular digital logic simulator engineered for the web. Built on an atomic NAND-foundation, it provides professional-grade tools for circuit design, hierarchical macro synthesis, and high-frequency Wasm-accelerated simulation.
 
@@ -14,7 +14,7 @@ bSim's simulation kernel is a masterpiece of modern web engineering, utilizing a
 ### 🚀 Simulation Engine
 - **Standard Wasm Kernel**: O(1) signal propagation using a linear instruction set compiled from native netlists.
 - **V8 Fallback**: A robust object-graph simulator for rapid prototyping and complex mixed-mode debugging.
-- **Hybrid Parity**: (v1.25.24) Full opcode dispatchers including the native **Opcode 9 (CONST_0)** for grounding and centralized Wasm memory evaluation.
+- **Hybrid Parity**: (v1.25.26) Full opcode dispatchers including the native **Opcode 9 (CONST_0)** for grounding and centralized Wasm memory evaluation.
 - **Memory Sync**: Forced heap synchronization for RAM/ROM primitives via netlist-dirty signaling and hardware-level instruction emission.
 
 ### 🛡️ Multi-Phase Commit Protocol
@@ -36,9 +36,10 @@ Design complex integrated circuits and encapsulate them into reusable chips. bSi
 - **Macro Management**: Hierarchical folder sub-menus with inline DOM mutation for rapid library organization.
 
 ### 🖥️ Modular Debug Terminal
-An integrated Linux-style CLI for low-level telemetry and netlist manipulation.
-- **Real-time Probing**: Use `peek` and `poke` to monitor and inject signal states.
-- **Batch Processing**: Run `.bsims` scripts for automated verification.
+(v1.25.26) An integrated Linux-style CLI for low-level telemetry and netlist manipulation.
+- **Virtual File System**: Navigate tab-specific netlists and global libraries via standard `ls`, `cd`, and `pwd`.
+- **Standard Symbolic Linking**: Use POSIX-compliant `ln -s <target> <link>` to map library paths to workspace aliases.
+- **Parametric Spawning**: Add components and wire ports directly from the terminal with sub-pixel coordinate precision.
 
 ### 💾 Hardened Persistence Layer
 - **Zero-Trust Auto-Save**: Continuous project backup to LocalStorage with binary-parity checks.
@@ -50,7 +51,7 @@ An integrated Linux-style CLI for low-level telemetry and netlist manipulation.
 
 ```text
 browser-sim/
-├── index.html          # Main entry point (v1.25.24 Architecture)
+├── index.html          # Main entry point (v1.25.26 Architecture)
 ├── wasm-core/          # WebAssembly source (WAT) for high-speed kernels
 ├── css/
 │   └── style.css       # Responsive UI & Design System (MRAP_V1 Protocol)
