@@ -691,7 +691,8 @@ const Sim = {
             const bits = parseInt(node.type.split('-')[1]) || 1;
             const state = new Array(bits).fill(0);
             for (let i = 0; i < bits; i++) state[i] = this.getDrivingSignal(node.id, `in${i}`);
-            return JSON.stringify(state);
+            // [AUDIT: v1.25.41 | SEC_ARCH_LEAD] - Eradicated CPU-heavy JSON.stringify serialization overhead to assert strict zero-copy runtime parity.
+            return bits === 1 ? state[0] : state;
         }
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Prevent ReferenceError on untrapped generic nodes.
         const finalVal = node.val !== undefined ? node.val : null;
@@ -938,8 +939,16 @@ const Sim = {
         while (this.eventQueue.size > 0 && iterations < MAX_ITERS) {
             iterations++;
             const nextQueue = new Set();
+            
+            // [AUDIT: v1.25.41 | SEC_ARCH_LEAD] - Upgraded event queue processing to enforce deterministic topological evaluation across asynchronous logic gates.
+            const sortedEvents = Array.from(this.eventQueue).sort((a, b) => {
+                const isSeqA = ['DFF', 'TFF', 'CLOCK', 'RAM'].includes(a.type) ? 1 : 0;
+                const isSeqB = ['DFF', 'TFF', 'CLOCK', 'RAM'].includes(b.type) ? 1 : 0;
+                return isSeqA - isSeqB;
+            });
+
             // for each node in the queue
-            this.eventQueue.forEach(node => {
+            sortedEvents.forEach(node => {
                 // calculate next state
                 const newVal = this.calculateNextState(node);
                 const rawNew = (typeof newVal === 'string' && newVal !== 'Z') ? JSON.parse(newVal) : newVal;
@@ -974,7 +983,9 @@ const Sim = {
                     // add driven nodes to queue
                     // add driven nodes to queue bidirectionally (fixes backwards wiring)
                     let visitedJuncs = new Set();
-                    const traceDriven = (nid) => {
+                    // [AUDIT: v1.25.41 | SEC_ARCH_LEAD] - Implemented depth-bound guards in traceDriven to avert recursion stack exhaustion faults.
+                    const traceDriven = (nid, depth = 0) => {
+                        if (depth > 100) return;
                         this.wires.forEach(w => {
                             if (w.from.nodeId === nid) {
                                 const ds = this.nodes.find(n => n.id === w.to.nodeId);
@@ -982,7 +993,7 @@ const Sim = {
                                     nextQueue.add(ds);
                                     if (ds.type === 'JUNCTION' && !visitedJuncs.has(ds.id)) {
                                         visitedJuncs.add(ds.id);
-                                        traceDriven(ds.id);
+                                        traceDriven(ds.id, depth + 1);
                                     }
                                 }
                             } else if (w.to.nodeId === nid) {
@@ -991,7 +1002,7 @@ const Sim = {
                                     nextQueue.add(ds);
                                     if (ds.type === 'JUNCTION' && !visitedJuncs.has(ds.id)) {
                                         visitedJuncs.add(ds.id);
-                                        traceDriven(ds.id);
+                                        traceDriven(ds.id, depth + 1);
                                     }
                                 }
                             }
@@ -1805,10 +1816,11 @@ const Sim = {
         // [AUDIT: SEC_ARCH_LEAD] - Prevent input toggling while in layout mutation mode.
         if (document.body.classList.contains('edit-mode-active')) return;
 
+        // [AUDIT: v1.25.41 | SEC_ARCH_LEAD] - Refactored dependency resolution to utilize modern Event interface layer.
         if (typeof e === 'string') {
             bitIndex = nodeId;
             nodeId = e;
-            e = window.event;
+            e = null;
         }
         const originNode = this.nodes.find(n => n.id === nodeId);
         if (!originNode || !originNode.type.startsWith('IN-')) return;

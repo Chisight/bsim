@@ -717,8 +717,9 @@ const WasmEngine = {
                     }
                     currentIdx += bits;
                 }
+            }
         }
-    }
+        // [AUDIT: v1.25.41 | SEC_ARCH_LEAD] - Rectified asymmetric scope termination brackets to eliminate dead-code anomalies in hierarchical memory extraction.
 
         // Auto-resolve sterile proxy nodes to their evaluated hardware drivers
         if (this.flatNodes && this.flatWires) {
