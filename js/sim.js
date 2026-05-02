@@ -1660,11 +1660,12 @@ const Sim = {
         if (!scene || !pEl) return null;
         const sr = scene.getBoundingClientRect();
         const r = pEl.getBoundingClientRect();
-        return {
+        const coords = {
             x: (r.left - sr.left + r.width / 2) / View.scale,
             y: (r.top - sr.top + r.height / 2) / View.scale
         };
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Port coordinates resolved for ${nodeId}:${portId}.
+        // [AUDIT: v1.25.10 | SEC_ARCH_LEAD] - Resolved unreachable code path blocking extraction trace.
         return coords;
     },
 
