@@ -5,9 +5,6 @@
 const NodeRenderer = {
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for node DOM instantiation.
-     * @ARCH: UI_RENDERING
-     * @IO: DOM_FACTORY
-     * @INTENT: Dynamically generate and inject the HTML/DOM representation for a specific logic node, including its ports and visual labels.
      */
     renderNode(node) {
         const div = document.createElement('div');
@@ -117,11 +114,8 @@ const NodeRenderer = {
                     <div class="port input" data-port="clk" style="top:78%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'clk')"><span class="port-label">CLK</span></div>
                     <div class="port output" data-port="q" style="top:42%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'q')"><span class="port-label">Q</span></div>
                     <div class="port output" data-port="nq" style="top:78%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'nq')"><span class="port-label">NQ</span></div>`;
-            } else if (node.type === 'RAM' || node.type === 'ROM') {
+            } else if (node.type === 'RAM') {
                 /**
-                 * @ARCH: UI_RENDERING
-                 * @IO: DOM_FACTORY
-                 * @INTENT: Dynamically generate parametric pin layouts and visual bounds for RAM and ROM primitives.
                  */
                 // [AUDIT: v1.24.97 | SEC_ARCH_LEAD] - Explicit parametric bounds and mapped port I/O rendering for memory modules.
                 const aBits = node.addressPins || 4;
@@ -236,7 +230,6 @@ const NodeRenderer = {
         document.getElementById('scene').appendChild(div);
         if (window.Sim && Sim._domCacheMap) Sim._domCacheMap.delete(node.id);
         Sim.updateNodeVisual(node);
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node rendered and appended to DOM: ${node.id} (${node.type}).
     }
 };
 

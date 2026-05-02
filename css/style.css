@@ -1,7 +1,4 @@
 /**
- * @ARCH: DESIGN_SYSTEM
- * @STATE: CSS_VARIABLES
- * @INTENT: Define global design tokens, color palettes, and typography for the professional simulation interface.
  */
 :root {
     --bg: #0b0b0e;
@@ -231,9 +228,6 @@ nav .sub-menu .menu-item::after { display: none; }
 }
 
 /**
- * @ARCH: COMPONENT_STYLE
- * @IO: VISUAL_REPRESENTATION
- * @INTENT: Define the visual structure and interactivity states for logic gate nodes on the workspace.
  */
 .gate {
     position: absolute; background: var(--gate-bg); 
@@ -410,9 +404,6 @@ footer::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px
 
 /* TRUTH TABLE STYLING - High-Fidelity Professional Grid */
 /**
- * @ARCH: COMPONENT_STYLE
- * @IO: DATA_VISUALIZATION
- * @INTENT: Define the layout and styling for the truth table analysis grid.
  */
 .truth-table-container { 
     max-height: 400px; overflow: auto; border: 1px solid #1a1a23; border-radius: 8px; margin-top: 15px; 
@@ -569,9 +560,6 @@ body.edit-mode-active .visual-extra.editing-pins, body.edit-mode-active .gate-la
 
 /* DEBUG TERMINAL v1.23.59 */
 /**
- * @ARCH: COMPONENT_STYLE
- * @IO: TERMINAL_UI
- * @INTENT: Define the visual parameters and positioning for the low-level debug terminal overlay.
  */
 .debug-terminal {
     position: fixed;

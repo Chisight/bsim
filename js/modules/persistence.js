@@ -5,31 +5,21 @@ const ProjectManager = {
     MigrationEngine: {
         /**
          * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for semantic version parsing.
-         * @ARCH: VERSION_PARSER
-         * @CONSTRAINT: SEMANTIC_VERSIONING
-         * @INTENT: Convert semantic version strings into a comparable integer format for migration logic.
          */
         parseVer(vStr) {
             if (!vStr) {
-                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Early exit, version string empty.
                 return 0;
             }
             const m = vStr.match(/v?(\d+)\.(\d+)\.(\d+)/);
             if (!m) {
-                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Early exit, version format invalid.
                 return 0;
             }
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Version parsed successfully.
             return parseInt(m[1]) * 1000000 + parseInt(m[2]) * 1000 + parseInt(m[3]);
         },
         /**
-         * @ARCH: SCHEMA_MIGRATOR
-         * @STATE: COMPATIBILITY_LAYER
-         * @INTENT: Upgrade legacy project schemas to the current runtime standard, including port remapping.
          */
         migrate(data) {
             if (!data) {
-                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Migration aborted, data payload null.
                 return data;
             }
             const fileVer = this.parseVer(data.meta?.version || "1.0.0");
@@ -115,12 +105,9 @@ const ProjectManager = {
 
             if (!data.meta) data.meta = {};
             data.meta.version = (window.EXPECTED_BSIM_VERSION || "1.24.00") + "-Modular";
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Migration complete. Target version: ${data.meta.version}.
             return data;
         },
         /**
-         * @STATE: PORT_NORMALIZER
-         * @INTENT: Apply bulk port remapping to a netlist for specific component types during migration.
          */
         remapPorts(data, type, map) {
             const rw = (wires, nodes) => {
@@ -138,8 +125,6 @@ const ProjectManager = {
             }
         },
         /**
-         * @STATE: DATA_CONSISTENCY
-         * @INTENT: Enforce structural integrity and default values across nodes and wires in a project blob.
          */
         standardize(data) {
             const NATIVE = new Set(['NAND', 'CLOCK', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'JUNCTION', 'TRISTATE', 'DFF', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR']);
@@ -215,17 +200,12 @@ const ProjectManager = {
     },
 
     /**
-     * @ARCH: PERSISTENCE_INTERFACE
-     * @INTENT: Normalize project data before ingestion into the simulation engine.
      */
     _normalizeData(data) {
         return this.MigrationEngine.migrate(data);
     },
 
     /**
-     * @IO: FILE_EXPORT
-     * @STATE: SERIALIZATION
-     * @INTENT: Serialize the current workspace and library into a .bsim project file.
      */
     exportProject(name) {
         if (name instanceof Event || typeof name !== 'string' || name.trim() === '') {
@@ -282,13 +262,9 @@ const ProjectManager = {
         document.body.removeChild(a);
         URL.revokeObjectURL(a.href);
         Sim.toast('Project exported successfully.', 'success');
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Project serialization and export complete.
     },
 
     /**
-     * @IO: FILE_IMPORT
-     * @STATE: DESERIALIZATION
-     * @INTENT: Load and validate a .bsim project file into the simulator workspace.
      */
     importProject() {
         const input = document.createElement('input');
@@ -341,13 +317,9 @@ const ProjectManager = {
             reader.readAsText(e.target.files[0]);
         };
         input.click();
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Import process initiated via UI file picker.
     },
 
     /**
-     * @IO: CANVAS_EXPORT
-     * @ARCH: RENDERING_EXPORT
-     * @INTENT: Render the current workspace to a static PNG image for documentation/sharing.
      */
     exportImage(name) {
         if (!name || typeof name !== 'string' || name instanceof Event || name.trim() === '') name = 'Diagram';
@@ -404,8 +376,6 @@ const ProjectManager = {
         img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgStr.replace(/var\(--wire-on\)/g, '#00ffaa').replace(/var\(--wire-off\)/g, '#883333'))));
     },
     /**
-     * @IO: REMOTE_IMPORT
-     * @INTENT: Fetch a .bsim project from a remote URL and ingest it into the local autosave slot.
      */
     async importFromUrl(url) {
         try {
@@ -421,8 +391,6 @@ const ProjectManager = {
     },
 
     /**
-     * @IO: SCREEN_CAPTURE
-     * @INTENT: Execute a high-fidelity workspace capture using the Screen Capture API for documentation.
      */
     async exportHighFidelity() {
         try {

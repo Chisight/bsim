@@ -2,9 +2,6 @@ const SynthUI = {
     state: { in: 3, out: 1, table: [], labels: { ins: [], outs: [] } },
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for logic synthesis UI activation.
-     * @IO: UI_MODAL
-     * @ARCH: SYNTHESIS_UI
-     * @INTENT: Open the advanced logic synthesizer modal and initialize the truth table UI.
      */
     open() {
         const mBody = document.getElementById('modal-body');
@@ -33,11 +30,8 @@ const SynthUI = {
         `;
         Sim.modal('Manual Logic Synthesizer [Advanced]', html, 'custom');
         this.render();
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Synthesis UI opened and table reset.
     },
     /**
-     * @STATE: SYNTHESIS_STATE
-     * @INTENT: Reinitialize the internal truth table state based on the current number of inputs and outputs.
      */
     resetTable() {
         this.state.table = [];
@@ -49,12 +43,8 @@ const SynthUI = {
                 outs: Array(this.state.out).fill(0), visible: true
             });
         }
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Truth table state reinitialized for ${this.state.in} inputs.
     },
     /**
-     * @IO: UI_INTERACTION
-     * @STATE: SYNTHESIS_STATE
-     * @INTENT: Cycle an input bit between 0, 1, and X (Don't Care) and re-process table folding.
      */
     toggleIn(r, b) {
         const cur = this.state.table[r].ins[b];
@@ -62,9 +52,6 @@ const SynthUI = {
         this.processFolding(); this.render();
     },
     /**
-     * @IO: UI_INTERACTION
-     * @STATE: SYNTHESIS_STATE
-     * @INTENT: Cycle an output bit between 0, 1, and X (Don't Care).
      */
     toggleOut(r, o) {
         const cur = this.state.table[r].outs[o];
@@ -72,8 +59,6 @@ const SynthUI = {
         this.render();
     },
     /**
-     * @CONSTRAINT: LOGIC_FOLDING
-     * @INTENT: Identify and hide truth table rows that are covered by higher-level "Don't Care" (X) patterns.
      */
     processFolding() {
         this.state.table.forEach(row => row.visible = true);
@@ -92,11 +77,8 @@ const SynthUI = {
                 if (isCovered) this.state.table[j].visible = false;
             }
         }
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Logic folding pass complete.
     },
     /**
-     * @IO: UI_RENDERING
-     * @INTENT: Redraw the truth table DOM elements based on the current synthesis state.
      */
     render() {
         const cont = document.getElementById('synth-table-container');
@@ -128,8 +110,6 @@ const SynthUI = {
         cont.innerHTML = html;
     },
     /**
-     * @ARCH: SYNTHESIS_DISPATCHER
-     * @INTENT: Extract the truth table data and dispatch it to the LogicSynthesizer for netlist generation.
      */
     build() {
         const ins = this.state.in;
@@ -154,7 +134,6 @@ const SynthUI = {
             });
             outputsData.push({ label: this.state.labels.outs[o], truthArray });
         }
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Dispatched logic data for synthesis.
         LogicSynthesizer.synthesizeToChip(outputsData, this.state.labels.ins, "");
     }
 };

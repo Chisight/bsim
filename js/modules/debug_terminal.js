@@ -92,9 +92,6 @@ const DebugTerminal = {
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for debug terminal bootstrap.
-     * @ARCH: APP_INITIALIZER
-     * @IO: TERMINAL_BOOT
-     * @INTENT: Initialize the debug terminal subsystem, including UI construction and console interception.
      */
     init() {
         // [AUDIT: v1.24.18 | SEC_ARCH_LEAD] - Prevent duplicate initialization from concurrent lifecycle hooks causing DOM ghosts.
@@ -107,12 +104,9 @@ const DebugTerminal = {
         this.overrideConsole();
         // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Updated terminal hotkey to avoid native print dialog collisions.
         console.log("[TERM] V8/WASM Debugger Initialized. Press Ctrl+Alt+P.");
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Debug terminal subsystem operational.
     },
 
     /**
-     * @ARCH: UI_STYLING
-     * @INTENT: Inject terminal-specific CSS into the document head for the telemetry interface.
      */
     // [AUDIT: v1.23.97 | SEC_ARCH_LEAD] - Upgraded terminal aesthetic and enforced text-selection capabilities.
     injectCSS() {
@@ -140,9 +134,6 @@ const DebugTerminal = {
     },
 
     /**
-     * @IO: UI_INTERACTION
-     * @STATE: TERMINAL_STATE
-     * @INTENT: Build the terminal DOM elements and attach dragging/resize event listeners.
      */
     // [AUDIT: v1.23.97 | SEC_ARCH_LEAD] - Injected Linux-style DOM wrappers for terminal prompt and auto-focus logic.
     buildUI() {
@@ -241,8 +232,6 @@ const DebugTerminal = {
     },
 
     /**
-     * @IO: AUTO_COMPLETE
-     * @INTENT: Handle tab-completion for commands and node IDs, with visual workspace highlighting.
      */
     // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Advanced Virtual File System path resolution.
     resolvePath(target) {
@@ -585,8 +574,6 @@ const DebugTerminal = {
     },
 
     /**
-     * @IO: KEYBOARD_INTERACTION
-     * @INTENT: Attach global keyboard shortcuts (e.g., Ctrl+P) to toggle terminal visibility.
      */
     attachHooks() {
         window.addEventListener('keydown', (e) => {
@@ -598,9 +585,6 @@ const DebugTerminal = {
     },
 
     /**
-     * @ARCH: LOGGING_INTERCEPTOR
-     * @IO: TELEMETRY
-     * @INTENT: Redirect standard console methods to the terminal output buffer for in-app debugging.
      */
     overrideConsole() {
         const ogLog = console.log, ogWarn = console.warn, ogErr = console.error;
@@ -610,8 +594,6 @@ const DebugTerminal = {
     },
 
     /**
-     * @STATE: TERMINAL_VISIBILITY
-     * @INTENT: Toggle the display state of the debug terminal and manage focus transitions.
      */
     toggle(state) {
         this.visible = state;
@@ -620,8 +602,6 @@ const DebugTerminal = {
     },
 
     /**
-     * @IO: TERMINAL_OUTPUT
-     * @INTENT: Append a formatted message line to the terminal output display.
      */
     // [AUDIT: v1.23.98 | SEC_ARCH_LEAD] - Adjusted print handler to safely interpret HTML layout injections.
     print(msg, type = 'sys') {
@@ -630,13 +610,9 @@ const DebugTerminal = {
         line.innerHTML = msg; // Upgraded to allow colored spans
         this.out.appendChild(line);
         this.out.scrollTop = this.out.scrollHeight;
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Message appended to terminal buffer.
     },
 
     /**
-     * @ARCH: COMMAND_PROCESSOR
-     * @IO: TERMINAL_INPUT
-     * @INTENT: Parse and execute user-entered terminal commands for simulator control.
      */
     // [AUDIT: v1.23.98 | SEC_ARCH_LEAD] - Upgraded terminal commands for verbose flags and bulk operations.
     exec(cmd) {
@@ -1326,13 +1302,9 @@ const DebugTerminal = {
                     this.print(`SUGGESTION: Did you mean '${suggestion}'?`, "sys");
                 }
         }
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Command execution finalized: ${cmd}.
     },
 
     /**
-     * @ARCH: HARDWARE_SYNTHESIZER
-     * @CONSTRAINT: RECURSIVE_BUILD
-     * @INTENT: Compile high-level gates from primitive NAND representations and inject into the simulator library.
      */
     synthesize(target) {
         if (!window.Sim) return this.print("Simulator context not linked.", "err");
@@ -1340,7 +1312,6 @@ const DebugTerminal = {
         
         const recipe = this.RECIPES[target];
         if (!recipe) {
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Synthesis aborted, no recipe for ${target}.
             return this.print(`No NAND synthesis recipe for: ${target}`, "err");
         }
 
@@ -1365,14 +1336,10 @@ const DebugTerminal = {
         } catch (e) {
             this.print(`Synthesis failed: ${e.message}`, 'err');
         }
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Synthesis process finalized for ${target}.
     },
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Injected topological tracing telemetry for active logic diagnostics.
-     * @ARCH: DIAGNOSTIC_TOOL
-     * @IO: TERMINAL_OUTPUT
-     * @INTENT: Map and display the connectivity and signal state of a specific node or the current selection.
      */
     // [AUDIT: v1.24.06 | SEC_ARCH_LEAD] - Context-aware topological tracing for nested workspace resolution.
     traceNode(nodeId) {

@@ -15,14 +15,10 @@ const WireRenderer = {
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for SVG wire layer redraw.
-     * @ARCH: UI_RENDERING
-     * @IO: SVG_LAYER_MUTATION
-     * @INTENT: Main entry point for redrawing the entire SVG wire layer based on current netlist connectivity and signal states.
      */
     drawWires() {
         const svg = document.getElementById('svg-layer');
         if (!svg) {
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire redraw aborted, SVG layer missing.
             return;
         }
         
@@ -89,13 +85,9 @@ const WireRenderer = {
 
         // [AUDIT: v1.24.13 | SEC_ARCH_LEAD] - Disabled geometric wire crossing masks per user preference.
         // this._renderCrossingMasks(svg);
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: SVG wire layer update complete. Rendered ${Sim.wires.length} wires.
     },
 
     /**
-     * @ARCH: RENDERING_POST_PROCESS
-     * @CONSTRAINT: GEOMETRIC_INTERSECTION
-     * @INTENT: Mathematically identify wire crossings and inject visual masks (jumps) to prevent ambiguity.
      */
     _renderCrossingMasks(svg) {
         svg.querySelectorAll('.wire-mask').forEach(m => m.remove());
@@ -159,9 +151,6 @@ const WireRenderer = {
 
 
     /**
-     * @ARCH: ROUTING_ALGORITHM
-     * @CONSTRAINT: MANHATTAN_STEER
-     * @INTENT: Calculate the optimal orthogonal path (Manhattan routing) for a wire based on port orientations and custom midpoints.
      */
     _calculateSmartPath(p1, p2, startNodeId, endNodeId, wire = null) {
         const L = 25; 
@@ -239,8 +228,6 @@ const WireRenderer = {
     },
 
     /**
-     * @IO: SVG_DOM_FACTORY
-     * @INTENT: Low-level drawing function to synchronize a specific wire's state with its SVG path element.
      */
     _drawOrtho(svg, p1, p2, isPreview, val, wireIndex, domIndex) {
         const wire = (wireIndex !== -1) ? Sim.wires[wireIndex] : null;

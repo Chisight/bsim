@@ -18,9 +18,6 @@ const WasmEngine = {
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for Wasm kernel initialization.
-     * @ARCH: KERNEL_LOADER
-     * @IO: WASM_FETCH
-     * @INTENT: Asynchronously initialize the WebAssembly execution environment and linear memory buffer.
      */
     async init() {
         try {
@@ -61,9 +58,6 @@ const WasmEngine = {
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for netlist expansion and hierarchical flattening.
-     * @ARCH: NETLIST_EXPANDER
-     * @CONSTRAINT: RECURSIVE_RESOLUTION
-     * @INTENT: Recursively expand hierarchical macros into primitive gates for the linear execution kernel.
      */
     _flattenNetlist(nodes, wires, prefix = "") {
         // Kernel primitives: pass through without expansion.
@@ -93,7 +87,6 @@ const WasmEngine = {
                 }
                 currentIdx += bits;
             }
-            // [AUDIT: v1.23.73 | SEC_ARCH_LEAD] - EXIT_TRACE: Port resolution failed for ${portStr}.
             return null;
         };
 
@@ -143,19 +136,14 @@ const WasmEngine = {
             fWires.push({ from: finalFrom, to: finalTo });
         });
 
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Returning flattened object graph with prefix context: ${prefix || 'ROOT'}
         return { nodes: fNodes, wires: fWires };
     },
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for Wasm linear memory synchronization and instruction assembly.
-     * @ARCH: SYNC_BRIDGE
-     * @STATE: LINEAR_ALLOCATION
-     * @INTENT: Synchronize the JS object graph with Wasm linear memory, assigning static slots and building instructions.
      */
     syncLayout(nodes, wires) {
         if (!this.ready) {
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: syncLayout aborted, engine not ready.
             return;
         }
         const flattened = this._flattenNetlist(nodes, wires);
@@ -182,12 +170,12 @@ const WasmEngine = {
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Ensure memory allocation accounts for 1MB instruction base.
         // [AUDIT: v1.24.60 | SEC_ARCH_LEAD] - Dynamic Region C allocation injected for linear Wasm payload bridging.
         // [AUDIT: v1.24.83 | SEC_ARCH_LEAD] - Enforce physical powers-of-2 memory chunking to prevent out-of-bounds module bleeding.
-        let romPayloadSize = 0;
+        let memPayloadSize = 0;
         this.flatNodes.forEach(n => {
-            if (n.type === 'ROM' || n.type === 'RAM') romPayloadSize += (1 << (n.addressPins || 4));
+            if (n.type === 'RAM') memPayloadSize += (1 << (n.addressPins || 4));
         });
         // [AUDIT: v1.24.94 | SEC_ARCH_LEAD] - Shifted allocation baseline to 24MB to encompass Region E power analysis buffers and prevent OOB traps.
-        const requiredBytes = 25165824 + (this.flatNodes.length * 256) + romPayloadSize;
+        const requiredBytes = 25165824 + (this.flatNodes.length * 256) + memPayloadSize;
         const requiredPages = Math.ceil(requiredBytes / 65536);
         const currentPages = this.memory.buffer.byteLength / 65536;
 
@@ -208,7 +196,7 @@ const WasmEngine = {
             } else if (n.type === 'DFF' || n.type === 'TFF') {
                 // [AUDIT: v1.24.92 | SEC_ARCH_LEAD] - Expand to 4 slots to support Shadow State NextQ for Three-Phase Commit.
                 this.idMap.set(n.id, [slot++, slot++, slot++, slot++]);
-            } else if (n.type === 'ROM' || n.type === 'RAM') {
+            } else if (n.type === 'RAM') {
                 let indices = [];
                 for (let i = 0; i < 8; i++) indices.push(slot++);
                 this.idMap.set(n.id, indices);
@@ -238,16 +226,13 @@ const WasmEngine = {
         // 4. Build the linear execution array
         const OP_NAND = 0; const OP_DFF = 1; const OP_CLOCK = 2; const OP_TRISTATE = 3; const OP_TFF = 4;
         // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Injected Memory and Offset Opcodes for Kernel Parity.
-        const OP_ROM = 5; const OP_BUFFER = 6; const OP_RAM = 7; const OP_SET_OFFSET = 8;
+        const OP_BUFFER = 6; const OP_RAM = 7; const OP_SET_OFFSET = 8;
         const OP_BUS_RESOLVE = 11;
 
         let virtualNodeCount = slot + 10;
         let currentRomOffset = 0;
         /**
          * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for logical driver resolution.
-         * @ARCH: SIGNAL_RESOLVER
-         * @STATE: DRIVER_GRAPH
-         * @INTENT: Perform a deep-search through the netlist to identify all logical drivers for a specific port.
          */
         const resolveAllDriverIndices = (startNodeId, startPortId) => {
             let visited = new Set();
@@ -306,7 +291,6 @@ const WasmEngine = {
                 });
             };
             trace(startNodeId, startPortId);
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Returning ${drivers.size} drivers for ${startNodeId}:${startPortId}.
             return drivers.size > 0 ? Array.from(drivers) : [0]; // Unconnected inputs default to GROUND (0)
         };
 
@@ -323,7 +307,6 @@ const WasmEngine = {
                 this.instructionCount++;
                 currentIdx = vTargetIdx;
             }
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Bus resolution tree built. Final index: ${currentIdx}
             return currentIdx;
         };
 
@@ -432,7 +415,7 @@ const WasmEngine = {
             else if (t === 'NOT') inputPorts = ['a'];
             else if (t === 'TRISTATE') inputPorts = ['in', 'en'];
             // [AUDIT: v1.25.07 | SEC_ARCH_LEAD] - Injected RAM into Kahn's topological dependency whitelist to resolve instruction out-of-order execution faults.
-            else if (t === 'ROM' || t === 'RAM') {
+            else if (t === 'RAM') {
                 const pins = receiverNode.addressPins || 4;
                 for (let i = 0; i < pins; i++) inputPorts.push(`in${i}`);
                 if (t === 'RAM') {
@@ -514,9 +497,6 @@ const WasmEngine = {
 
             /**
              * [AUDIT: v1.25.14 | SEC_ARCH_LEAD]
-             * @ARCH: WASM_BRIDGE
-             * @STATE: OPCODE_DISPATCH
-             * @INTENT: Emit Opcode 9 (CONST_0) for Constant Ground primitives to ensure native Wasm execution.
              */
             if (t === '0') {
                 const slot = this.getSpecificIdx(n.id, 'out0');
@@ -573,7 +553,7 @@ const WasmEngine = {
                 emitNAND(v3, b, v1);
                 emitNAND(v4, v2, v3);
                 emitNAND(mapped, v4, v4);
-            } else if (t === 'ROM' || t === 'RAM') {
+            } else if (t === 'RAM') {
                 const pins = n.addressPins || 4;
                 const addrBase = virtualNodeCount;
                 virtualNodeCount += pins;
@@ -601,7 +581,7 @@ const WasmEngine = {
                 
                 const addrPacking = addrBase | (pins << 24);
                 emitOP(0, currentRomOffset, 0, OP_SET_OFFSET);
-                emitOP(mapped[0], addrPacking, dataPacking, t === 'RAM' ? OP_RAM : OP_ROM);
+                emitOP(mapped[0], addrPacking, dataPacking, OP_RAM);
                 
                 currentRomOffset += allocSize;
             } else if (t === 'DFF' || t === 'CLOCK' || t === 'TRISTATE' || t === 'TFF') {
@@ -620,34 +600,24 @@ const WasmEngine = {
         });
 
         console.log(`[WasmEngine] Optimized execution graph built with ${this.instructionCount} instructions.`);
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: SYNC_BRIDGE synchronization complete. linear instruction count: ${this.instructionCount}
     },
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for Wasm execution step.
-     * @IO: KERNEL_STEP
-     * @CONSTRAINT: DETERMINISTIC_TICK
-     * @INTENT: Trigger a single simulation cycle in the Wasm engine.
      */
     // [AUDIT: v1.24.91 | SEC_ARCH_LEAD] - Expanded signature to support Two-Phase Commit for sequential latching.
     executeTick(evalSeq = 1) {
         if (!this.ready || !this.instance) {
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Early exit, Wasm engine not ready.
             return;
         }
         this.instance.exports.tick(this.instructionCount, evalSeq);
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Wasm tick executed successfully.
     },
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for state mutation (Host to Wasm).
-     * @STATE: MEMORY_UPDATE
-     * @IO: HOST_TO_WASM
-     * @INTENT: Write external signal values (user inputs, clocks) into Wasm linear memory.
      */
     writeState(nodeId, value) {
         if (!this.ready) {
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Early exit, Wasm memory not ready for write.
             return;
         }
         const mapped = this.idMap.get(nodeId);
@@ -659,56 +629,40 @@ const WasmEngine = {
         } else {
             this.memArray[this.REGION_A_OFFSET + mapped] = value;
         }
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node ${nodeId} state written to Wasm memory.
     },
 
     /**
-     * @IO: SIGNAL_PROBE
-     * @INTENT: Read the current logical state of a specific wire from Wasm linear memory.
      */
     readWireState(wireIndex) {
         if (!this.ready || !this.wireIdxMap.has(wireIndex)) {
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire ${wireIndex} state read failure (unmapped or not ready).
             return null;
         }
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire ${wireIndex} state read success.
         return this.memArray[this.REGION_A_OFFSET + this.wireIdxMap.get(wireIndex)];
     },
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for memory index mapping.
-     * @ARCH: MEMORY_MAPPER
-     * @INTENT: Map a specific node and port pair to its exact index in the Wasm linear memory buffer.
      */
     getSpecificIdx(id, port) {
         const mapped = this.idMap.get(id);
         if (mapped === undefined) {
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Mapping failure for ${id}:${port} (id not found).
             return undefined;
         }
         if (Array.isArray(mapped)) {
             if (port === 'q') {
-                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Bit mapping for ${id}:${port} -> index ${mapped[0]} (primary).
                 return mapped[0];
             }
             if (port === 'nq') {
-                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Bit mapping for ${id}:${port} -> index ${mapped[1]} (secondary).
                 return mapped[1];
             }
             const bit = parseInt(port.replace(/\D/g, '')) || 0;
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Bus bit mapping for ${id}:${port} -> bit ${bit} -> index ${mapped[bit]}.
             return mapped[bit] !== undefined ? mapped[bit] : mapped[0];
         }
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Linear mapping for ${id}:${port} -> index ${mapped}.
         return mapped;
     },
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for state readback.
-     * @ARCH: SYNC_BRIDGE
-     * @STATE: MEMORY_READBACK
-     * @IO: WASM_TO_HOST
-     * @INTENT: Retrieve the entire state vector for a node from Wasm linear memory.
      */
     getToggleCount(nodeId) {
         if (!this.ready || !this.memArray) return 0;
@@ -720,28 +674,21 @@ const WasmEngine = {
 
     readState(nodeId) {
         if (!this.ready) {
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Read failure for ${nodeId} (memory not ready).
             return 0;
         }
         const mapped = this.idMap.get(nodeId);
         if (Array.isArray(mapped)) {
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Vector read success for ${nodeId}.
             return mapped.map(idx => this.memArray[this.REGION_A_OFFSET + idx]);
         } else {
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Scalar read success for ${nodeId}.
             return this.memArray[this.REGION_A_OFFSET + mapped];
         }
     },
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for hierarchical pin probing.
-     * @IO: SIGNAL_PROBE
-     * @ARCH: SYNC_BRIDGE
-     * @INTENT: Probe a specific pin state, resolving through hierarchical proxy nodes to find the physical driver.
      */
     readPinState(nodeId, portId) {
         if (!this.ready || !this.memArray) {
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Pin probe failure for ${nodeId}:${portId} (system offline).
             return null;
         }
 
@@ -845,7 +792,6 @@ const WasmEngine = {
                     targetPortId = drv.port;
                 } else {
                     // Force ground (0) on unconnected sterile pins to prevent parity drift
-                    // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Unconnected sterile pin detected at ${targetNodeId}:${targetPortId}. Grounded to 0.
                     return 0;
                 }
             }
@@ -853,24 +799,17 @@ const WasmEngine = {
 
         let idx = this.getSpecificIdx(targetNodeId, targetPortId);
         if (idx === undefined) {
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Pin probe failed for ${targetNodeId}:${targetPortId} (resolution failed).
             return null;
         }
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Enforce REGION_A_OFFSET mapping to prevent layout boundary circumvention.
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: SYNC_BRIDGE pin probe success. Mapped bit-index: ${idx}. Relation: [Resolved: ${targetNodeId}:${targetPortId} from original ${nodeId}:${portId}].
         return this.memArray[this.REGION_A_OFFSET + idx];
     },
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for memory map extraction.
-     * @ARCH: DIAGNOSTIC_TOOL
-     * @IO: CONSOLE_EXPORT
-     * @INTENT: Generate and display a structured map of the Wasm linear memory allocation for all flattened nodes.
      */
     /**
      * [AUDIT: v1.24.90 | SEC_ARCH_LEAD] - Entry trace for reverse memory synchronization.
-     * @ARCH: MEMORY_SYNC
-     * @INTENT: Extract volatile RAM payloads from Wasm Region C back to JS host objects to preserve state during AutoSave.
      */
     syncMemoryToHost(rootNodes) {
         if (!this.ready || !this.memArray || !this.flatNodes) return;
@@ -890,7 +829,7 @@ const WasmEngine = {
 
         let currentRomOffset = 0;
         this.flatNodes.forEach(fn => {
-            if (fn.type === 'ROM' || fn.type === 'RAM') {
+            if (fn.type === 'RAM') {
                 const pins = fn.addressPins || 4;
                 const allocSize = 1 << pins;
                 if (fn.type === 'RAM') {
@@ -910,7 +849,7 @@ const WasmEngine = {
         console.group("WASM LINEAR MEMORY MAP (v1.24.90)");
         console.log("Region A (States) Offset: 0");
         console.log("Region B (Instructions) Offset: 1048576 (byte)");
-        console.log("Region C (ROM Payloads) Offset: 16777216 (byte)");
+        console.log("Region C (RAM Payloads) Offset: 16777216 (byte)");
 
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Align diagnostic export with true Engine.wat physical memory layout, removing metadata phantom mapping.
         const map = this.flatNodes.map((node) => {
@@ -925,7 +864,6 @@ const WasmEngine = {
 
         console.table(map);
         console.groupEnd();
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Memory map exported to console.
         return map;
     }
 };

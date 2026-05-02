@@ -149,9 +149,6 @@ const Sim = {
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for simulation kernel bootstrap.
-     * @ARCH: KERNEL_ORCHESTRATOR
-     * @IO: WORKSPACE_INITIALIZATION
-     * @INTENT: Initialize simulation kernel, viewport, and global event listeners for the workspace.
      */
     init() {
         let running = false;
@@ -246,13 +243,9 @@ const Sim = {
 
             this.updateWireVisuals();
         });
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Simulation kernel initialization complete.
     },
 
     /**
-     * @IO: UI_FEEDBACK
-     * @STATE: TOOLTIP_ENGINE
-     * @INTENT: Update dynamic tooltip descriptions based on node state and type.
      */
     refreshTooltips() {
         this.nodes.forEach(n => {
@@ -279,9 +272,6 @@ const Sim = {
     },
 
     /**
-     * @IO: KEYBOARD_INTERACTION
-     * @ARCH: COMMAND_DISPATCHER
-     * @INTENT: Map global hotkeys to simulator commands (Undo, Redo, Delete).
      */
     applyKeybinds() {
         window.addEventListener('keydown', (e) => {
@@ -305,8 +295,6 @@ const Sim = {
     },
 
     /**
-     * @ARCH: NETLIST_MUTATION
-     * @INTENT: Delete all currently selected nodes and wires via the History system.
      */
     deleteSelection() {
         if (this.selection.size === 0) return;
@@ -323,8 +311,6 @@ const Sim = {
     },
 
     /**
-     * @STATE: CLIPBOARD_MANAGEMENT
-     * @INTENT: Snapshot the current selection into the clipboard buffer.
      */
     copySelection() {
         if (this.selection.size === 0) return;
@@ -334,8 +320,6 @@ const Sim = {
     },
 
     /**
-     * @ARCH: NETLIST_MUTATION
-     * @INTENT: Instantiate components from the clipboard with new unique identifiers.
      */
     pasteSelection() {
         if (!this._clipboard || !this._clipboard.nodes) return;
@@ -366,9 +350,6 @@ const Sim = {
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Align persistence telemetry with MRAP taxonomy.
-     * @ARCH: PERSISTENCE_MANAGER
-     * @STATE: WORKSPACE_SERIAL
-     * @INTENT: Periodically synchronize the current workspace state to local storage for crash recovery.
      */
     autoSave() {
         if (this._autoSaveTimer) clearTimeout(this._autoSaveTimer);
@@ -433,7 +414,6 @@ const Sim = {
  
                 };
                 localStorage.setItem('bsim_autosave', JSON.stringify(project));
-                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: AutoSave operation finalized.
             } catch (e) {
                 console.error("[AutoSave] Serialization Failure:", e);
             }
@@ -441,9 +421,6 @@ const Sim = {
     },
 
     /**
-     * @IO: LOCAL_STORAGE
-     * @ARCH: WORKSPACE_RECOVERY
-     * @INTENT: Restore the last known workspace state and library from local storage on boot.
      */
     loadAutoSave() {
         try {
@@ -552,9 +529,6 @@ const Sim = {
     },
 
     /**
-     * @ARCH: COMPONENT_ADAPTER
-     * @STATE: PORT_SIGNAL_MAPPING
-     * @INTENT: Aggregate signals for macro internal ports during hierarchical simulation.
      */
     _assembleChipInputs(chipDef, getDriveFn) {
         // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - V8 Pipeline Crash Guards: Halt evaluation on unlinked custom definitions.
@@ -579,9 +553,6 @@ const Sim = {
     },
 
     /**
-     * @ARCH: COMPONENT_ADAPTER
-     * @STATE: PORT_SIGNAL_MAPPING
-     * @INTENT: Distribute internal signals to macro output terminals.
      */
     _mapChipOutputs(chipDef, internalRes) {
         // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - V8 Pipeline Crash Guards: Halt evaluation on unlinked custom definitions.
@@ -606,9 +577,6 @@ const Sim = {
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for logical signal evaluation.
-     * @ARCH: SIGNAL_RESOLVER
-     * @STATE: NODE_UPDATE
-     * @INTENT: Evaluate the logical transfer function for a single node based on its driving signals.
      */
     calculateNextState(node) {
         if (node.isCustom) {
@@ -652,9 +620,6 @@ const Sim = {
             case 'JUNCTION': return this.getDrivingSignal(node.id, 'j');
             /**
              * [AUDIT: v1.25.14 | SEC_ARCH_LEAD]
-             * @ARCH: V8_FALLBACK
-             * @STATE: CONSTANT_GROUND
-             * @INTENT: Ensure Constant Ground (0) primitives are zero-initialized in the V8 simulation heap.
              */
             case '0': return 0;
             // TRISTATE
@@ -715,7 +680,6 @@ const Sim = {
         }
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Prevent ReferenceError on untrapped generic nodes.
         const finalVal = node.val !== undefined ? node.val : null;
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: State calculated for node.
         return finalVal;
     },
     // =========================================================================
@@ -725,9 +689,6 @@ const Sim = {
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for simulation tick.
-     * @ARCH: SCHEDULER
-     * @CONSTRAINT: TIME_STEP_QUANTIZATION
-     * @INTENT: Orchestrate the main simulation loop, delegating to Wasm for native logic blocks when possible.
      */
     processQueue() {
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - JIT Interceptor for Dual-Engine Parity. Wasm macro expansion requires sequential proxy indices ('in0'), while V8 requires strict strings ('a').
@@ -787,7 +748,6 @@ const Sim = {
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Purged destructive '7-num' legacy migration hack. Architectural topological parity natively restored.
 
         if (!this.eventQueue || this.eventQueue.size === 0) {
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Early exit, simulation queue empty.
             return;
         }
 
@@ -951,7 +911,6 @@ const Sim = {
                 WireRenderer.drawWires();
                 // clear the queue
                 this.eventQueue.clear();
-                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Wasm-accelerated simulation tick complete.
                 return;
             }
         }
@@ -1057,20 +1016,15 @@ const Sim = {
         }
         // update HUD
         this.updateHUD();
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: V8-based simulation tick complete. Iterations: ${iterations}.
     },
 
     // [wasm] parity check
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Telemetry taxonomy taxonomy correction for parity diagnostic module.
-     * @ARCH: DIAGNOSTIC_ORCHESTRATOR
-     * @CONSTRAINT: ENGINE_PARITY
-     * @INTENT: Perform a stress-test comparison between the V8 JS engine and the Wasm kernel to ensure state parity.
      */
     async runWasmParityCheck(iterations = 1000) {
         // check if WasmEngine is loaded
         if (!window.WasmEngine || !WasmEngine.ready) {
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Diagnostics aborted, Wasm Engine not linked.
             return this.toast('Wasm Engine not linked.', 'danger');
         }
         // show toast notification
@@ -1084,7 +1038,6 @@ const Sim = {
         const isPureNative = this.isPureNative();
         // if not pure native, return toast
         if (!isPureNative) {
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Diagnostics aborted, mixed-mode netlist detected.
             return this.toast('Parity check requires native logic components only.', 'warning');
         }
         // start console group
@@ -1225,14 +1178,10 @@ const Sim = {
         this.toast(passed ? 'Parity Suite: PASSED' : 'Parity Suite: FAILED (Check Console)', passed ? 'success' : 'danger');
         // update wire visuals
         this.updateWireVisuals();
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Parity diagnostics suite finalized. Result: ${passed ? 'PASSED' : 'FAILED'}.
     },
 
     // simulate internal circuit (sub-circuit simulation)
     /**
-     * @ARCH: SUB_SIMULATOR
-     * @CONSTRAINT: RECURSIVE_EVAL
-     * @INTENT: Execute a synchronous logical sweep of a sub-circuit (custom chip) to resolve its outputs.
      */
     simulateInternalCircuit(chipTypeOrMeta, externalInputs) {
         // debug message
@@ -1387,14 +1336,10 @@ const Sim = {
         const res = {};
         meta.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-')).forEach(out => res[out.id] = out.val === undefined ? 0 : out.val);
         if (this.debugToasts) console.debug(`[SimTrace] Sub-Circuit Result: ${typeof chipTypeOrMeta === 'string' ? chipTypeOrMeta : 'Custom'} | Outputs:`, res);
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Sub-simulation complete for ${typeof chipTypeOrMeta === 'string' ? chipTypeOrMeta : 'Custom'}.
         return res;
     },
 
     /**
-     * @ARCH: NETLIST_FACTORY
-     * @IO: UI_MUTATION
-     * @INTENT: Add a new node to the workspace with optional coordinate snapping and collision detection.
      */
     addNode(type, x = null, y = null, label = null, preferredId = null) {
         if (x === null) {
@@ -1409,14 +1354,10 @@ const Sim = {
         if (this.snapNodes) { x = Math.round(x / 10) * 10; y = Math.round(y / 10) * 10; }
         if (this.debugToasts) this.toast(`Added ${type} node`);
         const newNode = this._finalizeAddNode(type, x, y, label || type, preferredId);
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node added to workspace: ${newNode.id} (${type}).
         return newNode;
     },
 
     /**
-     * @ARCH: NETLIST_FACTORY
-     * @STATE: NODE_INITIALIZATION
-     * @INTENT: Construct the internal node object representation and trigger the AddNodeCommand.
      */
     // [AUDIT: v1.24.70 | SEC_ARCH_LEAD] - Deterministic node allocation constraint injected for terminal parity validation.
     _finalizeAddNode(type, x, y, label, preferredId = null) {
@@ -1437,20 +1378,16 @@ const Sim = {
         if (this.polarity && this.polarity[type]) {
             node.flipPolarity = true;
         }
-        // [AUDIT: v1.24.53 | SEC_ARCH_LEAD] - Injected ROM native component type to allow bypass of custom chip verifications.
         // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Formally classified RAM as a native primitive to ensure linear memory execution priority.
         // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Formally registered RAM as a core primitive to prevent macro-substitution logic.
         // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Registered '0' as native primitive.
         const NATIVE_TYPES = new Set(['NAND', 'CLOCK', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'JUNCTION', 'TRISTATE', 'DFF', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'RAM', '0']);
         if (this.library[type] && !NATIVE_TYPES.has(type)) { node.isCustom = true; }
         History.execute(new AddNodeCommand(node));
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node command dispatched for ${node.id}.
         return node;
     },
 
     /**
-     * @IO: UI_POSITIONING
-     * @INTENT: Synchronize the DOM element's CSS position with the internal node coordinates.
      */
     updateNodePosition(node, el = null) {
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Enforce topological wire relativity: custom segments follow source node movement.
@@ -1476,13 +1413,9 @@ const Sim = {
             div.style.top = node.y + 'px';
             div.style.transform = 'none';
         }
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: DOM position updated for node ${node.id}.
     },
 
     /**
-     * @IO: UI_RENDERING
-     * @STATE: NODE_VISUAL_STATE
-     * @INTENT: Update a node's visual representation (colors, labels, bit-dots) based on its logical value.
      */
     updateNodeVisual(n) {
         const el = document.getElementById(n.id); if (!el) return;
@@ -1682,13 +1615,9 @@ const Sim = {
             }
         }
         
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node visual state synchronized for ${n.id}.
     },
 
     /**
-     * @ARCH: RENDERING_DISPATCHER
-     * @STATE: NETLIST_DIRTY
-     * @INTENT: Trigger a redraw of the SVG wire layer and mark the netlist for Wasm recompilation.
      */
     updateWireVisuals() {
         this._netlistDirty = true; // Forces WASM engine to recognize the new layout
@@ -1703,8 +1632,6 @@ const Sim = {
     },
 
     /**
-     * @IO: UI_COORDINATE_RESOLVER
-     * @INTENT: Resolve the viewport-relative coordinates of a specific port on a node.
      */
     getPortCoords(nodeId, portId) {
         const scene = document.getElementById('scene');
@@ -1716,15 +1643,11 @@ const Sim = {
             x: (r.left - sr.left + r.width / 2) / View.scale,
             y: (r.top - sr.top + r.height / 2) / View.scale
         };
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Port coordinates resolved for ${nodeId}:${portId}.
         // [AUDIT: v1.25.10 | SEC_ARCH_LEAD] - Resolved unreachable code path blocking extraction trace.
         return coords;
     },
 
     /**
-     * @IO: UI_INTERACTION
-     * @ARCH: WIRING_MANAGER
-     * @INTENT: Manage the state machine for manual wire creation between ports.
      */
     handlePortInteraction(e, nodeId, portId) {
         // [AUDIT: SEC_ARCH_LEAD] - Global freeze on wiring interactions during layout configurations.
@@ -1767,13 +1690,9 @@ const Sim = {
             this.clearSnapState();
             WireRenderer.drawWires();
         }
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Port interaction state machine cycle complete.
     },
 
     /**
-     * @ARCH: NETLIST_MUTATION
-     * @STATE: WIRE_ALLOCATION
-     * @INTENT: Programmatically create a wire connection between two specific ports.
      */
     connectNodes(n1Id, p1Id, n2Id, p2Id) {
         if (this.debugToasts) this.toast(`Connecting ${n1Id} to ${n2Id}`, 'debug');
@@ -1786,9 +1705,6 @@ const Sim = {
     },
 
     /**
-     * @ARCH: SIGNAL_RESOLVER
-     * @STATE: NODE_OUTPUT_STATE
-     * @INTENT: Retrieve the current logical signal value emitted by a specific port.
      */
     getSignal(nodeId, portId) {
         const node = this.nodes.find(n => n.id === nodeId);
@@ -1817,9 +1733,6 @@ const Sim = {
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for driving signal resolution.
-     * @ARCH: SIGNAL_RESOLVER
-     * @STATE: NETLIST_TRAVERSAL
-     * @INTENT: Trace a net backwards to find the driving signal for a given input port.
      */
     getDrivingSignal(nodeId, portId, visited = new Set()) {
         const netKey = `${nodeId}:${portId}`;
@@ -1876,9 +1789,6 @@ const Sim = {
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for full simulation reset.
-     * @ARCH: SIMULATION_KERNEL
-     * @STATE: SIMULATION_RESET
-     * @INTENT: Reset transition histories and force a full-netlist propagation sweep.
      */
     seedQueue() { 
         this._transitions.clear(); 
@@ -1886,12 +1796,8 @@ const Sim = {
         this.eventQueue = new Set(this.nodes); 
         // [AUDIT: v1.24.91 | SEC_ARCH_LEAD] - Force wake lock on scheduler to prevent stalled evaluation of newly instantiated clock sources.
         if (this.wakeQueue) this.wakeQueue();
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Queue seeded for full propagation sweep.
     },
     /**
-     * @IO: UI_INTERACTION
-     * @STATE: INPUT_MUTATION
-     * @INTENT: Toggle a specific bit of an input node and trigger a simulation tick.
      */
     toggleBit(e, nodeId, bitIndex) {
         // [AUDIT: SEC_ARCH_LEAD] - Prevent input toggling while in layout mutation mode.
@@ -1926,12 +1832,9 @@ const Sim = {
             this.updateNodeVisual(n);
         });
         this.seedQueue(); this.processQueue();
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Input bit(s) toggled and propagation triggered.
     },
 
     /**
-     * @ARCH: ENGINE_SWITCH
-     * @INTENT: Switch between V8 (JavaScript) and Wasm simulation kernels.
      */
     setEngine(type) {
         this.useWasm = (type === 'wasm');
@@ -1940,8 +1843,6 @@ const Sim = {
     },
 
     /**
-     * @IO: HUD_DISPLAY
-     * @INTENT: Update the Heads-Up Display with current netlist statistics and engine status.
      */
     updateHUD() {
         let hud = document.getElementById('ui-hud');
@@ -1979,8 +1880,6 @@ const Sim = {
     },
 
     /**
-     * @IO: SIDEBAR_DISPLAY
-     * @INTENT: Populate the component sidebar with categorized native gate buttons.
      */
     updateSidebar() {
         const sb = document.getElementById('sidebar');
@@ -2014,8 +1913,6 @@ const Sim = {
     },
 
     /**
-     * @IO: LIBRARY_DISPLAY
-     * @INTENT: Synchronize the custom chip library UI with the internal library state.
      */
     updateLibraryUI() {
         // 1. Ensure Context Menu DOM Element Exists
@@ -2157,8 +2054,6 @@ const Sim = {
     },
 
     /**
-     * @ARCH: WORKSPACE_CONTEXT_SWITCH
-     * @INTENT: Push the current board to the workspace stack and enter the internal logic editor for a custom chip.
      */
     uiEditChip(name, isSwitching = false) {
         if (!this.library[name]) return;
@@ -2222,9 +2117,6 @@ const Sim = {
         this.autoSave();
     },
     /**
-     * @ARCH: NETLIST_MUTATION
-     * @IO: MODAL_CONFIRM
-     * @INTENT: Prompt for confirmation and delete a chip definition from the library, purging all instances.
      */
     uiDeleteChip(name) {
         this.modal('Delete Chip', `Delete ${name}? This will remove all instances from the board.`, 'danger', ok => {
@@ -2267,8 +2159,6 @@ const Sim = {
         });
     },
     /**
-     * @IO: UI_MODAL
-     * @INTENT: Display a customizable modal dialog for alerts, prompts, or confirmations.
      */
     modal(title, content, type, callback, val) {
         const overlay = document.getElementById('ui-overlay');
@@ -2306,18 +2196,12 @@ const Sim = {
 
     /**
      * [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - Overhauled toast engine with global positioning persistence and interaction capture.
-     * @ARCH: UI_TOAST_SYSTEM
-     * @STATE: TOAST_PERSISTENCE
-     * @IO: USER_NOTIFICATION
-     * @INTENT: Display interactive, draggable toast notifications with persistent positioning.
      */
     toast(msg, type = 'info', duration = 3000) {
         if (!this.showToasts) {
-            // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - EXIT_TRACE: Toast aborted, notifications disabled.
             return;
         }
         if (type === 'debug' && !this.debugToasts) {
-            // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - EXIT_TRACE: Toast aborted, debug mode inactive.
             return;
         }
 
@@ -2387,18 +2271,11 @@ const Sim = {
         if (duration > 0) {
             this._toastTimer = setTimeout(() => el.classList.remove('show'), duration);
         }
-        // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - EXIT_TRACE: Toast notification lifecycle initiated.
     },
 
     /**
-     * @IO: UI_MODAL
-     * @STATE: PREFERENCES
-     * @INTENT: Display the global simulator preferences modal and synchronize user adjustments.
      */
     /**
-     * @IO: UI_MODAL
-     * @STATE: PREFERENCES
-     * @INTENT: Display the global simulator preferences modal and synchronize user adjustments.
      */
     // [AUDIT: v1.24.37 | SEC_ARCH_LEAD] - Shifted from modal to independent non-blocking window for uninterrupted workspace tuning.
     showPrefs() {
@@ -2455,9 +2332,6 @@ const Sim = {
 
     /**
      * [AUDIT: v1.23.99 | SEC_ARCH_LEAD] - Multi-tab context switching logic.
-     * @ARCH: WORKSPACE_MANAGER
-     * @STATE: CONTEXT_SWITCH
-     * @INTENT: Manage tab instances, synchronize active working memory to inactive tabs, and hydrate DOM states.
      */
     updateTabsUI() {
         const tb = document.getElementById('tab-bar');
@@ -2562,9 +2436,6 @@ const Sim = {
     },
 
     /**
-     * @ARCH: WORKSPACE_RESET
-     * @IO: LOCAL_STORAGE_DELETE
-     * @INTENT: Completely wipe the active workspace, library, and autosave to start a fresh project.
      */
     uiNewProject() {
         this.modal('New Project', 'Warning: This will wipe your library, workspace, and autosave. Continue?', 'confirm', (ok) => {
@@ -2575,8 +2446,6 @@ const Sim = {
         });
     },
     /**
-     * @ARCH: UI_STYLING
-     * @INTENT: Synchronize dynamic CSS variables (e.g., port size) with current application preferences.
      */
     applyStyles() {
         // [AUDIT: v1.24.37 | SEC_ARCH_LEAD] - Extended style injection to support global animation muting.
@@ -2593,9 +2462,6 @@ const Sim = {
         document.body.classList.toggle('no-animations', !!this.disableAnimations);
     },
     /**
-     * @ARCH: NETLIST_FACTORY
-     * @STATE: LIBRARY_PERSISTENCE
-     * @INTENT: Snapshot the current workspace into a new custom chip definition and register it in the library.
      */
     // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Hierarchical namespacing injection for macro library.
     uiSaveAsGate() {
@@ -2626,9 +2492,6 @@ const Sim = {
 
     /**
      * [AUDIT: SEC_ARCH_LEAD] - Entry trace for parametric node edit mode.
-     * @ARCH: UI_CONTROLLER
-     * @STATE: LAYOUT_MUTATION
-     * @INTENT: Enable bounded spatial editing for internal pin indicators and node geometry via click-drag isolation.
      */
     // [AUDIT: v1.24.43 | SEC_ARCH_LEAD] - Injected nomenclature translation layer to intercept legacy pin-dots dispatches.
     enterNodeEditMode(nodeId, mode) {
@@ -2917,7 +2780,6 @@ const Sim = {
                 this.updateWireVisuals();
                 this.autoSave();
                 this.toast(`Global layout applied to all ${state.node.type} components.`, 'success');
-                // [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - EXIT_TRACE: Global layout mutation finalized and persisted.
             };
             tEl.appendChild(btn);
         }
@@ -2926,8 +2788,6 @@ const Sim = {
 
     /**
      * [AUDIT: v1.23.79 | SEC_ARCH_LEAD] - Parametric macro geometry bounds override.
-     * @ARCH: NETLIST_FACTORY
-     * @INTENT: Modify the custom bounding box of a chip globally, mathematical offsets automatically realign.
      */
     uiScaleChip(name) {
         this.modal('Set Custom Geometry', 'Enter width and height (e.g., 100,200):', 'prompt', (input) => {
@@ -2952,9 +2812,6 @@ const Sim = {
 
 
     /**
-     * @IO: UI_PROMPT
-     * @STATE: INPUT_MUTATION
-     * @INTENT: Prompt the user for a numeric value (Hex, Dec, Bin) and apply it to a multi-bit input node.
      */
     uiInlineEditValue(e, id, format) {
         // [AUDIT: SEC_ARCH_LEAD] - Inline structural editor for multi-bit readouts.
@@ -3029,8 +2886,6 @@ const Sim = {
 
 
     /**
-     * @ARCH: WORKSPACE_RESET
-     * @INTENT: Clear the active workspace to prepare for a new logic design without wiping the library.
      */
     uiNewChip() {
         this.modal('New Chip', 'Clear workspace? Your saved library will be kept.', 'confirm', (ok) => {
@@ -3047,8 +2902,6 @@ const Sim = {
     },
 
     /**
-     * @ARCH: SESSION_TERMINATION
-     * @INTENT: Terminate the current simulation session and optionally clear persistence.
      */
     uiQuit() {
         this.modal('Quit', 'Discard current session and clear autosave before exiting?', 'danger', (discard) => {
@@ -3058,9 +2911,6 @@ const Sim = {
     },
 
     /**
-     * @IO: UI_COORDINATE_RESOLVER
-     * @ARCH: RENDERING_QUERIES
-     * @INTENT: Identify a wire at a specific coordinate for interaction handling.
      */
     getWireAt(x, y) {
         return this.wires.find(w => {
@@ -3083,8 +2933,6 @@ const Sim = {
     },
 
     /**
-     * @CONSTRAINT: GEOMETRIC_MATH
-     * @INTENT: Calculate the minimum distance between a point and a line segment.
      */
     distToSegment(px, py, x1, y1, x2, y2) {
         const l2 = Math.hypot(x2 - x1, y2 - y1);
@@ -3094,8 +2942,6 @@ const Sim = {
     },
 
     /**
-     * @STATE: NETLIST_INDEXING
-     * @INTENT: Rebuild the internal wireMap index for fast signal resolution lookups.
      */
     reindexWires() {
         this.wireMap.clear();
@@ -3106,8 +2952,6 @@ const Sim = {
     },
 
     /**
-     * @STATE: UI_FEEDBACK_RESET
-     * @INTENT: Clear all active port-snapping highlights and reset the snapping state.
      */
     clearSnapState() {
         document.querySelectorAll('.snap-hover').forEach(el => el.classList.remove('snap-hover'));
@@ -3116,9 +2960,6 @@ const Sim = {
 
 
     /**
-     * @ARCH: WORKSPACE_CONTEXT_SWITCH
-     * @STATE: LIBRARY_SYNC
-     * @INTENT: Save current chip logic to the library and return to the parent workspace context.
      */
     // [AUDIT: v1.24.11 | SEC_ARCH_LEAD] - Architecture augmentation for dual-pane editing layout with workspace clearing and state restoration.
     uiSplitEditor(direction, overrideChip = null, isRestore = false) {

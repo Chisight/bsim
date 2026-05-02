@@ -12,9 +12,6 @@ const View = {
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for viewport controller initialization.
-     * @ARCH: VIEWPORT_INITIALIZATION
-     * @IO: MOUSE_EVENT_LISTENERS
-     * @INTENT: Initialize global event listeners for workspace panning and mouse-wheel zooming.
      */
     init() {
         const ws = document.getElementById('workspace');
@@ -69,14 +66,10 @@ const View = {
             
             this.apply();
         }, { passive: false });
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Viewport event listeners operational.
     },
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for viewport matrix synchronization.
-     * @IO: CSS_TRANSFORM_SYNC
-     * @STATE: VIEWPORT_MATRIX
-     * @INTENT: Synchronize the DOM and SVG layers with the current internal pan/zoom transformation matrix.
      */
     apply() {
         document.getElementById('scene').style.transform = `translate(${this.x}px, ${this.y}px) scale(${this.scale})`;
@@ -86,7 +79,6 @@ const View = {
         document.getElementById('grid-layer').style.backgroundSize = `${gs}px ${gs}px`;
         // Force wire recalculation on view matrix change
         if (window.Sim) Sim.updateWireVisuals();
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Viewport transformation applied to DOM/SVG.
     }
 };
 

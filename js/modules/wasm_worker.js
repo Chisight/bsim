@@ -1,7 +1,5 @@
 /**
  * [AUDIT: v1.24.95 | SEC_ARCH_LEAD] - Worker-side orchestration for asynchronous kernel execution.
- * @ARCH: ASYNC_KERNEL
- * @INTENT: Offload Wasm simulation ticks to a high-priority worker thread using SharedArrayBuffer.
  */
 self.onmessage = async (e) => {
     const { action, wasmBuffer, memory, instructionCount, evalSeq } = e.data;

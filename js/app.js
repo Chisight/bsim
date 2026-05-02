@@ -3,8 +3,6 @@
  */
 /**
  * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for main application bootstrap.
- * @ARCH: APP_INITIALIZER
- * @INTENT: Initialize the simulator, UI components, and global event listeners on window load.
  */
 window.onload = () => {
     // Inject marquee div if missing
@@ -118,26 +116,16 @@ window.onload = () => {
     });
 
     /**
-     * @STATE: BSIM_METADATA
-     * @INTENT: Define the application semantic versioning for runtime compatibility checks.
+     * Define the application semantic versioning for runtime compatibility checks.
      */
-    // [AUDIT: v1.25.27 | SEC_ARCH_LEAD] - Encapsulated native primitives inside a collapsible hierarchical directory.
-    // [AUDIT: v1.25.28 | SEC_ARCH_LEAD] - Synchronized nomenclature to 'primatives' (lowercase) across UI and terminal.
-    // [AUDIT: v1.25.29 | SEC_ARCH_LEAD] - Reverted to 'primitives' (correct spelling) after user-initiated correction.
-    // [AUDIT: v1.25.30 | SEC_ARCH_LEAD] - Replaced nested dropdowns with inline accordion expansion to cure sub-menu boundary clipping.
-    // [AUDIT: v1.25.31 | SEC_ARCH_LEAD] - Injected JIT renderer intercept to reverse RAM address and data bus pin polarity.
-    // [AUDIT: v1.25.32 | SEC_ARCH_LEAD] - Deprecated specific RAM interceptor in favor of a universal pin-polarity reversal architecture.
-    // [AUDIT: v1.25.33 | SEC_ARCH_LEAD] - Segregated pin-label translation logic to the X-axis and injected discrete vertical port-spacing tools.
-    // [AUDIT: v1.25.34 | SEC_ARCH_LEAD] - Corrected precision truncation fault in address bus scaling computation and excised deprecated ROM primitive.
-    // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Purged legacy JIT DOM interceptor in favor of native parametric coordinate generation in NodeRenderer.
     // [AUDIT: v1.25.36 | SEC_ARCH_LEAD] - Reprogrammed node layout algorithms to preserve asymmetric RAM component matrices during translation cycles.
     // [AUDIT: v1.25.37 | SEC_ARCH_LEAD] - Injected native output pin (out0) for Constant Ground (0) primitive to enable Wasm-parity topological driver resolution.
-    window.LOADED_BSIM_VERSION = "1.25.37";
+    // [AUDIT: v1.25.39 | SEC_ARCH_LEAD] - Executed global codebase sanitation; purged deprecated ROM primitive and archived stale taxonomy/audit metadata to ARCHIVE_BLOAT.md.
+    window.LOADED_BSIM_VERSION = "1.25.39";
 
     // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Purged legacy JIT DOM interceptor in favor of native parametric coordinate generation.
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Native integration finalized in history.js and sim.js.
-    // [AUDIT: v1.23.96 | SEC_ARCH_LEAD] - Engine Parity Check: Assert parity between V8 and Wasm execution states on boot.
     // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - JIT Patches Purged: Remote Import and High-Fidelity Export natively integrated into ProjectManager.
     // [AUDIT: SEC_ARCH_LEAD] - Injected passive workspace boundary validation to catch upgrade mismatches.
     window.addEventListener('load', () => {
@@ -166,5 +154,4 @@ window.onload = () => {
             localStorage.setItem('bsim_state_version', window.LOADED_BSIM_VERSION);
         }, 2000); // Delayed execution to ensure workspace load completion
     });
-    // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Application bootstrap sequence finalized.
 };

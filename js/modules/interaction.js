@@ -4,10 +4,6 @@
 const InteractionHandler = {
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for node translation.
-     * @ARCH: UI_CONTROLLER
-     * @IO: UI_INTERACTION
-     * @STATE: NODE_POSITION
-     * @INTENT: Handle mouse-driven node translation and group dragging for selected components.
      */
     handleNodeDrag(e, node, div) {
         console.debug('[DEBUG] Node onmousedown triggered. Node ID:', node.id, '| Button pressed:', e.button);
@@ -15,7 +11,6 @@ const InteractionHandler = {
         if (document.body.classList.contains('edit-mode-active')) return;
 
         if (e.target.classList.contains('port')) {
-            // [AUDIT: SEC_ARCH_LEAD] - EXIT_TRACE: Drag aborted, port interaction detected.
             return;
         }
         
@@ -23,7 +18,6 @@ const InteractionHandler = {
             e.preventDefault(); e.stopPropagation();
             const menu = document.getElementById('context-menu');
             if (!menu) {
-                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Context menu aborted, DOM target missing.
                 return;
             }
 
@@ -44,11 +38,11 @@ const InteractionHandler = {
             if (node.type === 'CLOCK') {
                 configOption = `<div class="menu-item" onclick="Sim.handleNodeDblClick(new Event('dblclick'), Sim.nodes.find(n=>n.id==='${node.id}'), document.getElementById('${node.id}')); document.getElementById('context-menu').style.display='none';">Configure Frequency</div>`;
             // [AUDIT: SEC_ARCH_LEAD] - Added info readout layout mutation to preferences.
-            } else if (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.isCustom || node.type === 'ROM' || node.type === 'RAM') {
+            } else if (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.isCustom || node.type === 'RAM') {
                 // [AUDIT: v1.24.34 | SEC_ARCH_LEAD] - Replaced monolithic pin layout with granular dot/label mutators.
                 nodePrefs = `
                     <div class="menu-item" style="color:var(--accent); font-weight:bold; cursor:default;">Node Prefs:</div>
-                    ${(node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.isCustom || node.type === 'ROM' || node.type === 'RAM') ? `
+                    ${(node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.isCustom || node.type === 'RAM') ? `
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-leds'); document.getElementById('context-menu').style.display='none';">↳ Edit Pin LEDs</div>
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-labels'); document.getElementById('context-menu').style.display='none';">↳ Edit Pin Labels</div>
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-both'); document.getElementById('context-menu').style.display='none';">↳ Edit Both (Sync)</div>
@@ -62,7 +56,7 @@ const InteractionHandler = {
 
             // [AUDIT: v1.25.04 | SEC_ARCH_LEAD] - Integrated binary payload uploader specifically for memory components.
             let memUpload = '';
-            if (node.type === 'RAM' || node.type === 'ROM') {
+            if (node.type === 'RAM') {
                 memUpload = `<div class="menu-item" style="color:#00ffaa; font-weight:bold;" onclick="InteractionHandler.triggerMemoryUpload('${node.id}'); document.getElementById('context-menu').style.display='none';">Upload .bin Payload</div>`;
             }
 
@@ -90,7 +84,6 @@ const InteractionHandler = {
                 menu.classList.add('open-up');
             }
             
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Context menu displayed for node ${node.id}.
             return; 
         }
         
@@ -151,18 +144,12 @@ const InteractionHandler = {
             const wMoves = dragWires.map(item => ({ wire: item.wire, ox: item.ox, oy: item.oy, nx: item.wire.midX, ny: item.wire.midY }));
 
             if (moves.length > 0) History.execute(new MoveNodeCommand(moves, wMoves));
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node translation finalized. Commands dispatched: ${moves.length}.
         };
         document.addEventListener('mousemove', onMove); document.addEventListener('mouseup', onUp, { once: true });
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node drag lifecycle initialized for ${node.id}.
     },
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for logical state toggle.
-     * @ARCH: SIGNAL_INJECTOR
-     * @IO: UI_INTERACTION
-     * @STATE: NODE_STATE
-     * @INTENT: Toggle logical state of input nodes and frequency of clock nodes on click.
      */
     handleNodeClick(e, node, div, bits) {
         // [AUDIT: SEC_ARCH_LEAD] - Global freeze on node topological clicks during layout configurations.
@@ -191,15 +178,10 @@ const InteractionHandler = {
             }
             Sim.updateNodeVisual(node);
         }
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node interaction complete for ${node.id}.
     },
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for configuration modal activation.
-     * @ARCH: UI_ORCHESTRATOR
-     * @IO: UI_INTERACTION
-     * @ARCH: UI_MODAL
-     * @INTENT: Trigger configuration modals for components (clocks, multi-bit inputs) on double-click.
      */
     handleNodeDblClick(e, node, div) {
         // [AUDIT: SEC_ARCH_LEAD] - Global freeze on node topological double-clicks during layout configurations.
@@ -221,12 +203,8 @@ const InteractionHandler = {
                 }
             }, node.freq);
         // [AUDIT: v1.24.25 | SEC_ARCH_LEAD] - Removed uiEnterValue popup intercept to allow inline renaming on multi-bit inputs.
-        } else if (node.type === 'RAM' || node.type === 'ROM') {
+        } else if (node.type === 'RAM') {
             /**
-             * @ARCH: UI_MODAL
-             * @IO: UI_INTERACTION
-             * @STATE: MEMORY_CONFIG
-             * @INTENT: Configure memory primitives (RAM/ROM) with custom address bit widths and binary payload URLs.
              */
             // [AUDIT: v1.24.97 | SEC_ARCH_LEAD] - Intercept configuration triggers to accept URL mapping and memory depth natively.
             const currentAddr = node.addressPins || 4;
@@ -260,7 +238,6 @@ const InteractionHandler = {
             btnCancel.innerText = 'Cancel';
             btnCancel.onclick = () => { 
                 overlay.style.display = 'none'; overlay.querySelector('.ui-modal').classList.remove('show'); 
-                // [AUDIT: v1.24.97 | SEC_ARCH_LEAD] - EXIT_TRACE: Memory configuration cancelled.
             };
             
             const btnOk = document.createElement('button');
@@ -331,7 +308,6 @@ const InteractionHandler = {
                 }
                 overlay.style.display = 'none';
                 overlay.querySelector('.ui-modal').classList.remove('show');
-                // [AUDIT: v1.24.97 | SEC_ARCH_LEAD] - EXIT_TRACE: Memory configuration applied for node ${node.id}.
             };
             
             mButtons.appendChild(btnCancel);
@@ -378,17 +354,14 @@ const InteractionHandler = {
             input.focus();
             input.select();
         }
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Modal configuration triggered for ${node.id}.
     },
 
     /**
      * [AUDIT: v1.25.04 | SEC_ARCH_LEAD] - Entry trace for localized memory payload ingestion.
-     * @ARCH: FILE_IO
-     * @INTENT: Trigger a local file picker to flash binary data directly into the active RAM/ROM node buffer.
      */
     triggerMemoryUpload(nodeId) {
         const node = Sim.nodes.find(n => n.id === nodeId);
-        if (!node || (node.type !== 'RAM' && node.type !== 'ROM')) return;
+        if (!node || (node.type !== 'RAM')) return;
         
         const input = document.createElement('input');
         input.type = 'file';
@@ -432,10 +405,8 @@ const InteractionHandler = {
                         Sim.toast(`${node.type} flashed. Bus auto-scaled to ${requiredPins} pins.`, 'success');
                     }
                     Sim.autoSave();
-                    // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - EXIT_TRACE: Memory buffer mounted and netlist marked dirty for Wasm sync.
                 } catch (err) {
                     Sim.toast('Failed to mount memory buffer.', 'danger');
-                    // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - EXIT_TRACE: Memory mount failed.
                 }
             }
         };
@@ -444,9 +415,6 @@ const InteractionHandler = {
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for wire splitting.
-     * @ARCH: NETLIST_MODIFIER
-     * @ARCH: NETLIST_MUTATION
-     * @INTENT: Split an existing wire by inserting a logical JUNCTION node at the specified coordinates.
      */
     _splitWire(fromNodeId, fromPortId, toNodeId, toPortId, clickX, clickY) {
         const wire = Sim.wires.find(w => w.from.nodeId === fromNodeId && w.to.nodeId === toNodeId && w.from.portId === fromPortId && w.to.portId === toPortId);
@@ -455,15 +423,10 @@ const InteractionHandler = {
         // [AUDIT: v1.24.77 | SEC_ARCH_LEAD] - Atomic wire splitting via unified history command.
         History.execute(new SplitWireCommand(wire, clickX, clickY));
         Sim.autoSave();
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire split successful at (${clickX}, ${clickY}).
     },
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for wire context manipulation.
-     * @ARCH: UI_CONTROLLER
-     * @IO: UI_INTERACTION
-     * @ARCH: NETLIST_MUTATION
-     * @INTENT: Manage context-menu actions and manual routing adjustments for individual wires.
      */
     handleWireInteraction(e, wire, p1, p2) {
         console.debug('[DEBUG] handleWireInteraction invoked. Button:', e.button);
@@ -539,16 +502,11 @@ const InteractionHandler = {
                 oldOrthoDir: wire.orthoDir || 'H'
             };
         }
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire interaction handled for ${wire.id}.
     },
 
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for marquee selection initialization.
-     * @ARCH: SELECTION_CONTROLLER
-     * @IO: UI_INTERACTION
-     * @STATE: SELECTION_STATE
-     * @INTENT: Initialize and manage the marquee selection box for group operations on nodes.
      */
     initMarquee() {
         const ws = document.getElementById('workspace');
@@ -850,29 +808,20 @@ const InteractionHandler = {
             isDragging = false;
             marquee.style.display = 'none';
         });
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Marquee selection listeners initialized.
     },
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for selection serialization.
-     * @ARCH: CLIPBOARD_ENGINE
-     * @STATE: CLIPBOARD_MANAGEMENT
-     * @INTENT: Serialize selected nodes and wires into the internal clipboard buffer.
      */
     copySelection() {
         if (Sim.selection.size === 0) return;
         const nodesToCopy = Sim.nodes.filter(n => Sim.selection.has(n.id));
         const wiresToCopy = Sim.wires.filter(w => Sim.selection.has(w.from.nodeId) && Sim.selection.has(w.to.nodeId));
         Sim._clipboard = { nodes: JSON.parse(JSON.stringify(nodesToCopy)), wires: JSON.parse(JSON.stringify(wiresToCopy)) };
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Copied ${nodesToCopy.length} nodes to clipboard.
     },
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for selection instantiation.
-     * @ARCH: NETLIST_MODIFIER
-     * @ARCH: NETLIST_MUTATION
-     * @STATE: SELECTION_STATE
-     * @INTENT: Instantiate and reconnect components from the internal clipboard into the active netlist.
      */
     pasteSelection() {
         if (!Sim._clipboard || !Sim._clipboard.nodes) return;
@@ -911,14 +860,10 @@ const InteractionHandler = {
             const el = document.getElementById(n.id);
             if (el) el.classList.add('selected');
         });
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Selection pasted and re-indexed.
     },
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for global clipboard listeners.
-     * @ARCH: INTERACTION_HANDLER
-     * @IO: KEYBOARD_INTERACTION
-     * @INTENT: Register global keyboard shortcuts for clipboard (Ctrl+C/V) and deletion operations.
      */
     initClipboardListeners() {
         window.addEventListener('keydown', (e) => {
@@ -939,14 +884,10 @@ const InteractionHandler = {
                 }
             }
         });
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Clipboard listeners registered.
     },
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for physical wire creation.
-     * @ARCH: NETLIST_INTERCONNECT
-     * @IO: SIGNAL_INTERCONNECT
-     * @INTENT: Establish a logical bridge between node ports with strict width parity enforcement.
      */
     // [AUDIT: v1.23.62 | SEC_ARCH_LEAD] - Workflow 10: Strict Bus Widths (SBW).
     createWire(sourceNodeId, sourcePortId, targetNodeId, targetPortId) {
@@ -989,7 +930,6 @@ const InteractionHandler = {
         };
         Sim.wires.push(wire);
         Sim.updateWireVisuals();
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Wire created successfully between ${sourceNodeId} and ${targetNodeId}.
         return true;
     }
 };
