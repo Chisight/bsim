@@ -100,6 +100,43 @@ const NodeRenderer = {
                     <div class="port input" data-port="clk" style="top:78%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'clk')"><span class="port-label">CLK</span></div>
                     <div class="port output" data-port="q" style="top:42%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'q')"><span class="port-label">Q</span></div>
                     <div class="port output" data-port="nq" style="top:78%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'nq')"><span class="port-label">NQ</span></div>`;
+            } else if (node.type === 'RAM' || node.type === 'ROM') {
+                /**
+                 * @ARCH: UI_RENDERING
+                 * @IO: DOM_FACTORY
+                 * @INTENT: Dynamically generate parametric pin layouts and visual bounds for RAM and ROM primitives.
+                 */
+                // [AUDIT: v1.24.97 | SEC_ARCH_LEAD] - Explicit parametric bounds and mapped port I/O rendering for memory modules.
+                const aBits = node.addressPins || 4;
+                const dBits = 8;
+                
+                const leftPins = aBits + (node.type === 'RAM' ? 1 : 0); 
+                const rightPins = dBits;
+                const maxPins = Math.max(leftPins, rightPins);
+                const heightCalc = (maxPins * 20 + 30);
+                
+                div.style.minHeight = heightCalc + 'px';
+                div.style.height = heightCalc + 'px';
+                div.style.width = node.customWidth ? node.customWidth + 'px' : '100px';
+
+                for (let i = 0; i < aBits; i++) {
+                    const tStyle = `top:calc(24px + ${i * 20}px)`;
+                    portsHtml += `<div class="port input" data-port="in${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'in${i}')"><span class="port-label">A${i}</span></div>`;
+                }
+                
+                if (node.type === 'RAM') {
+                    const ctrlY = aBits * 20 + 24;
+                    portsHtml += `<div class="port input" data-port="we" style="top:${ctrlY}px" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'we')"><span class="port-label">WE</span></div>`;
+                }
+
+                for (let i = 0; i < dBits; i++) {
+                    const tStyle = `top:calc(24px + ${i * 20}px)`;
+                    portsHtml += `<div class="port output" data-port="out${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${i}')"><span class="port-label">D${i}</span></div>`;
+                    
+                    if (node.type === 'RAM') {
+                        portsHtml += `<div class="port input" data-port="din${i}" style="left:-6px; top:calc(24px + ${i * 20}px)" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'din${i}')"><span class="port-label" style="left:14px; text-align:left;">DI${i}</span></div>`;
+                    }
+                }
             } else if (node.isCustom) {
                 const chipDef = Sim.library[node.type];
                 if (chipDef) {

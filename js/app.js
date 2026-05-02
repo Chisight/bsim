@@ -163,7 +163,8 @@ window.onload = () => {
     // [AUDIT: v1.24.94 | SEC_ARCH_LEAD] - Expanded Wasm linear memory allocation baseline to safely encompass the 24MB Power Analysis Region E.
     // [AUDIT: v1.24.95 | SEC_ARCH_LEAD] - Deployed Asynchronous Worker Kernel, Wasm SIMD Vectorization, and Combinatorial Oscillation Watchdog.
     // [AUDIT: v1.24.96 | SEC_ARCH_LEAD] - Parity Recovery: Reverted to non-shared memory to bypass Cross-Origin Isolation requirements for local deployment.
-    window.LOADED_BSIM_VERSION = "1.24.96";
+    // [AUDIT: v1.24.97 | SEC_ARCH_LEAD] - Natively mapped explicit spatial boundaries and state mutation matrices for memory primitives.
+    window.LOADED_BSIM_VERSION = "1.24.97";
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Enforce ring-buffer limits on the History stack to prevent V8 heap exhaustion during macro execution.
     if (window.History) {
@@ -233,86 +234,7 @@ window.onload = () => {
             };
         }
 
-        // [AUDIT: v1.24.58 | SEC_ARCH_LEAD] - Injected URL payload parser and monotonic address pin auto-scaling for ROM primitives.
-        document.addEventListener('dblclick', (e) => {
-            const gate = e.target.closest('.gate');
-            if (!gate) return;
-            const node = Sim.nodes.find(n => n.id === gate.id);
-            // [AUDIT: v1.24.64 | SEC_ARCH_LEAD] - Unified configuration entry for both volatile RAM and static ROM payloads.
-            if (node && (node.type === 'ROM' || node.type === 'RAM')) {
-                Sim.modal(`Configure ${node.type} Data`, `Enter URL to fetch raw binary data:`, 'prompt', async (url) => {
-                    if (url) {
-                        node.dataUrl = url;
-                        try {
-                            Sim.toast('Fetching ROM data via network...', 'info');
-                            const res = await fetch(url);
-                            const buffer = await res.arrayBuffer();
-                            const bytes = new Uint8Array(buffer);
-                            node.memoryData = Array.from(bytes);
-                            
-                            const reqPins = Math.max(4, Math.ceil(Math.log2(bytes.length)));
-                            if (reqPins > (node.addressPins || 4)) {
-                                node.addressPins = reqPins; // Monotonic increase only
-                                Sim.toast(`Address bus scaled up to ${reqPins} bits to fit payload.`, 'warning');
-                                if (window.NodeRenderer) {
-                                    gate.remove();
-                                    NodeRenderer.renderNode(node);
-                                }
-                            } else {
-                                Sim.toast(`ROM payload flashed successfully (${bytes.length} bytes).`, 'success');
-                            }
-                            Sim.updateWireVisuals();
-                            Sim.seedQueue();
-                            Sim.processQueue();
-                            Sim.autoSave();
-                        } catch(err) {
-                            Sim.toast('Network fault during ROM flash.', 'danger');
-                        }
-                    }
-                }, node.dataUrl || '');
-                return;
-            }
-        });
-        
-        if (window.NodeRenderer && typeof NodeRenderer.renderNode === 'function') {
-            const origRender = NodeRenderer.renderNode.bind(NodeRenderer);
-            NodeRenderer.renderNode = function(node) {
-                // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Injected RAM pin-out generation including Data-In bus and Write-Enable control.
-                if (node.type === 'ROM' || node.type === 'RAM') {
-                    const tmpType = node.type;
-                    node.isCustom = true; 
-                    Sim.library[tmpType] = {
-                        nodes: [
-                            ...Array.from({length: node.addressPins || 4}).map((_, i) => ({ type: 'IN-1', id: `in${i}` })),
-                            ...(tmpType === 'RAM' ? [
-                                ...Array.from({length: 8}).map((_, i) => ({ type: 'IN-1', id: `din${i}` })),
-                                { type: 'IN-1', id: 'we' }
-                            ] : []),
-                            ...Array.from({length: 8}).map((_, i) => ({ type: 'OUT-1', id: `out${i}` }))
-                        ]
-                    };
-                    origRender(node);
-                    node.type = tmpType;
-                    node.isCustom = false;
-                    const el = document.getElementById(node.id);
-                    if (el) {
-                        const lbl = el.querySelector('.gate-label');
-                        if (lbl) {
-                            if (!node.label || node.label === 'ROM' || node.label === 'RAM') {
-                                lbl.innerText = `${tmpType} (${node.addressPins || 4}x8)`;
-                            } else {
-                                lbl.innerText = node.label;
-                            }
-                            lbl.style.color = '#fff';
-                        }
-                        el.style.backgroundColor = tmpType === 'RAM' ? '#1e4a2c' : '#2c1e4a';
-                    }
-                    delete Sim.library[tmpType];
-                    return;
-                }
-                return origRender(node);
-            }
-        }
+        // [AUDIT: v1.24.97 | SEC_ARCH_LEAD] - Purged legacy ROM/RAM monkey-patches; configuration and rendering natively integrated into Core IO modules.
     }, 500);
 
     // [AUDIT: SEC_ARCH_LEAD] - Injected passive workspace boundary validation to catch upgrade mismatches.
