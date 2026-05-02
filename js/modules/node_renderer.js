@@ -47,26 +47,31 @@ const NodeRenderer = {
             let dotsHtml = '';
             for (let i = 0; i < bits; i++) {
                 const bIdx = bits - 1 - i; // TOP is MSB, BOTTOM is LSB
-                const topStyle = bits === 1 ? "top:50%" : `top:calc(24px + ${((i + 0.5) / bits)} * (100% - 30px))`;
+                // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Evaluated flipPolarity vector directly against geometric calculation loops.
+                const vIdx = node.flipPolarity ? (bits - 1 - i) : i;
+                const topStyle = bits === 1 ? "top:50%" : `top:calc(24px + ${((vIdx + 0.5) / bits)} * (100% - 30px))`;
                 // [AUDIT: v1.24.28 | SEC_ARCH_LEAD] - Adjusted pin layout percentage calculation to prevent header collision.
                 const labelText = (bits > 1) ? bIdx : '';
                 portsHtml += `<div class="port output" data-port="out${bIdx}" style="${topStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${bIdx}')">
                     <div class="port-meta"><span class="port-label">${labelText}</span></div>
                 </div>`;
-                dotsHtml += `<div class="bit-dot" data-bit="${bIdx}" onclick="event.stopPropagation(); Sim.toggleBit(event, '${node.id}', ${bIdx})"></div>`;
+                const dot = `<div class="bit-dot" data-bit="${bIdx}" onclick="event.stopPropagation(); Sim.toggleBit(event, '${node.id}', ${bIdx})"></div>`;
+                if (node.flipPolarity) dotsHtml = dot + dotsHtml; else dotsHtml += dot;
             }
             portsHtml += `<div class="pin-container in">${dotsHtml}</div>`;
         } else if (node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
             let dotsHtml = '';
             for (let i = 0; i < bits; i++) {
                 const bIdx = bits - 1 - i; // TOP is MSB, BOTTOM is LSB
-                const topStyle = bits === 1 ? "top:50%" : `top:calc(24px + ${((i + 0.5) / bits)} * (100% - 30px))`;
+                const vIdx = node.flipPolarity ? (bits - 1 - i) : i;
+                const topStyle = bits === 1 ? "top:50%" : `top:calc(24px + ${((vIdx + 0.5) / bits)} * (100% - 30px))`;
                 // [AUDIT: v1.24.28 | SEC_ARCH_LEAD] - Adjusted pin layout percentage calculation to prevent header collision.
                 const labelText = (bits > 1) ? bIdx : '';
                 portsHtml += `<div class="port input" data-port="in${bIdx}" style="${topStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'in${bIdx}')">
                     <div class="port-meta"><span class="port-label">${labelText}</span></div>
                 </div>`;
-                dotsHtml += `<div class="bit-dot" data-bit="${bIdx}"></div>`;
+                const dot = `<div class="bit-dot" data-bit="${bIdx}"></div>`;
+                if (node.flipPolarity) dotsHtml = dot + dotsHtml; else dotsHtml += dot;
             }
             portsHtml += `<div class="pin-container out">${dotsHtml}</div>`;
         }
@@ -126,8 +131,9 @@ const NodeRenderer = {
                 div.style.width = node.customWidth ? node.customWidth + 'px' : '100px';
 
                 // [AUDIT: v1.25.03 | SEC_ARCH_LEAD] - Inverted physical pin layout rendering so MSB is visually higher on the chip chassis.
+                // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Injected native parametric coordinate calculation for RAM polarity matrices.
                 for (let i = 0; i < aBits; i++) {
-                    const visualIdx = (aBits - 1) - i;
+                    const visualIdx = node.flipPolarity ? i : (aBits - 1) - i;
                     const tStyle = `top:calc(24px + ${visualIdx * 20}px)`;
                     portsHtml += `<div class="port input" data-port="in${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'in${i}')"><span class="port-label">A${i}</span></div>`;
                 }
@@ -138,7 +144,7 @@ const NodeRenderer = {
                 }
 
                 for (let i = 0; i < dBits; i++) {
-                    const visualIdx = (dBits - 1) - i;
+                    const visualIdx = node.flipPolarity ? i : (dBits - 1) - i;
                     const tStyle = `top:calc(24px + ${visualIdx * 20}px)`;
                     portsHtml += `<div class="port output" data-port="out${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${i}')"><span class="port-label">D${i}</span></div>`;
                     
@@ -176,7 +182,8 @@ const NodeRenderer = {
                             const portId = `in${cIn}`;
                             // [AUDIT: v1.24.28 | SEC_ARCH_LEAD] - UI Scaling: Cascade bus labels to macro pins and prevent header collision.
                             const lbl = bits > 1 ? (labelBase + bIdx) : p.label;
-                            const topStyle = totalIns === 1 ? "top:50%" : `top:calc(24px + ${((cIn + 0.5) / totalIns)} * (100% - 30px))`;
+                            const vIdx = node.flipPolarity ? (totalIns - 1 - cIn) : cIn;
+                            const topStyle = totalIns === 1 ? "top:50%" : `top:calc(24px + ${((vIdx + 0.5) / totalIns)} * (100% - 30px))`;
                             portsHtml += `<div class="port input" data-port="${portId}" style="${topStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', '${portId}')"><span class="port-label">${lbl}</span></div>`;
                             cIn++;
                         }
@@ -191,7 +198,8 @@ const NodeRenderer = {
                             const portId = `out${cOut}`;
                             // [AUDIT: v1.24.28 | SEC_ARCH_LEAD] - UI Scaling: Cascade bus labels to macro pins and prevent header collision.
                             const lbl = bits > 1 ? (labelBase + bIdx) : p.label;
-                            const topStyle = totalOuts === 1 ? "top:50%" : `top:calc(24px + ${((cOut + 0.5) / totalOuts)} * (100% - 30px))`;
+                            const vIdx = node.flipPolarity ? (totalOuts - 1 - cOut) : cOut;
+                            const topStyle = totalOuts === 1 ? "top:50%" : `top:calc(24px + ${((vIdx + 0.5) / totalOuts)} * (100% - 30px))`;
                             portsHtml += `<div class="port output" data-port="${portId}" style="${topStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', '${portId}')"><span class="port-label">${lbl}</span></div>`;
                             cOut++;
                         }

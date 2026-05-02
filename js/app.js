@@ -129,59 +129,11 @@ window.onload = () => {
     // [AUDIT: v1.25.32 | SEC_ARCH_LEAD] - Deprecated specific RAM interceptor in favor of a universal pin-polarity reversal architecture.
     // [AUDIT: v1.25.33 | SEC_ARCH_LEAD] - Segregated pin-label translation logic to the X-axis and injected discrete vertical port-spacing tools.
     // [AUDIT: v1.25.34 | SEC_ARCH_LEAD] - Corrected precision truncation fault in address bus scaling computation and excised deprecated ROM primitive.
-    window.LOADED_BSIM_VERSION = "1.25.34";
+    // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Purged legacy JIT DOM interceptor in favor of native parametric coordinate generation in NodeRenderer.
+    // [AUDIT: v1.25.36 | SEC_ARCH_LEAD] - Reprogrammed node layout algorithms to preserve asymmetric RAM component matrices during translation cycles.
+    window.LOADED_BSIM_VERSION = "1.25.36";
 
-    // [AUDIT: v1.25.32 | SEC_ARCH_LEAD] - Universal JIT intercept for dynamic pin polarity inversion.
-    window.addEventListener('load', () => {
-        if (window.NodeRenderer && typeof window.NodeRenderer.renderNode === 'function') {
-            const ogRender = window.NodeRenderer.renderNode;
-            window.NodeRenderer.renderNode = function(node, container) {
-                ogRender.call(this, node, container);
-                if (node.flipPolarity) {
-                    const el = document.getElementById(node.id);
-                    if (el) {
-                        const reverseElements = (selector) => {
-                            const elements = Array.from(el.querySelectorAll(selector));
-                            const groups = new Map();
-                            elements.forEach(child => {
-                                if (!groups.has(child.parentElement)) groups.set(child.parentElement, []);
-                                groups.get(child.parentElement).push(child);
-                            });
-                            groups.forEach((group, parent) => {
-                                if (group.length > 1) group.reverse().forEach(p => parent.appendChild(p));
-                            });
-                        };
-                        
-                        reverseElements('.port.input');
-                        reverseElements('.port.output');
-                        reverseElements('.bit-dot');
-
-                        if (node.portY === undefined) {
-                            node.portY = 24;
-                            node.portH = (node.customHeight || parseInt(el.style.height) || 64) - 30;
-                        }
-                        if (window.Sim && typeof window.Sim.updateNodeVisual === 'function') {
-                            window.Sim.updateNodeVisual(node);
-                        }
-                    }
-                }
-            };
-            
-            // Re-render nodes possessing inverted polarity configurations
-            if (window.Sim && window.Sim.nodes) {
-                window.Sim.nodes.forEach(n => {
-                    if (n.flipPolarity) {
-                        const el = document.getElementById(n.id);
-                        if (el) el.remove();
-                        window.NodeRenderer.renderNode(n);
-                    }
-                });
-                if (window.Sim && typeof window.Sim.updateWireVisuals === 'function') {
-                    window.Sim.updateWireVisuals();
-                }
-            }
-        }
-    });
+    // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Purged legacy JIT DOM interceptor in favor of native parametric coordinate generation.
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Native integration finalized in history.js and sim.js.
     // [AUDIT: v1.23.96 | SEC_ARCH_LEAD] - Engine Parity Check: Assert parity between V8 and Wasm execution states on boot.

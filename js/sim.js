@@ -1495,17 +1495,39 @@ const Sim = {
         if (n.portY !== undefined || n.portH !== undefined) {
             const py = n.portY !== undefined ? n.portY : 24;
             const ph = n.portH !== undefined ? n.portH : (n.customHeight || parseInt(el.style.height) || 64) - 30;
-            const alignPorts = (selector) => {
-                const ports = Array.from(el.querySelectorAll(selector));
-                const total = ports.length;
-                if (total === 0) return;
-                ports.forEach((p, i) => {
-                    const topPct = total === 1 ? 0.5 : ((i + 0.5) / total);
-                    p.style.top = (py + topPct * ph) + 'px';
+            
+            // [AUDIT: v1.25.36 | SEC_ARCH_LEAD] - Intercepted RAM port layout mutation to prevent asymmetric array collapse and preserve hardware bus parity.
+            if (n.type === 'RAM') {
+                const aBits = n.addressPins || 4;
+                const dBits = 8;
+                const maxPins = Math.max(aBits + 1, dBits);
+                const stride = maxPins > 1 ? ph / (maxPins - 1) : 0;
+                
+                const getVIdx = (pid) => {
+                    if (!pid) return 0;
+                    if (pid.startsWith('in')) return n.flipPolarity ? parseInt(pid.replace('in','')) : (aBits - 1 - parseInt(pid.replace('in','')));
+                    if (pid === 'we') return aBits;
+                    if (pid.startsWith('din')) return n.flipPolarity ? parseInt(pid.replace('din','')) : (dBits - 1 - parseInt(pid.replace('din','')));
+                    if (pid.startsWith('out')) return n.flipPolarity ? parseInt(pid.replace('out','')) : (dBits - 1 - parseInt(pid.replace('out','')));
+                    return 0;
+                };
+
+                el.querySelectorAll('.port').forEach(p => {
+                    p.style.top = (py + getVIdx(p.dataset.port) * stride) + 'px';
                 });
-            };
-            alignPorts('.port.input');
-            alignPorts('.port.output');
+            } else {
+                const alignPorts = (selector) => {
+                    const ports = Array.from(el.querySelectorAll(selector));
+                    const total = ports.length;
+                    if (total === 0) return;
+                    ports.forEach((p, i) => {
+                        const topPct = total === 1 ? 0.5 : ((i + 0.5) / total);
+                        p.style.top = (py + topPct * ph) + 'px';
+                    });
+                };
+                alignPorts('.port.input');
+                alignPorts('.port.output');
+            }
         }
 
         // [AUDIT: v1.25.33 | SEC_ARCH_LEAD] - Injected horizontal offset geometry tracking for dynamic port labels.
