@@ -173,7 +173,9 @@ window.onload = () => {
     // [AUDIT: v1.25.11 | SEC_ARCH_LEAD] - Implemented hard cache-busting on ingress scripts to resolve remote client state desynchronization.
     // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Corrected version sequence and synchronized baseline architectural primitives including Ground (0) and RAM sync.
     // [AUDIT: v1.25.15 | SEC_ARCH_LEAD] - Forced V8 engine fallback for memory primitives and enforced rigid array boundary padding.
-    window.LOADED_BSIM_VERSION = "1.25.15";
+    // [AUDIT: v1.25.16 | SEC_ARCH_LEAD] - Injected 10px high-resolution layout grid.
+    // [AUDIT: v1.25.17 | SEC_ARCH_LEAD] - Auto-scaled RAM/ROM address bus to dynamically encompass context-menu binary payloads.
+    window.LOADED_BSIM_VERSION = "1.25.17";
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Native integration finalized in history.js and sim.js.
     

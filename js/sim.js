@@ -1398,7 +1398,8 @@ const Sim = {
             // Offset if already occupied
             while (this.nodes.some(n => Math.abs(n.x - x) < 20 && Math.abs(n.y - y) < 20)) { x += 20; y += 20; }
         }
-        if (this.snapNodes) { x = Math.round(x / 20) * 20; y = Math.round(y / 20) * 20; }
+        // [AUDIT: v1.25.16 | SEC_ARCH_LEAD] - Increased grid resolution to 10px to accommodate diverse port geometries and eliminate layout micro-offsets.
+        if (this.snapNodes) { x = Math.round(x / 10) * 10; y = Math.round(y / 10) * 10; }
         if (this.debugToasts) this.toast(`Added ${type} node`);
         const newNode = this._finalizeAddNode(type, x, y, label || type, preferredId);
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node added to workspace: ${newNode.id} (${type}).
