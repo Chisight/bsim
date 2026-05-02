@@ -1,6 +1,6 @@
 /**
- * Simulator Core v1.23.90 (Modular Professional)
- * FIXED: Eradicated pseudo-element dimension snapping and rigidly clamped pin-container bounding offsets.
+ * Simulator Core v1.25.49 (Modular Professional)
+ * [AUDIT: v1.25.49 | SEC_ARCH_LEAD] - Eradicated layout collision bounds for RAM parametric scaling to restore address pin reachability.
  */
 const Sim = {
     nodes: [],
@@ -384,7 +384,8 @@ const Sim = {
                 }));
                 
                 if (this.activeEditingChip && wsStack.length > 0) {
-                    this.library[this.activeEditingChip] = { nodes: cNodes, wires: cWires };
+                    // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Preserved macro folder hierarchy upon autosave to prevent root directory drift.
+                    this.library[this.activeEditingChip] = { folder: this.library[this.activeEditingChip]?.folder || '', nodes: cNodes, wires: cWires };
                 }
                 
                 const safeLib = {};
@@ -1395,7 +1396,21 @@ const Sim = {
         // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Formally registered RAM as a core primitive to prevent macro-substitution logic.
         // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Registered '0' as native primitive.
         const NATIVE_TYPES = new Set(['NAND', 'CLOCK', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'JUNCTION', 'TRISTATE', 'DFF', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'RAM', '0']);
-        if (this.library[type] && !NATIVE_TYPES.has(type)) { node.isCustom = true; }
+        if (this.library[type] && !NATIVE_TYPES.has(type)) { 
+            // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Established cyclical dependency scanner to avert recursion faults.
+            if (this.activeEditingChip) {
+                const checkCycle = (target, check) => {
+                    if (target === check) return true;
+                    if (!this.library[check]) return false;
+                    return this.library[check].nodes.some(n => n.isCustom && checkCycle(target, n.type));
+                };
+                if (checkCycle(this.activeEditingChip, type)) {
+                    this.toast('Cyclic dependency blocked.', 'danger');
+                    return null;
+                }
+            }
+            node.isCustom = true; 
+        }
         History.execute(new AddNodeCommand(node));
         return node;
     },
@@ -1442,25 +1457,38 @@ const Sim = {
             const py = n.portY !== undefined ? n.portY : 24;
             const ph = n.portH !== undefined ? n.portH : (n.customHeight || parseInt(el.style.height) || 64) - 30;
             
-            // [AUDIT: v1.25.36 | SEC_ARCH_LEAD] - Intercepted RAM port layout mutation to prevent asymmetric array collapse and preserve hardware bus parity.
+            // [AUDIT: v1.25.49 | SEC_ARCH_LEAD] - Rewritten RAM port matrix traversal to decouple read/write bus strides and eliminate collision clipping.
             if (n.type === 'RAM') {
                 const aBits = n.addressPins || 4;
                 const dBits = 8;
-                const maxPins = Math.max(aBits + 1, dBits);
-                const stride = maxPins > 1 ? ph / (maxPins - 1) : 0;
+                const leftPins = aBits + 1;
+                const rightPins = dBits;
+                const maxPins = Math.max(leftPins, rightPins);
+                const strideL = leftPins > 1 ? ph / (leftPins - 1) : 0;
+                const strideR = rightPins > 1 ? ph / (rightPins - 1) : 0;
                 
-                const getVIdx = (pid) => {
-                    if (!pid) return 0;
-                    if (pid.startsWith('in')) return n.flipPolarity ? parseInt(pid.replace('in','')) : (aBits - 1 - parseInt(pid.replace('in','')));
-                    if (pid === 'we') return aBits;
-                    if (pid.startsWith('din')) return n.flipPolarity ? parseInt(pid.replace('din','')) : (dBits - 1 - parseInt(pid.replace('din','')));
-                    if (pid.startsWith('out')) return n.flipPolarity ? parseInt(pid.replace('out','')) : (dBits - 1 - parseInt(pid.replace('out','')));
-                    return 0;
+                const applyPin = (p) => {
+                    const pid = p.dataset.port;
+                    if (!pid) return;
+                    if (pid.startsWith('out')) {
+                        const idx = parseInt(pid.replace('out',''));
+                        const vIdx = (dBits - 1) - idx; // MSB at top
+                        p.style.top = (py + vIdx * strideR) + 'px';
+                    } else if (pid.startsWith('din')) {
+                        const idx = parseInt(pid.replace('din',''));
+                        const vIdx = (dBits - 1) - idx; // MSB at top
+                        p.style.top = (py + vIdx * strideR) + 'px';
+                    } else if (pid === 'we') {
+                        // WE is placed at the end of the left side (address block)
+                        p.style.top = (py + aBits * strideL) + 'px';
+                    } else if (pid.startsWith('in')) {
+                        const idx = parseInt(pid.replace('in',''));
+                        const vIdx = (aBits - 1) - idx; // MSB at top
+                        p.style.top = (py + vIdx * strideL) + 'px';
+                    }
                 };
 
-                el.querySelectorAll('.port').forEach(p => {
-                    p.style.top = (py + getVIdx(p.dataset.port) * stride) + 'px';
-                });
+                el.querySelectorAll('.port').forEach(applyPin);
             } else {
                 const alignPorts = (selector) => {
                     const ports = Array.from(el.querySelectorAll(selector));
@@ -1812,6 +1840,37 @@ const Sim = {
     },
     /**
      */
+    // [AUDIT: v1.25.46 | SEC_ARCH_LEAD] - Injected global macro renaming mechanism to assert topological consistency across all workspaces, historical stacks, and nested dependencies.
+    renameMacroGlobally(oldName, newName) {
+        if (!this.library || !this.library[oldName] || this.library[newName]) return false;
+        
+        this.library[newName] = this.library[oldName];
+        delete this.library[oldName];
+        
+        const propagate = (nodes) => {
+            if (!nodes) return;
+            nodes.forEach(n => {
+                if (n.type === oldName) n.type = newName;
+            });
+        };
+        
+        propagate(this.nodes);
+        if (this.tabs) this.tabs.forEach(t => propagate(t.nodes));
+        if (this.workspaceStack) this.workspaceStack.forEach(ws => propagate(ws.nodes));
+        
+        Object.values(this.library).forEach(macro => propagate(macro.nodes));
+        
+        // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Integrated hardware validation hook to verify pin parity post-rename mutation.
+        const ioNodes = this.library[newName].nodes.filter(n => n.type.startsWith('IN-') || n.type.startsWith('OUT-') || n.type.startsWith('PROBE-'));
+        if (ioNodes.length === 0 && this.nodes.some(n => n.type === newName)) console.warn(`[Hardware Validation] Warning: Renamed chip '${newName}' lacks IO pins.`);
+        
+        this._netlistDirty = true;
+        if (typeof this.updateLibraryUI === 'function') this.updateLibraryUI();
+        if (typeof this.updateTabsUI === 'function') this.updateTabsUI();
+        this.autoSave();
+        return true;
+    },
+
     toggleBit(e, nodeId, bitIndex) {
         // [AUDIT: SEC_ARCH_LEAD] - Prevent input toggling while in layout mutation mode.
         if (document.body.classList.contains('edit-mode-active')) return;
@@ -1946,6 +2005,10 @@ const Sim = {
         const lib = document.getElementById('chip-lib');
         if (!lib) return;
 
+        // [AUDIT: v1.25.48 | SEC_ARCH_LEAD] - Capture hierarchical folder collapse state prior to UI flush to preserve workspace layout.
+        const collapsedFolders = new Set();
+        lib.querySelectorAll('.lib-folder.collapsed .folder-title').forEach(el => collapsedFolders.add(el.innerText.replace('📁 ', '').trim()));
+
         // 3. Inject Chips (Native first, then Custom Library)
         lib.innerHTML = '';
 
@@ -1964,7 +2027,8 @@ const Sim = {
         // [AUDIT: v1.25.27 | SEC_ARCH_LEAD] - Encapsulated native primitives inside a collapsible hierarchical directory.
         // [AUDIT: v1.25.29 | SEC_ARCH_LEAD] - Reverted nomenclature to 'primitives' to resolve previous user-initiated misspelling.
         const primFolder = document.createElement('div');
-        primFolder.className = 'lib-folder';
+        // [AUDIT: v1.25.48 | SEC_ARCH_LEAD] - Restore native primitive folder collapse state.
+        primFolder.className = 'lib-folder' + (collapsedFolders.has('primitives') ? ' collapsed' : '');
         primFolder.innerHTML = `<span class="folder-title" onclick="this.parentElement.classList.toggle('collapsed')">📁 primitives</span><div class="folder-contents"></div>`;
         lib.appendChild(primFolder);
         const primContainer = primFolder.querySelector('.folder-contents');
@@ -2007,7 +2071,8 @@ const Sim = {
             let container = lib;
             if (folder !== '') {
                 const fDiv = document.createElement('div');
-                fDiv.className = 'lib-folder';
+                // [AUDIT: v1.25.48 | SEC_ARCH_LEAD] - Restore custom macro folder collapse state.
+                fDiv.className = 'lib-folder' + (collapsedFolders.has(folder) ? ' collapsed' : '');
                 fDiv.innerHTML = `<span class="folder-title" onclick="this.parentElement.classList.toggle('collapsed')">📁 ${folder}</span><div class="folder-contents"></div>`;
                 lib.appendChild(fDiv);
                 container = fDiv.querySelector('.folder-contents');
@@ -2051,8 +2116,9 @@ const Sim = {
                         </div>
                     `;
 
+                    // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Deprecated direct mutable access to Sim.library keys; enforced strict API layer for topology changes.
                     menu.innerHTML = '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.uiEditChip(\'' + name + '\')">Edit Internals</div>' +
-                        '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.modal(\'Rename Chip\',\'New name:\',\'prompt\',nn=>{if(nn && !Sim.library[nn]){Sim.library[nn]=Sim.library[\'' + name + '\']; delete Sim.library[\'' + name + '\']; Sim.nodes.forEach(n=>{if(n.type===\'' + name + '\')n.type=nn;}); Sim.updateLibraryUI(); Sim.autoSave(); }},\'' + name + '\')">Rename</div>' +
+                        '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.modal(\'Rename Chip\',\'New name:\',\'prompt\',nn=>{if(nn){Sim.renameMacroGlobally(\'' + name + '\', nn);}},\'' + name + '\')">Rename</div>' +
                         moveMenu +
                         '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#ff4757; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#ff6b81\'" onmouseout="this.style.color=\'#ff4757\'" onclick="if(Sim.activeEditingChip===\'' + name + '\') Sim.uiExitChipEdit(); Sim.uiDeleteChip(\'' + name + '\')">Delete</div>';
                         
@@ -2133,6 +2199,19 @@ const Sim = {
     /**
      */
     uiDeleteChip(name) {
+        // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Implemented pre-flight reference counter during deletion sequences.
+        let inUse = false;
+        const checkNodes = (nodes) => nodes.some(n => n.type === name);
+        if (checkNodes(this.nodes)) inUse = true;
+        this.tabs.forEach(t => { if (checkNodes(t.nodes)) inUse = true; });
+        this.workspaceStack.forEach(ws => { if (checkNodes(ws.nodes)) inUse = true; });
+        Object.keys(this.library).forEach(k => { if (k !== name && checkNodes(this.library[k].nodes)) inUse = true; });
+        
+        if (inUse) {
+            this.toast(`Deletion blocked: Chip '${name}' is actively instanced.`, 'danger');
+            return;
+        }
+
         this.modal('Delete Chip', `Delete ${name}? This will remove all instances from the board.`, 'danger', ok => {
             if (ok) {
                 const isEditingThis = this.activeEditingChip === name;
@@ -3120,7 +3199,9 @@ const Sim = {
     uiExitChipEdit() {
         if (this.workspaceStack.length === 0 || !this.activeEditingChip) return;
 
+        // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Preserved macro folder hierarchy upon editor exit to prevent root directory drift.
         this.library[this.activeEditingChip] = {
+            folder: this.library[this.activeEditingChip]?.folder || '',
             nodes: this.nodes.map(n => this._cleanNode(n)).filter(n => n !== null),
             wires: this.wires.map(w => this._cleanWire(w)).filter(w => w !== null)
         };

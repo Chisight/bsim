@@ -115,13 +115,12 @@ const NodeRenderer = {
                     <div class="port output" data-port="q" style="top:42%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'q')"><span class="port-label">Q</span></div>
                     <div class="port output" data-port="nq" style="top:78%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'nq')"><span class="port-label">NQ</span></div>`;
             } else if (node.type === 'RAM') {
-                /**
-                 */
-                // [AUDIT: v1.24.97 | SEC_ARCH_LEAD] - Explicit parametric bounds and mapped port I/O rendering for memory modules.
+                // [AUDIT: v1.25.60 | SEC_ARCH_LEAD] - Restored MSB-at-top pin ordering for RAM; A[n] and D[n] are now visually prioritized at the top of the chassis.
+                // [AUDIT: v1.25.60 | SEC_ARCH_LEAD] - Standardized fixed 20px vertical spacing to eliminate fractional pixel offsets and "crooked" pin rendering.
                 const aBits = node.addressPins || 4;
                 const dBits = 8;
                 
-                const leftPins = aBits + (node.type === 'RAM' ? 1 : 0); 
+                const leftPins = aBits + 1; 
                 const rightPins = dBits;
                 const maxPins = Math.max(leftPins, rightPins);
                 const heightCalc = (maxPins * 20 + 30);
@@ -130,27 +129,20 @@ const NodeRenderer = {
                 div.style.height = heightCalc + 'px';
                 div.style.width = node.customWidth ? node.customWidth + 'px' : '100px';
 
-                // [AUDIT: v1.25.03 | SEC_ARCH_LEAD] - Inverted physical pin layout rendering so MSB is visually higher on the chip chassis.
-                // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Injected native parametric coordinate calculation for RAM polarity matrices.
                 for (let i = 0; i < aBits; i++) {
-                    const visualIdx = node.flipPolarity ? i : (aBits - 1) - i;
+                    const visualIdx = (aBits - 1) - i; // MSB at top
                     const tStyle = `top:calc(24px + ${visualIdx * 20}px)`;
                     portsHtml += `<div class="port input" data-port="in${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'in${i}')"><span class="port-label">A${i}</span></div>`;
                 }
                 
-                if (node.type === 'RAM') {
-                    const ctrlY = aBits * 20 + 24;
-                    portsHtml += `<div class="port input" data-port="we" style="top:${ctrlY}px" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'we')"><span class="port-label">WE</span></div>`;
-                }
+                const ctrlY = aBits * 20 + 24;
+                portsHtml += `<div class="port input" data-port="we" style="top:${ctrlY}px" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'we')"><span class="port-label">WE</span></div>`;
 
                 for (let i = 0; i < dBits; i++) {
-                    const visualIdx = node.flipPolarity ? i : (dBits - 1) - i;
+                    const visualIdx = (dBits - 1) - i; // MSB at top
                     const tStyle = `top:calc(24px + ${visualIdx * 20}px)`;
                     portsHtml += `<div class="port output" data-port="out${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${i}')"><span class="port-label">D${i}</span></div>`;
-                    
-                    if (node.type === 'RAM') {
-                        portsHtml += `<div class="port input" data-port="din${i}" style="left:-6px; top:calc(24px + ${visualIdx * 20}px)" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'din${i}')"><span class="port-label" style="left:14px; text-align:left;">DI${i}</span></div>`;
-                    }
+                    portsHtml += `<div class="port input" data-port="din${i}" style="left:-6px; top:calc(24px + ${visualIdx * 20}px)" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'din${i}')"><span class="port-label" style="left:14px; text-align:left;">DI${i}</span></div>`;
                 }
             } else if (node.isCustom) {
                 const chipDef = Sim.library[node.type];
@@ -183,7 +175,7 @@ const NodeRenderer = {
                             // [AUDIT: v1.24.28 | SEC_ARCH_LEAD] - UI Scaling: Cascade bus labels to macro pins and prevent header collision.
                             const lbl = bits > 1 ? (labelBase + bIdx) : p.label;
                             const vIdx = node.flipPolarity ? (totalIns - 1 - cIn) : cIn;
-                            const topStyle = totalIns === 1 ? "top:50%" : `top:calc(24px + ${((vIdx + 0.5) / totalIns)} * (100% - 30px))`;
+                            const topStyle = `top:calc(24px + ${vIdx * 20}px)`;
                             portsHtml += `<div class="port input" data-port="${portId}" style="${topStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', '${portId}')"><span class="port-label">${lbl}</span></div>`;
                             cIn++;
                         }
@@ -199,7 +191,7 @@ const NodeRenderer = {
                             // [AUDIT: v1.24.28 | SEC_ARCH_LEAD] - UI Scaling: Cascade bus labels to macro pins and prevent header collision.
                             const lbl = bits > 1 ? (labelBase + bIdx) : p.label;
                             const vIdx = node.flipPolarity ? (totalOuts - 1 - cOut) : cOut;
-                            const topStyle = totalOuts === 1 ? "top:50%" : `top:calc(24px + ${((vIdx + 0.5) / totalOuts)} * (100% - 30px))`;
+                            const topStyle = `top:calc(24px + ${vIdx * 20}px)`;
                             portsHtml += `<div class="port output" data-port="${portId}" style="${topStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', '${portId}')"><span class="port-label">${lbl}</span></div>`;
                             cOut++;
                         }
