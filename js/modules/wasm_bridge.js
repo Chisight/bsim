@@ -71,7 +71,7 @@ const WasmEngine = {
         // The bridge has zero knowledge of AND/OR/XOR/etc — if a user wants those
         // gates, they build them from NANDs in the library. Done.
         // [AUDIT: v1.24.73 | SEC_ARCH_LEAD] - Synchronized KERNEL primitives to prevent errant flattening of ROM/RAM modules.
-        const KERNEL = new Set(['NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'DFF', 'CLOCK', 'TFF', 'TRISTATE', 'JUNCTION', 'ROM', 'RAM']);
+        const KERNEL = new Set(['NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'DFF', 'CLOCK', 'TFF', 'TRISTATE', 'JUNCTION', 'RAM']);
 
         let fNodes = [];
         let fWires = [];
@@ -259,9 +259,11 @@ const WasmEngine = {
                 const isInternalIO = (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) && nId.includes(':');
                 if (isInternalIO || node.type === 'JUNCTION') return;
                 // [AUDIT: v1.24.69 | SEC_ARCH_LEAD] - Synchronized Driver Resolution to recognize RAM primitives as valid signal sources for Wasm netlists.
-                const NATIVE_GATES = new Set(['NAND', 'DFF', 'CLOCK', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM', 'RAM']);
+                // [AUDIT: v1.25.22 | SEC_ARCH_LEAD] - Whitelisted '0' primitive as a valid signal driver in Wasm netlist tracing.
+                // [AUDIT: v1.25.34 | SEC_ARCH_LEAD] - Excised ROM from Wasm netlist driver trace.
+                const NATIVE_GATES = new Set(['NAND', 'DFF', 'CLOCK', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'RAM', '0']);
                 if (node.type === 'CLOCK' && pId === 'out0') drivers.add(this.getSpecificIdx(nId, pId));
-                if (NATIVE_GATES.has(node.type) && (pId === 'q' || pId === 'nq' || pId === 'out' || ((node.type === 'ROM' || node.type === 'RAM') && pId.startsWith('out')))) drivers.add(this.getSpecificIdx(nId, pId));
+                if (NATIVE_GATES.has(node.type) && (pId === 'q' || pId === 'nq' || pId === 'out' || (node.type === 'RAM' && pId.startsWith('out')))) drivers.add(this.getSpecificIdx(nId, pId));
                 if (node.type.startsWith('IN-') && !nId.includes(':')) drivers.add(this.getSpecificIdx(nId, pId));
             };
             checkDriver(startNodeId, startPortId);
@@ -385,8 +387,10 @@ const WasmEngine = {
                 // [AUDIT: v1.24.69 | SEC_ARCH_LEAD] - Injected RAM output port detection into Kahn's topological sort whitelists.
                 let isOutput = false;
                 if (node.type === 'CLOCK' && currPortId === 'out0') isOutput = true;
-                const NATIVE_GATES = new Set(['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM', 'RAM']);
-                if (NATIVE_GATES.has(node.type) && (currPortId === 'out' || currPortId === 'q' || currPortId === 'nq' || ((node.type === 'ROM' || node.type === 'RAM') && currPortId.startsWith('out')))) isOutput = true;
+                // [AUDIT: v1.25.22 | SEC_ARCH_LEAD] - Registered '0' primitive to Kahn's topological sort as an origin boundary.
+                // [AUDIT: v1.25.34 | SEC_ARCH_LEAD] - Purged ROM from Kahn's topological sort.
+                const NATIVE_GATES = new Set(['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'RAM', '0']);
+                if (NATIVE_GATES.has(node.type) && (currPortId === 'out' || currPortId === 'q' || currPortId === 'nq' || (node.type === 'RAM' && currPortId.startsWith('out')))) isOutput = true;
                 if (node.type.startsWith('IN-') && !currNodeId.includes(':')) isOutput = true;
                 // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Identify output nodes for topological sorting.
                 if (isOutput && !isPassThrough) {
@@ -501,7 +505,9 @@ const WasmEngine = {
             const t = n.type;
             
             // [AUDIT: v1.25.19 | SEC_ARCH_LEAD] - Eradicated array-exclusion trap that suppressed instruction emission for multi-slot memory and sequential primitives.
-            if (Array.isArray(mapped) && !(t === 'ROM' || t === 'RAM' || t === 'DFF' || t === 'TFF')) return; 
+            // [AUDIT: v1.25.19 | SEC_ARCH_LEAD] - Eradicated array-exclusion trap that suppressed instruction emission for multi-slot memory and sequential primitives.
+            // [AUDIT: v1.25.34 | SEC_ARCH_LEAD] - Purged ROM from Wasm compiler mapping phase.
+            if (Array.isArray(mapped) && !(t === 'RAM' || t === 'DFF' || t === 'TFF')) return; 
 
             // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Exclude static input nodes to prevent UI flickering and primitive overwrite.
             if (t.startsWith('IN-') || t === '1') return;
@@ -783,7 +789,10 @@ const WasmEngine = {
                     // [AUDIT: v1.24.69 | SEC_ARCH_LEAD] - Corrected Trace Logic to allow hierarchical pin reading from RAM buffers in the host UI.
                     let isDriver = false;
                     if (cNode.type === 'CLOCK' && cPort === 'out0') isDriver = true;
-                    if (['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM', 'RAM'].includes(cNode.type) && (cPort === 'out' || cPort === 'q' || cPort === 'nq' || ((cNode.type === 'ROM' || cNode.type === 'RAM') && cPort.startsWith('out')))) isDriver = true;
+                    // [AUDIT: v1.25.22 | SEC_ARCH_LEAD] - Extended physical driver probing constraints to include '0' primitive.
+                    // [AUDIT: v1.25.34 | SEC_ARCH_LEAD] - Excised ROM from physical driver probing array.
+                    const NATIVE_GATES = new Set(['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'RAM', '0']);
+                    if (NATIVE_GATES.has(cNode.type) && (cPort === 'out' || cPort === 'q' || cPort === 'nq' || (cNode.type === 'RAM' && cPort.startsWith('out')))) isDriver = true;
                     if (cNode.type.startsWith('IN-') && !cId.includes(':') && cPort.startsWith('out')) isDriver = true;
 
                     if (isDriver) return { id: cId, port: cPort };

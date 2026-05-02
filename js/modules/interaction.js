@@ -53,6 +53,7 @@ const InteractionHandler = {
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-labels'); document.getElementById('context-menu').style.display='none';">↳ Edit Pin Labels</div>
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-both'); document.getElementById('context-menu').style.display='none';">↳ Edit Both (Sync)</div>
                     ` : ''}
+                    <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.toggleNodePolarity('${node.id}'); document.getElementById('context-menu').style.display='none';">↳ Flip Pin Polarity</div>
                     ${((node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) && !node.type.endsWith('-1')) ? `<div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'info'); document.getElementById('context-menu').style.display='none';">↳ Edit Readout Layout</div>` : ''}
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'label'); document.getElementById('context-menu').style.display='none';">↳ Edit Label Layout</div>
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'icon'); document.getElementById('context-menu').style.display='none';">↳ Edit Icon Scale</div>
@@ -397,7 +398,9 @@ const InteractionHandler = {
                 try {
                     const file = ev.target.files[0];
                     // [AUDIT: v1.25.17 | SEC_ARCH_LEAD] - Auto-scale address bus width to accommodate uploaded payload size without truncation.
-                    let requiredPins = Math.max(4, Math.ceil(Math.log2(file.size || 1)));
+                    // [AUDIT: v1.25.34 | SEC_ARCH_LEAD] - Corrected precision truncation fault in address bus scaling computation.
+                    let requiredPins = Math.max(4, Math.ceil(Math.log2(Math.max(1, file.size))));
+                    if (Math.pow(2, requiredPins) < file.size) requiredPins++; // Guarantee encapsulation boundary
                     if (requiredPins > 24) requiredPins = 24; // Clamp to 16MB physical limit
                     node.addressPins = requiredPins;
                     const MAX_BYTES = Math.pow(2, requiredPins);
@@ -623,7 +626,6 @@ const InteractionHandler = {
                 </div>
                 <div class="menu-item" onclick="Sim.addNode('CLOCK', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">Spawn Clock</div>
                 <div class="menu-item" style="color:#fff; font-weight:bold" onclick="Sim.addNode('NAND', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">Spawn NAND</div>
-                <div class="menu-item" style="color:#ffca28; font-weight:bold" onclick="Sim.addNode('ROM', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">Spawn ROM</div>
                 ${customChipsHtml}
                 ${Sim.activeEditingChip ? `
                     <div class="menu-item has-sub" style="color:#ffca28; font-weight:bold; border-top:1px solid #334; margin-top:5px; padding-top:5px;">

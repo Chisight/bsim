@@ -7,8 +7,9 @@ const Sim = {
     wires: [],
     
     // [AUDIT: v1.25.20 | SEC_ARCH_LEAD] - Centralized purity validator to prevent local scope drift and ensure RAM/ROM evaluation parity.
+    // [AUDIT: v1.25.34 | SEC_ARCH_LEAD] - Excised deprecated ROM primitive from native kernel boundary.
     isPureNative() {
-        const KERNEL = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'ROM', 'RAM', '0']);
+        const KERNEL = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'RAM', '0']);
         const checkPure = (nodes) => nodes.every(n => {
             if (KERNEL.has(n.type)) return true;
             if (n.isCustom && this.library && this.library[n.type]) return checkPure(this.library[n.type].nodes);
@@ -35,7 +36,7 @@ const Sim = {
                 freq: n.freq, interval: n.interval, lastTick: n.lastTick, 
                 // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Relational serialization: Strip deep meta instances to prevent bloat.
                 meta: n.meta ? { folder: n.meta.folder } : undefined,
-                customWidth: n.customWidth, customHeight: n.customHeight,
+                customWidth: n.customWidth, customHeight: n.customHeight, flipPolarity: n.flipPolarity,
                 memoryData: n.memoryData ? Array.from(n.memoryData) : undefined,
                 addressPins: n.addressPins,
                 dataUrl: n.dataUrl,
@@ -44,6 +45,7 @@ const Sim = {
                 pinX: n.pinX, pinY: n.pinY, pinW: n.pinW, pinH: n.pinH,
                 infoX: n.infoX, infoY: n.infoY, infoW: n.infoW, infoH: n.infoH,
                 labelX: n.labelX, labelY: n.labelY, labelW: n.labelW, labelH: n.labelH,
+                portY: n.portY, portH: n.portH, portLabelX: n.portLabelX,
                 _lastX: n._lastX, _lastY: n._lastY
             }));
         } catch (e) { console.error("Data sanitization fault on node:", e); return null; }
@@ -74,6 +76,45 @@ const Sim = {
         this.seedQueue();
         this.processQueue();
         this.toast('Layout Memory Flushed & Resynchronized', 'success');
+    },
+
+    // [AUDIT: v1.25.32 | SEC_ARCH_LEAD] - Universal node polarity mutation engine with global persistence prompt.
+    toggleNodePolarity(nodeId) {
+        const node = this.nodes.find(n => n.id === nodeId);
+        if (!node) return;
+        node.flipPolarity = !node.flipPolarity;
+        if (typeof NodeRenderer !== 'undefined') {
+            const el = document.getElementById(nodeId);
+            if (el) el.remove();
+            NodeRenderer.renderNode(node);
+            this.updateWireVisuals();
+        }
+        this.toast(`Polarity flipped for ${node.id}. `, 'success', 5000);
+        const tEl = document.getElementById('ui-toast-el');
+        if (tEl) {
+            const btn = document.createElement('span');
+            btn.innerText = '[Apply Global]';
+            btn.style.cssText = 'cursor:pointer; text-decoration:underline; margin-left:10px; font-weight:bold; color:#fff;';
+            btn.onclick = () => {
+                this.nodes.forEach(n => {
+                    if (n.type === node.type && !!n.flipPolarity !== !!node.flipPolarity) {
+                        n.flipPolarity = node.flipPolarity;
+                        if (typeof NodeRenderer !== 'undefined') {
+                            const nEl = document.getElementById(n.id);
+                            if (nEl) nEl.remove();
+                            NodeRenderer.renderNode(n);
+                        }
+                    }
+                });
+                if (!this.polarity) this.polarity = {};
+                this.polarity[node.type] = node.flipPolarity;
+                this.updateWireVisuals();
+                this.autoSave();
+                this.toast(`Global polarity applied to all ${node.type} components.`, 'success');
+            };
+            tEl.appendChild(btn);
+        }
+        this.autoSave();
     },
 
     // [AUDIT: v1.25.12 | SEC_ARCH_LEAD] - Hard purge of SharedArrayBuffer mutex. Reverted to boolean spin-lock to definitively bypass COI security faults.
@@ -387,8 +428,9 @@ const Sim = {
                     library: safeLib, directories: this.directories || [], workspaceStack: wsStack, activeEditingChip: this.activeEditingChip,
                     tabs: safeTabs, activeTabId: this.activeTabId,
                     // [AUDIT: v1.24.37 | SEC_ARCH_LEAD] - Append extended UI preferences payload including animation overrides.
-                    // [AUDIT: v1.25.28 | SEC_ARCH_LEAD] - Included parametric UI scaling value in persistence bundle.
-                    prefs: { snapNodes: this.snapNodes, snapWires: this.snapWires, confirmDelete: this.confirmDelete, showStats: this.showStats, showTooltips: this.showTooltips, tutorialMode: this.tutorialMode, hudPos: this.hudPos, toastPos: this.toastPos, disableAnimations: this.disableAnimations, portSize: this.portSize, dotSize: this.dotSize, uiScale: this.uiScale } 
+                    // [AUDIT: v1.25.32 | SEC_ARCH_LEAD] - Appended polarity preferences payload.
+                    prefs: { snapNodes: this.snapNodes, snapWires: this.snapWires, confirmDelete: this.confirmDelete, showStats: this.showStats, showTooltips: this.showTooltips, tutorialMode: this.tutorialMode, hudPos: this.hudPos, toastPos: this.toastPos, disableAnimations: this.disableAnimations, portSize: this.portSize, dotSize: this.dotSize, uiScale: this.uiScale, polarity: this.polarity || {} } 
+ 
                 };
                 localStorage.setItem('bsim_autosave', JSON.stringify(project));
                 // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: AutoSave operation finalized.
@@ -641,21 +683,6 @@ const Sim = {
                 node.lastClk = valClk;
                 return { q: node.state, nq: node.state === 1 ? 0 : 1 };
             }
-            // [AUDIT: v1.24.58 | SEC_ARCH_LEAD] - Hardened memory retrieval logic mapping N-bit address space to 8-bit output vectors.
-            case 'ROM': {
-                let addr = 0;
-                const pins = node.addressPins || 4;
-                for (let i = 0; i < pins; i++) {
-                    const bit = this.getDrivingSignal(node.id, `in${i}`);
-                    if (bit === 1 || bit === true) addr |= (1 << i);
-                }
-                const data = (node.memoryData && node.memoryData.length > addr) ? node.memoryData[addr] : 0;
-                const outObj = {};
-                for (let i = 0; i < 8; i++) {
-                    outObj[`out${i}`] = (data & (1 << i)) ? 1 : 0;
-                }
-                return outObj;
-            }
             // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Implemented Synchronous R/W cycle for V8 RAM fallback.
             case 'RAM': {
                 let addr = 0;
@@ -836,7 +863,7 @@ const Sim = {
                                 this.updateNodeVisual(n);
                             }
                         }
-                    } else if ((n.type === 'ROM' || n.type === 'RAM') && !n.isCustom) {
+                    } else if (n.type === 'RAM' && !n.isCustom) {
                         // [AUDIT: v1.25.07 | SEC_ARCH_LEAD] - Hardware memory extraction parity implemented for DOM node visual synchronization.
                         const newVal = WasmEngine.readState(n.id);
                         if (newVal && newVal.length === 8) {
@@ -1327,15 +1354,6 @@ const Sim = {
                     nVal = { q: inner.state, nq: inner.state === 1 ? 0 : 1 };
                 } else if (inner.type === 'JUNCTION') {
                     nVal = getDrive(inner.id, 'j');
-                } else if (inner.type === 'ROM') {
-                    // [AUDIT: v1.24.73 | SEC_ARCH_LEAD] - Internal macro sub-simulation logic applied for ROM.
-                    let addr = 0;
-                    const pins = inner.addressPins || 4;
-                    for (let i = 0; i < pins; i++) if (getDrive(inner.id, `in${i}`) === 1) addr |= (1 << i);
-                    const data = (inner.memoryData && inner.memoryData.length > addr) ? inner.memoryData[addr] : 0;
-                    const outObj = {};
-                    for (let i = 0; i < 8; i++) outObj[`out${i}`] = (data & (1 << i)) ? 1 : 0;
-                    nVal = outObj;
                 } else if (inner.type === 'RAM') {
                     // [AUDIT: v1.24.73 | SEC_ARCH_LEAD] - Internal macro sub-simulation logic applied for RAM.
                     let addr = 0;
@@ -1413,14 +1431,17 @@ const Sim = {
             outputs: {}, lastClk: 0,
             ...(type === 'CLOCK' && { freq: 1, interval: 1000, lastTick: performance.now() }),
             // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Synchronized initialization for volatile RAM memory structures.
-            ...(type === 'ROM' && { addressPins: 4, dataUrl: '', memoryData: Array.from(new Uint8Array(16)) }),
             ...(type === 'RAM' && { addressPins: 4, dataUrl: '', memoryData: Array.from(new Uint8Array(16)) })
         };
+        // [AUDIT: v1.25.32 | SEC_ARCH_LEAD] - Inject global polarity persistence onto new instances.
+        if (this.polarity && this.polarity[type]) {
+            node.flipPolarity = true;
+        }
         // [AUDIT: v1.24.53 | SEC_ARCH_LEAD] - Injected ROM native component type to allow bypass of custom chip verifications.
         // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Formally classified RAM as a native primitive to ensure linear memory execution priority.
         // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Formally registered RAM as a core primitive to prevent macro-substitution logic.
         // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Registered '0' as native primitive.
-        const NATIVE_TYPES = new Set(['NAND', 'CLOCK', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'JUNCTION', 'TRISTATE', 'DFF', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM', 'RAM', '0']);
+        const NATIVE_TYPES = new Set(['NAND', 'CLOCK', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'JUNCTION', 'TRISTATE', 'DFF', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'RAM', '0']);
         if (this.library[type] && !NATIVE_TYPES.has(type)) { node.isCustom = true; }
         History.execute(new AddNodeCommand(node));
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Node command dispatched for ${node.id}.
@@ -1485,6 +1506,12 @@ const Sim = {
             };
             alignPorts('.port.input');
             alignPorts('.port.output');
+        }
+
+        // [AUDIT: v1.25.33 | SEC_ARCH_LEAD] - Injected horizontal offset geometry tracking for dynamic port labels.
+        if (n.portLabelX !== undefined) {
+            el.querySelectorAll('.port.input > .port-label, .port.input .port-meta').forEach(l => l.style.left = n.portLabelX + 'px');
+            el.querySelectorAll('.port.output > .port-label, .port.output .port-meta').forEach(l => l.style.right = n.portLabelX + 'px');
         }
 
         // [AUDIT: v1.24.27 | SEC_ARCH_LEAD] - Apply localized label geometry bounding box limits and dynamic font scaling.
@@ -1804,8 +1831,10 @@ const Sim = {
             let isPeerOutput = false;
             if (peerNode.type.startsWith('IN-') || peerNode.type === 'CLOCK') isPeerOutput = true;
             if (peerNode.isCustom && peerPortId.startsWith('out')) isPeerOutput = true;
-            const NATIVE_GATES = new Set(['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'ROM', 'RAM']);
-            if (NATIVE_GATES.has(peerNode.type) && (peerPortId === 'out' || peerPortId === 'q' || peerPortId === 'nq' || ((peerNode.type === 'ROM' || peerNode.type === 'RAM') && peerPortId.startsWith('out')))) isPeerOutput = true;
+            // [AUDIT: v1.25.22 | SEC_ARCH_LEAD] - Injected '0' primitive into driver resolution whitelist for V8 evaluation parity.
+            // [AUDIT: v1.25.34 | SEC_ARCH_LEAD] - Excised ROM from driver resolution.
+            const NATIVE_GATES = new Set(['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'RAM']);
+            if (NATIVE_GATES.has(peerNode.type) && (peerPortId === 'out' || peerPortId === 'q' || peerPortId === 'nq' || (peerNode.type === 'RAM' && peerPortId.startsWith('out')))) isPeerOutput = true;
 
             let sig = null;
             if (peerNode.type === 'JUNCTION' || !isPeerOutput) {
@@ -1944,8 +1973,6 @@ const Sim = {
                 { label: 'Output 1', type: 'OUT-1' },
                 { label: 'Output 4', type: 'OUT-4' },
                 { label: 'Output 8', type: 'OUT-8' },
-                // [AUDIT: v1.24.57 | SEC_ARCH_LEAD] - Relocated ROM instantiation to primitive category per updated UI specification.
-                { label: 'ROM 8-Bit', type: 'ROM' },
                 // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Injected RAM primitive into UI category.
                 { label: 'RAM 8-Bit', type: 'RAM' }
             ],
@@ -2587,7 +2614,7 @@ const Sim = {
         const node = this.nodes.find(n => n.id === nodeId);
         const el = document.getElementById(nodeId);
         if (!node || !el) return;
-        this.activeNodeEdit = { node, mode, og: { w: node.customWidth, h: node.customHeight, px: node.pinX, py: node.pinY, pw: node.pinW, ph: node.pinH, ix: node.infoX, iy: node.infoY, iw: node.infoW, ih: node.infoH, lx: node.labelX, ly: node.labelY, lw: node.labelW, lh: node.labelH, portY: node.portY, portH: node.portH } };
+        this.activeNodeEdit = { node, mode, og: { w: node.customWidth, h: node.customHeight, px: node.pinX, py: node.pinY, pw: node.pinW, ph: node.pinH, ix: node.infoX, iy: node.infoY, iw: node.infoW, ih: node.infoH, lx: node.labelX, ly: node.labelY, lw: node.labelW, lh: node.labelH, portY: node.portY, portH: node.portH, portLabelX: node.portLabelX } };
         
         // [AUDIT: SEC_ARCH_LEAD] - Lock global wiring interactions to prevent misclicks during layout mutation.
         document.body.classList.add('edit-mode-active');
@@ -2602,7 +2629,7 @@ const Sim = {
         let target = (mode === 'pins' || mode === 'pin-leds') ? pinCont : (mode === 'info' ? infoCont : (mode === 'label' ? lblCont : el));
         
         // [AUDIT: v1.24.34 | SEC_ARCH_LEAD] - Dynamic proxy generation for port geometry mutations.
-        if (mode === 'pin-labels' || mode === 'pin-both') {
+        if (mode === 'pin-labels' || mode === 'pin-both' || mode === 'ports') {
             let proxy = el.querySelector('.port-edit-proxy');
             if (!proxy) {
                 proxy = document.createElement('div');
@@ -2624,7 +2651,7 @@ const Sim = {
         
         // [AUDIT: v1.24.26 | SEC_ARCH_LEAD] - Injected edit mode dispatch handling for gate label components.
         // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Adapted edit mode dispatch handling for pin-leds components.
-        if (mode === 'pins' || mode === 'pin-leds' || mode === 'info' || mode === 'label' || mode === 'pin-labels' || mode === 'pin-both') {
+        if (mode === 'pins' || mode === 'pin-leds' || mode === 'info' || mode === 'label' || mode === 'pin-labels' || mode === 'pin-both' || mode === 'ports') {
             if (mode === 'info' && node.infoX === undefined) {
                 // [AUDIT: SEC_ARCH_LEAD] - Initialize default offset coordinates if previously relative
                 node.infoX = target.offsetLeft;
@@ -2643,7 +2670,7 @@ const Sim = {
                 target.style.margin = '0';
             }
             target.classList.add('editing-pins');
-            target.style.outline = (mode === 'pin-labels' || mode === 'pin-both') ? '2px dotted #ffca28' : '2px dashed #ff00aa';
+            target.style.outline = (mode === 'pin-labels' || mode === 'pin-both' || mode === 'ports') ? '2px dotted #ffca28' : '2px dashed #ff00aa';
             target.style.cursor = 'move';
             target.style.transform = 'none'; // Release absolute centering lock for dragging
             
@@ -2660,7 +2687,9 @@ const Sim = {
                 const hTop = hy < thY;
                 const hBottom = hy > target.offsetHeight - thY;
                 
-                if (mode === 'pin-labels' || mode === 'pin-both') target.style.cursor = 'ns-resize';
+                // [AUDIT: v1.25.33 | SEC_ARCH_LEAD] - Injected distinct cursor locks for horizontal label dragging vs vertical port scaling.
+                if (mode === 'pin-labels') target.style.cursor = 'ew-resize';
+                else if (mode === 'pin-both' || mode === 'ports') target.style.cursor = 'ns-resize';
                 else if ((hTop && hLeft) || (hBottom && hRight)) target.style.cursor = 'nwse-resize';
                 else if ((hTop && hRight) || (hBottom && hLeft)) target.style.cursor = 'nesw-resize';
                 else if (hTop || hBottom) target.style.cursor = 'ns-resize';
@@ -2691,13 +2720,14 @@ const Sim = {
             const rBottom = clickY > target.offsetHeight - thY;
             // [AUDIT: v1.24.38 | SEC_ARCH_LEAD] - Unified translation and scaling boolean logic to prevent dead zones on proxy.
             // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Adapted scaling hitboxes for renamed pin-leds target.
-            const isResizing = (mode === 'pin-labels' || mode === 'pin-both') ? (rLeft || rRight || rTop || rBottom) : ((mode === 'pins' || mode === 'pin-leds' || mode === 'info' || mode === 'label') && (rLeft || rRight || rTop || rBottom));
+            const isResizing = (mode === 'pin-labels' || mode === 'pin-both' || mode === 'ports') ? (rLeft || rRight || rTop || rBottom) : ((mode === 'pins' || mode === 'pin-leds' || mode === 'info' || mode === 'label') && (rLeft || rRight || rTop || rBottom));
             
             const startX = e.clientX;
             const startY = e.clientY;
             const isInfo = mode === 'info';
             const isLabel = mode === 'label';
-            const isPort = mode === 'pin-labels' || mode === 'pin-both';
+            const isPort = mode === 'pin-labels' || mode === 'pin-both' || mode === 'ports';
+            const startPortLabelX = node.portLabelX !== undefined ? node.portLabelX : 12;
             const startPinX = isInfo ? (node.infoX || 0) : (isLabel ? (node.labelX || 0) : (node.pinX || 0));
             const startPinY = isInfo ? (node.infoY || 0) : (isLabel ? (node.labelY || 0) : (isPort ? (node.portY !== undefined ? node.portY : 24) : (node.pinY || 0)));
             const startPinW = isInfo ? (node.infoW || target.offsetWidth) : (isLabel ? (node.labelW || target.offsetWidth) : (node.pinW || target.offsetWidth));
@@ -2719,7 +2749,7 @@ const Sim = {
                     el.style.height = node.customHeight + 'px';
                     Sim.updateWireVisuals();
                 // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Restored missing target condition for pin-leds scaling and translation propagation to fix regression.
-                } else if (mode === 'pins' || mode === 'pin-leds' || mode === 'info' || mode === 'label' || mode === 'pin-labels' || mode === 'pin-both') {
+                } else if (mode === 'pins' || mode === 'pin-leds' || mode === 'info' || mode === 'label' || mode === 'pin-labels' || mode === 'pin-both' || mode === 'ports') {
                     let cX = startPinX, cY = startPinY, cW = startPinW, cH = startPinH;
                     if (isResizing || m.shiftKey) { 
                         // [AUDIT: v1.24.27 | SEC_ARCH_LEAD] - Adjusted scaling constraints for label geometries to permit overhangs and font scaling.
@@ -2732,7 +2762,7 @@ const Sim = {
                             cW = Math.max(16, mode === 'label' ? Math.min(startNodeW * 3, startPinW + dx) : Math.min(startNodeW - startPinX, startPinW + dx));
                         }
 
-                        if (mode === 'pin-labels' || mode === 'pin-both') {
+                        if (mode === 'pin-labels' || mode === 'pin-both' || mode === 'ports') {
                             // [AUDIT: v1.24.38 | SEC_ARCH_LEAD] - Isolated 1D vertical geometric mutations for port proxies absorbing horizontal input without translation.
                             cX = startPinX; 
                             cW = startPinW;
@@ -2769,6 +2799,9 @@ const Sim = {
                     } else if (mode === 'label') {
                         node.labelX = cX; node.labelY = cY; node.labelW = cW; node.labelH = cH;
                     } else if (mode === 'pin-labels') {
+                        // [AUDIT: v1.25.33 | SEC_ARCH_LEAD] - Isolated pin-labels to horizontal translation explicitly mapping to X-axis tracking.
+                        node.portLabelX = Math.max(-40, startPortLabelX + dx);
+                    } else if (mode === 'ports') {
                         node.portY = cY; node.portH = cH;
                     } else if (mode === 'pin-both') {
                         // [AUDIT: v1.24.36 | SEC_ARCH_LEAD] - Synchronized physical pin arrays with proxy height and vertical delta.
@@ -2779,7 +2812,7 @@ const Sim = {
                         node.pinX = cX; node.pinY = cY; node.pinW = cW; node.pinH = cH;
                     }
                     
-                    if (mode === 'pin-labels' || mode === 'pin-both') {
+                    if (mode === 'pin-labels' || mode === 'pin-both' || mode === 'ports') {
                         Sim.updateNodeVisual(node);
                         Sim.updateWireVisuals();
                     }
@@ -2814,7 +2847,7 @@ const Sim = {
         const lblCont = el?.querySelector('.gate-label');
         // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Updated node edit exit hook for LED nomenclature sync.
         let target = state.mode === 'pins' || state.mode === 'pin-leds' ? pinCont : (state.mode === 'info' ? infoCont : (state.mode === 'label' ? lblCont : el));
-        if (state.mode === 'pin-labels' || state.mode === 'pin-both') target = el?.querySelector('.port-edit-proxy');
+        if (state.mode === 'pin-labels' || state.mode === 'pin-both' || state.mode === 'ports') target = el?.querySelector('.port-edit-proxy');
         
         if (target && this._editModeDown) {
             target.removeEventListener('mousedown', this._editModeDown);
@@ -2828,7 +2861,7 @@ const Sim = {
         const proxy = el?.querySelector('.port-edit-proxy');
         if (proxy) proxy.remove();
 
-        const nw = { w: state.node.customWidth, h: state.node.customHeight, px: state.node.pinX, py: state.node.pinY, pw: state.node.pinW, ph: state.node.pinH, ix: state.node.infoX, iy: state.node.infoY, iw: state.node.infoW, ih: state.node.infoH, lx: state.node.labelX, ly: state.node.labelY, lw: state.node.labelW, lh: state.node.labelH, portY: state.node.portY, portH: state.node.portH };
+        const nw = { w: state.node.customWidth, h: state.node.customHeight, px: state.node.pinX, py: state.node.pinY, pw: state.node.pinW, ph: state.node.pinH, ix: state.node.infoX, iy: state.node.infoY, iw: state.node.infoW, ih: state.node.infoH, lx: state.node.labelX, ly: state.node.labelY, lw: state.node.labelW, lh: state.node.labelH, portY: state.node.portY, portH: state.node.portH, portLabelX: state.node.portLabelX };
         if (JSON.stringify(nw) !== JSON.stringify(state.og)) {
             // [AUDIT: SEC_ARCH_LEAD] - Delegated layout state modifications to structured history command.
             History.execute(new MutateLayoutCommand(state.node, state.og, nw));
@@ -2855,6 +2888,7 @@ const Sim = {
                         n.labelX = state.node.labelX; n.labelY = state.node.labelY;
                         n.labelW = state.node.labelW; n.labelH = state.node.labelH;
                         n.portY = state.node.portY; n.portH = state.node.portH;
+                        n.portLabelX = state.node.portLabelX;
                         Sim.updateNodeVisual(n);
                     }
                 });
