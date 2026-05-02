@@ -370,18 +370,15 @@ const InteractionHandler = {
             if (ev.target.files.length > 0) {
                 try {
                     const file = ev.target.files[0];
-                    // [AUDIT: v1.25.17 | SEC_ARCH_LEAD] - Auto-scale address bus width to accommodate uploaded payload size without truncation.
-                    // [AUDIT: v1.25.34 | SEC_ARCH_LEAD] - Corrected precision truncation fault in address bus scaling computation.
-                    let requiredPins = Math.max(4, Math.ceil(Math.log2(Math.max(1, file.size))));
-                    if (Math.pow(2, requiredPins) < file.size) requiredPins++; // Guarantee encapsulation boundary
-                    if (requiredPins > 24) requiredPins = 24; // Clamp to 16MB physical limit
-                    node.addressPins = requiredPins;
+                    // [AUDIT: v1.25.58 | SEC_ARCH_LEAD] - Excised auto-scaling address bus mutation; strictly honor existing hardware architecture bounds.
+                    const requiredPins = node.addressPins || 4;
                     const MAX_BYTES = Math.pow(2, requiredPins);
 
 // [AUDIT: v1.25.15 | SEC_ARCH_LEAD] - Pad memory payload to hardware boundary to prevent out-of-bounds evaluation faults.
                     const buffer = await file.arrayBuffer();
                     const safeView = new Uint8Array(MAX_BYTES);
-                    safeView.set(new Uint8Array(buffer).subarray(0, MAX_BYTES));
+                    const sourceBytes = new Uint8Array(buffer);
+                    safeView.set(sourceBytes.subarray(0, Math.min(MAX_BYTES, sourceBytes.byteLength)));
                     node.memoryData = Array.from(safeView);
                     node.dataUrl = file.name;
                     // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Mark netlist dirty to force Wasm heap synchronization on next tick.
@@ -395,14 +392,14 @@ const InteractionHandler = {
                     }
                     
                     // [AUDIT: v1.25.06 | SEC_ARCH_LEAD] - Injected hardware-level diagnostic telemetry for direct context-menu payload ingestion.
-                    const logMsg = `[MEM_CTRL] Context Flash: ${node.type} [${node.id}] <- ${file.name} (${safeView.byteLength} bytes) | Auto-scaled to ${requiredPins}-bit Bus`;
+                    const logMsg = `[MEM_CTRL] Context Flash: ${node.type} [${node.id}] <- ${file.name} (${Math.min(MAX_BYTES, sourceBytes.byteLength)} bytes written) | Fixed ${requiredPins}-bit Bus`;
                     if (window.DebugTerminal && typeof window.DebugTerminal.log === 'function') window.DebugTerminal.log(logMsg, 'sys');
                     console.info(logMsg);
                     
                     if (file.size > MAX_BYTES) {
-                        Sim.toast(`Payload truncated to 16MB architectural limit.`, 'warning');
+                        Sim.toast(`Payload truncated to ${MAX_BYTES} bytes boundary.`, 'warning');
                     } else {
-                        Sim.toast(`${node.type} flashed. Bus auto-scaled to ${requiredPins} pins.`, 'success');
+                        Sim.toast(`${node.type} payload flashed successfully.`, 'success');
                     }
                     Sim.autoSave();
                 } catch (err) {
