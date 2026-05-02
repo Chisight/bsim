@@ -20,7 +20,8 @@ const View = {
 
         ws.addEventListener('mousedown', (e) => {
             // Check for both buttons: Left (1) + Right (2) = 3
-            if (e.buttons === 3) {
+            // [AUDIT: v1.25.43 | SEC_ARCH_LEAD] - Injected industry-standard middle-mouse (4) interaction bounds for spatial translation.
+            if (e.buttons === 3 || e.buttons === 4) {
                 isPanning = true;
                 startX = e.clientX;
                 startY = e.clientY;
@@ -31,7 +32,8 @@ const View = {
 
         window.addEventListener('mousemove', (e) => {
             if (isPanning) {
-                if (e.buttons !== 3) {
+                // [AUDIT: v1.25.43 | SEC_ARCH_LEAD] - Injected industry-standard middle-mouse (4) interaction bounds for spatial translation.
+                if (e.buttons !== 3 && e.buttons !== 4) {
                     isPanning = false;
                     ws.style.cursor = 'default';
                     return;

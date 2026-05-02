@@ -180,7 +180,10 @@ const WasmEngine = {
         const currentPages = this.memory.buffer.byteLength / 65536;
 
         if (requiredPages > currentPages) {
-            this.memory.grow(requiredPages - currentPages);
+            // [AUDIT: v1.25.43 | SEC_ARCH_LEAD] - Enforced hard allocation ceiling on Wasm memory expansion to avert host heap exhaustion traps.
+            const expansion = requiredPages - currentPages;
+            if (currentPages + expansion > 2048) throw new Error("Wasm Linear Memory allocation exceeds 128MB strict limit.");
+            this.memory.grow(expansion);
             this.memArray = new Int32Array(this.memory.buffer);
             console.log(`[WasmEngine] Linear memory expanded to ${requiredPages} pages.`);
         }
@@ -696,8 +699,9 @@ const WasmEngine = {
         let targetPortId = portId;
 
         // Boundary resolution for custom chips: map outer port to internal IO node
-        if (window.Sim && Sim.nodes.find(n => n.id === nodeId)?.isCustom) {
-            const chipNode = Sim.nodes.find(n => n.id === nodeId);
+        const chipNode = window.Sim ? Sim.nodes.find(n => n.id === nodeId) : null;
+        // [AUDIT: v1.25.43 | SEC_ARCH_LEAD] - Consolidated redundant array traversal for custom chip boundary resolution.
+        if (chipNode && chipNode.isCustom) {
             const lib = Sim.library[chipNode.type];
             if (lib) {
                 const isInput = portId.startsWith('in');

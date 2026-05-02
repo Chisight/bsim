@@ -125,7 +125,8 @@ window.onload = () => {
     // [AUDIT: v1.25.41 | SEC_ARCH_LEAD] - Executed architectural stability directives: zero-copy parity alignment, depth-bound trace guards, and deterministic evaluation.
     // [AUDIT: v1.25.42 | SEC_ARCH_LEAD] - Patched Virtual File System boundary guards to permit workspace initialization and destruction within the home directory.
     // [AUDIT: v1.25.43 | SEC_ARCH_LEAD] - Instituted UI synchronization, multi-bit bus parsing guards, and strict VFS allocation limits.
-    window.LOADED_BSIM_VERSION = "1.25.43";
+    // [AUDIT: v1.25.44 | SEC_ARCH_LEAD] - Enforced Wasm memory expansion limits, optimized pin state retrieval, and standardized viewport panning.
+    window.LOADED_BSIM_VERSION = "1.25.44";
 
     // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Purged legacy JIT DOM interceptor in favor of native parametric coordinate generation.
 
