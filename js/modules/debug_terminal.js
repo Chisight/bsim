@@ -265,7 +265,8 @@ const DebugTerminal = {
         if (path.startsWith('/etc/lib/custom/')) return true; // Assume virtual folders exist if chips are in them
         const tMatch = path.match(/^\/home\/bsim\/(tab-\d+|[^/]+)(?:\/(editor))?$/);
         if (tMatch) {
-            const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === tMatch[1] || t.id === tMatch[1]);
+            // [AUDIT: v1.25.42 | SEC_ARCH_LEAD] - Expanded VFS tab resolution to support human-readable workspace names.
+            const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === tMatch[1] || t.id === tMatch[1] || t.name.replace(/\s+/g, '_') === tMatch[1] || t.name === tMatch[1]);
             if (!tab) return false;
             if (tMatch[2] === 'editor') return (Sim.activeTabId === tab.id && (!!Sim.activeEditingChip || !!Sim.activeSplitChip));
             return true;
@@ -281,7 +282,8 @@ const DebugTerminal = {
         else if (path === '/etc') dirs = ['lib'];
         else if (path === '/etc/lib') dirs = ['primitives', 'custom'];
         else if (path === '/home/bsim') {
-            Sim.tabs.forEach((t, i) => dirs.push(`tab-${i+1}`));
+            // [AUDIT: v1.25.42 | SEC_ARCH_LEAD] - Transitioned home directory VFS readouts to utilize physical workspace names over virtual aliases.
+            Sim.tabs.forEach((t, i) => dirs.push(t.name.replace(/\s+/g, '_')));
             // [AUDIT: v1.25.25 | SEC_ARCH_LEAD] - Append virtual symlinks to directory listings for autocomplete parity.
             if (this.symlinks) {
                 Object.keys(this.symlinks).forEach(k => {
@@ -321,7 +323,8 @@ const DebugTerminal = {
         else if (path.startsWith('/home/bsim/')) {
             const tMatch = path.match(/^\/home\/bsim\/(tab-\d+|[^/]+)(?:\/(editor))?$/);
             if (tMatch) {
-                const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === tMatch[1] || t.id === tMatch[1]);
+                // [AUDIT: v1.25.42 | SEC_ARCH_LEAD] - Expanded VFS tab resolution to support human-readable workspace names.
+                const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === tMatch[1] || t.id === tMatch[1] || t.name.replace(/\s+/g, '_') === tMatch[1] || t.name === tMatch[1]);
                 if (tab) {
                     if (!tMatch[2]) {
                         if (Sim.activeTabId === tab.id) {
@@ -392,7 +395,8 @@ const DebugTerminal = {
         const tMatch = this.cwd.match(/^\/home\/bsim\/(tab-\d+|[^/]+)(?:\/(editor))?$/);
         if (!tMatch) return defaultCtx;
         
-        const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === tMatch[1] || t.id === tMatch[1]);
+        // [AUDIT: v1.25.42 | SEC_ARCH_LEAD] - Expanded VFS tab resolution to support human-readable workspace names.
+        const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === tMatch[1] || t.id === tMatch[1] || t.name.replace(/\s+/g, '_') === tMatch[1] || t.name === tMatch[1]);
         if (!tab) return defaultCtx;
         
         if (tMatch[2] === 'editor') {
@@ -759,10 +763,11 @@ const DebugTerminal = {
                     return;
                 } else if (targetPath === '/home/bsim') {
                     this.print(`--- WORKSPACES & LINKS ---`, "warn");
+                    // [AUDIT: v1.25.42 | SEC_ARCH_LEAD] - Transitioned home directory VFS readouts to utilize physical workspace names over virtual aliases.
                     Sim.tabs.forEach((t, i) => {
-                        const alias = `tab-${i+1}`;
+                        const alias = t.name.replace(/\s+/g, '_');
                         const tag = t.id === Sim.activeTabId ? '<span style="color:#ffca28">*</span>' : ' ';
-                        this.print(`${tag} [Dir] <span style="color:#0af; font-weight:bold;">${alias}/</span> <span style="color:#667">(id: ${t.id}, name: ${t.name})</span>`, "ok");
+                        this.print(`${tag} [Dir] <span style="color:#0af; font-weight:bold;">${alias}/</span> <span style="color:#667">(id: ${t.id})</span>`, "ok");
                     });
                     // [AUDIT: v1.25.25 | SEC_ARCH_LEAD] - Appended active virtual symlinks to home directory readout.
                     if (this.symlinks) {
@@ -780,7 +785,8 @@ const DebugTerminal = {
                 const tMatch = targetPath.match(/^\/home\/bsim\/(tab-\d+|[^/]+)(?:\/(editor))?$/);
                 if (!tMatch) return this.print("Invalid directory.", "err");
 
-                const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === tMatch[1] || t.id === tMatch[1]);
+                // [AUDIT: v1.25.42 | SEC_ARCH_LEAD] - Expanded VFS tab resolution to support human-readable workspace names.
+                const tab = Sim.tabs.find((t, i) => `tab-${i+1}` === tMatch[1] || t.id === tMatch[1] || t.name.replace(/\s+/g, '_') === tMatch[1] || t.name === tMatch[1]);
                 if (!tab) return this.print("Invalid workspace.", "err");
 
                 let nodesToList = [];
@@ -880,6 +886,21 @@ const DebugTerminal = {
 
                 dirArgs.forEach(d => {
                     let targetPath = this.resolvePath(d).replace(/\/$/, '');
+                    
+                    // [AUDIT: v1.25.42 | SEC_ARCH_LEAD] - Expanded mkdir boundary to support workspace (tab) instantiation within the user home directory.
+                    if (targetPath.startsWith('/home/bsim/')) {
+                        const parts = targetPath.split('/');
+                        if (parts.length > 4) return this.print(`mkdir: cannot create directory '${d}': Nested workspaces not supported`, "err");
+                        const tabName = parts.pop();
+                        if (Sim.tabs.some(t => t.id === tabName || t.name.replace(/\s+/g, '_') === tabName || t.name === tabName)) {
+                            return this.print(`mkdir: cannot create directory '${d}': File exists`, "err");
+                        }
+                        const newId = 'tab-' + Math.random().toString(36).substr(2, 5);
+                        Sim.tabs.push({ id: newId, name: tabName, nodes: [], wires: [], historyStack: [], historyIndex: -1, activeSplitChip: null, splitDirection: 'right' });
+                        Sim.updateTabsUI();
+                        return this.print(`Created workspace: ${targetPath}`, "ok");
+                    }
+
                     if (!targetPath.startsWith('/etc/lib/custom')) {
                         return this.print(`mkdir: cannot create directory '${d}': Permission denied`, "err");
                     }
@@ -936,38 +957,51 @@ const DebugTerminal = {
                 if (ctx.simObj) ctx.simObj.selection.clear();
                 
                 rmArgs.forEach(target => {
-                    if (target.includes('/') || this.cwd.startsWith('/etc/lib')) {
-                        let targetPath = this.resolvePath(target).replace(/\/$/, '');
-                        if (targetPath.startsWith('/etc/lib/custom')) {
-                            const searchDir = targetPath.replace('/etc/lib/custom', '').replace(/^\//, '');
-                            if (searchDir === '') return this.print("rm: cannot remove root custom directory", "err");
-                            
-                            if (Sim.library[searchDir]) {
-                                delete Sim.library[searchDir];
-                                rmCount++;
-                            } else if (isRf) {
-                                let deleted = false;
-                                Object.keys(Sim.library).forEach(name => {
-                                    const folder = Sim.library[name].folder || '';
-                                    if (folder === searchDir || folder.startsWith(searchDir + '/')) {
-                                        delete Sim.library[name];
-                                        rmCount++;
-                                        deleted = true;
-                                    }
-                                });
-                                if (Sim.directories) {
-                                    const initLen = Sim.directories.length;
-                                    Sim.directories = Sim.directories.filter(d => d !== searchDir && !d.startsWith(searchDir + '/'));
-                                    if (Sim.directories.length < initLen) deleted = true;
+                    let targetPath = this.resolvePath(target).replace(/\/$/, '');
+                    
+                    if (targetPath.startsWith('/etc/lib/custom')) {
+                        const searchDir = targetPath.replace('/etc/lib/custom', '').replace(/^\//, '');
+                        if (searchDir === '') return this.print("rm: cannot remove root custom directory", "err");
+                        
+                        if (Sim.library[searchDir]) {
+                            delete Sim.library[searchDir];
+                            rmCount++;
+                        } else if (isRf) {
+                            let deleted = false;
+                            Object.keys(Sim.library).forEach(name => {
+                                const folder = Sim.library[name].folder || '';
+                                if (folder === searchDir || folder.startsWith(searchDir + '/')) {
+                                    delete Sim.library[name];
+                                    rmCount++;
+                                    deleted = true;
                                 }
-                                if (deleted) rmDirCount++;
-                                else this.print(`rm: cannot remove '${target}': No such file or directory`, "err");
-                            } else {
-                                this.print(`rm: cannot remove '${target}': Is a directory (use -rf)`, "err");
+                            });
+                            if (Sim.directories) {
+                                const initLen = Sim.directories.length;
+                                Sim.directories = Sim.directories.filter(d => d !== searchDir && !d.startsWith(searchDir + '/'));
+                                if (Sim.directories.length < initLen) deleted = true;
                             }
+                            if (deleted) rmDirCount++;
+                            else this.print(`rm: cannot remove '${target}': No such file or directory`, "err");
                         } else {
-                            this.print(`rm: cannot remove '${target}': Permission denied`, "err");
+                            this.print(`rm: cannot remove '${target}': Is a directory (use -rf)`, "err");
                         }
+                    // [AUDIT: v1.25.42 | SEC_ARCH_LEAD] - Re-routed rm directory resolution to support workspace destruction.
+                    } else if (targetPath.startsWith('/home/bsim/') && targetPath.split('/').length === 4 && (target.includes('/') || this.cwd === '/home/bsim')) {
+                        const tabStr = targetPath.split('/').pop();
+                        const tabIdx = Sim.tabs.findIndex((t, i) => `tab-${i+1}` === tabStr || t.id === tabStr || t.name.replace(/\s+/g, '_') === tabStr || t.name === tabStr);
+                        if (tabIdx > -1) {
+                            if (Sim.tabs.length <= 1) return this.print(`rm: cannot remove '${target}': Minimum one workspace required`, "err");
+                            const tId = Sim.tabs[tabIdx].id;
+                            Sim.tabs.splice(tabIdx, 1);
+                            if (Sim.activeTabId === tId) Sim.uiSwitchTab(Sim.tabs[Math.max(0, tabIdx - 1)].id);
+                            else Sim.updateTabsUI();
+                            rmDirCount++;
+                        } else {
+                            this.print(`rm: cannot remove '${target}': No such file or directory`, "err");
+                        }
+                    } else if (target.includes('/') || this.cwd.startsWith('/etc/lib')) {
+                        this.print(`rm: cannot remove '${target}': Permission denied`, "err");
                     } else {
                         const n = ctx.nodes.find(node => node.id === target || node.id === `node-${target}`);
                         if (n && ctx.simObj) { ctx.simObj.selection.add(n.id); rmCount++; }
