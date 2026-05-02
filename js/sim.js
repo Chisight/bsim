@@ -834,8 +834,13 @@ const Sim = {
                         const newVal = WasmEngine.readState(n.id);
                         if (newVal && newVal.length === 8) {
                             const outObj = {};
-                            for (let i = 0; i < 8; i++) outObj[`out${i}`] = newVal[i];
-                            if (!fastEqual(n.val, outObj) || n._forcePropagate) {
+                            let isDiff = !n.val || n._forcePropagate;
+                            for (let i = 0; i < 8; i++) {
+                                outObj[`out${i}`] = newVal[i];
+                                if (!isDiff && n.val[`out${i}`] !== newVal[i]) isDiff = true;
+                            }
+                            // [AUDIT: v1.25.09 | SEC_ARCH_LEAD] - Purged undefined fastEqual reference; implemented zero-dependency inline differential verification.
+                            if (isDiff) {
                                 n._forcePropagate = false;
                                 n.val = outObj;
                                 changed = true;
