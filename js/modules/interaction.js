@@ -270,12 +270,11 @@ const InteractionHandler = {
                     
                     // [AUDIT: v1.25.02 | SEC_ARCH_LEAD] - Priority execution for local file payloads over remote URL string.
                     try {
-                        // [AUDIT: v1.25.05 | SEC_ARCH_LEAD] - Enforced 16MB bounds on configuration modal execution paths to prevent buffer hijacking.
-                        const MAX_BYTES = 16777216;
+                        // [AUDIT: v1.25.08 | SEC_ARCH_LEAD] - Enforced hardware-defined spatial bounds clamping on configuration modal execution paths.
+                        const MAX_BYTES = Math.pow(2, aBits);
                         if (fileInput && fileInput.files.length > 0) {
                             Sim.toast('Reading local memory file...', 'info');
                             const file = fileInput.files[0];
-                            if (file.size > MAX_BYTES) throw new Error('Payload exceeds 16MB hardware limit.');
                             const buffer = await file.arrayBuffer();
                             const safeView = new Uint8Array(buffer).subarray(0, MAX_BYTES);
                             node.memoryData = Array.from(safeView);
@@ -286,16 +285,15 @@ const InteractionHandler = {
                             if (window.DebugTerminal && typeof window.DebugTerminal.log === 'function') window.DebugTerminal.log(logMsg, 'sys');
                             console.info(logMsg);
                             
-                            Sim.toast('Local memory payload flashed directly to heap.', 'success');
+                            if (file.size > MAX_BYTES) Sim.toast(`Payload truncated to ${MAX_BYTES} bytes.`, 'warning');
+                            else Sim.toast('Local memory payload flashed directly to heap.', 'success');
                         } else if (url) {
                             node.dataUrl = url;
                             Sim.toast('Fetching memory data via network...', 'info');
-                            const res = await fetch(url);
-                            if (!res.ok) throw new Error('HTTP ' + res.status);
-                            const contentLength = res.headers.get('content-length');
-                            if (contentLength && parseInt(contentLength) > MAX_BYTES) throw new Error('Remote payload exceeds 16MB hardware limit.');
+                            // [AUDIT: v1.25.08 | SEC_ARCH_LEAD] - Implemented HTTP Range requests to preserve network bandwidth and prevent heap overflow.
+                            const res = await fetch(url, { headers: { 'Range': `bytes=0-${MAX_BYTES - 1}` } });
+                            if (!res.ok && res.status !== 206) throw new Error('HTTP ' + res.status);
                             const buffer = await res.arrayBuffer();
-                            if (buffer.byteLength > MAX_BYTES) throw new Error('Remote payload exceeds 16MB hardware limit.');
                             const safeView = new Uint8Array(buffer).subarray(0, MAX_BYTES);
                             node.memoryData = Array.from(safeView);
                             
@@ -385,18 +383,14 @@ const InteractionHandler = {
             if (ev.target.files.length > 0) {
                 try {
                     const file = ev.target.files[0];
-                    // [AUDIT: v1.25.05 | SEC_ARCH_LEAD] - Injected strict 16MB spatial bounds checking on local payload ingestion to prevent Wasm memory overflow.
-                    const MAX_BYTES = 16777216; // 16MB max addressable hardware limit (24-bit)
-                    if (file.size > MAX_BYTES) throw new Error(`Payload size (${file.size} bytes) exceeds hardware limit.`);
+                    // [AUDIT: v1.25.08 | SEC_ARCH_LEAD] - Enforced hardware-defined spatial bounds clamping based on active address bus width.
+                    const prevPins = node.addressPins || 4;
+                    const MAX_BYTES = Math.pow(2, prevPins);
                     
                     const buffer = await file.arrayBuffer();
                     const safeView = new Uint8Array(buffer).subarray(0, MAX_BYTES);
                     node.memoryData = Array.from(safeView);
                     node.dataUrl = file.name;
-                    
-                    const reqPins = Math.max(1, Math.ceil(Math.log2(safeView.byteLength)));
-                    const prevPins = node.addressPins || 4;
-                    if (reqPins > prevPins) node.addressPins = reqPins;
                     
                     if (window.NodeRenderer) {
                         const el = document.getElementById(nodeId);
@@ -406,11 +400,15 @@ const InteractionHandler = {
                     }
                     
                     // [AUDIT: v1.25.06 | SEC_ARCH_LEAD] - Injected hardware-level diagnostic telemetry for direct context-menu payload ingestion.
-                    const logMsg = `[MEM_CTRL] Context Flash: ${node.type} [${node.id}] <- ${file.name} (${safeView.byteLength} bytes) | Address Bus: ${prevPins} -> ${node.addressPins}`;
+                    const logMsg = `[MEM_CTRL] Context Flash: ${node.type} [${node.id}] <- ${file.name} (${safeView.byteLength} bytes) | Constrained to ${prevPins}-bit Bus`;
                     if (window.DebugTerminal && typeof window.DebugTerminal.log === 'function') window.DebugTerminal.log(logMsg, 'sys');
                     console.info(logMsg);
                     
-                    Sim.toast(`${node.type} payload flashed from ${file.name}.`, 'success');
+                    if (file.size > MAX_BYTES) {
+                        Sim.toast(`Payload truncated to ${MAX_BYTES} bytes to fit ${prevPins}-bit bus.`, 'warning');
+                    } else {
+                        Sim.toast(`${node.type} payload flashed from ${file.name}.`, 'success');
+                    }
                     Sim.autoSave();
                 } catch (err) {
                     Sim.toast('Failed to mount memory buffer.', 'danger');
