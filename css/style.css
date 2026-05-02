@@ -24,7 +24,8 @@
 ::-webkit-scrollbar-thumb:hover { background: var(--accent); }
 
 body, html {
-    margin: 0; padding: 0; height: 100vh; width: 100vw;
+    /* [AUDIT: v1.25.21 | SEC_ARCH_LEAD] - Injected dynamic viewport height (dvh) to prevent mobile browser chrome from clipping the footer logic library. */
+    margin: 0; padding: 0; height: 100vh; height: 100dvh; width: 100vw;
     font-family: var(--font); background: var(--bg); color: var(--text);
     overflow: hidden; user-select: none;
     display: flex; flex-direction: column;
@@ -367,7 +368,11 @@ footer::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px
     position: absolute; left: 100%; top: -1px; background: #1a1a23;
     border: 1px solid #334; border-radius: 6px; box-shadow: 0 10px 25px rgba(0,0,0,0.6);
     display: none; min-width: 120px; z-index: 10001; padding: 5px 0;
+    /* [AUDIT: v1.25.21 | SEC_ARCH_LEAD] - Constrained sub-menu geometry with dynamic viewport bounds and integrated vertical scrolling for dense macro libraries. */
+    max-height: 60vh; overflow-y: auto; overflow-x: hidden;
 }
+.sub-menu::-webkit-scrollbar { width: 4px; }
+.sub-menu::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
 /* [AUDIT: v1.24.23 | SEC_ARCH_LEAD] - Constrained hover reveal to direct child sub-menus globally. */
 .menu-item.has-sub:hover > .sub-menu, .menu-item.has-sub.keep-open > .sub-menu { display: block; }
 /* [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Sub-menu boundary inversion logic. */
