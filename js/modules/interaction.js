@@ -59,8 +59,15 @@ const InteractionHandler = {
                 `;
             }
 
+            // [AUDIT: v1.25.04 | SEC_ARCH_LEAD] - Integrated binary payload uploader specifically for memory components.
+            let memUpload = '';
+            if (node.type === 'RAM' || node.type === 'ROM') {
+                memUpload = `<div class="menu-item" style="color:#00ffaa; font-weight:bold;" onclick="InteractionHandler.triggerMemoryUpload('${node.id}'); document.getElementById('context-menu').style.display='none';">Upload .bin Payload</div>`;
+            }
+
             menu.innerHTML = `
                 ${configOption}
+                ${memUpload}
                 ${nodePrefs}
                 <div class="menu-item" ${renameAction}>Rename</div>
                 ${!isNative ? `<div class="menu-item" ${geomAction}>Set Geometry</div>` : ''}
@@ -340,6 +347,45 @@ const InteractionHandler = {
             input.select();
         }
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Modal configuration triggered for ${node.id}.
+    },
+
+    /**
+     * [AUDIT: v1.25.04 | SEC_ARCH_LEAD] - Entry trace for localized memory payload ingestion.
+     * @ARCH: FILE_IO
+     * @INTENT: Trigger a local file picker to flash binary data directly into the active RAM/ROM node buffer.
+     */
+    triggerMemoryUpload(nodeId) {
+        const node = Sim.nodes.find(n => n.id === nodeId);
+        if (!node || (node.type !== 'RAM' && node.type !== 'ROM')) return;
+        
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.bin';
+        input.onchange = async (ev) => {
+            if (ev.target.files.length > 0) {
+                try {
+                    const file = ev.target.files[0];
+                    const buffer = await file.arrayBuffer();
+                    node.memoryData = Array.from(new Uint8Array(buffer));
+                    node.dataUrl = file.name;
+                    
+                    const reqPins = Math.max(1, Math.ceil(Math.log2(buffer.byteLength)));
+                    if (reqPins > (node.addressPins || 4)) node.addressPins = reqPins;
+                    
+                    if (window.NodeRenderer) {
+                        const el = document.getElementById(nodeId);
+                        if (el) el.remove();
+                        NodeRenderer.renderNode(node);
+                        Sim.updateWireVisuals();
+                    }
+                    Sim.toast(`${node.type} payload flashed from ${file.name}.`, 'success');
+                    Sim.autoSave();
+                } catch (err) {
+                    Sim.toast('Failed to mount memory buffer.', 'danger');
+                }
+            }
+        };
+        input.click();
     },
 
     /**
