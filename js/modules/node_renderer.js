@@ -115,13 +115,12 @@ const NodeRenderer = {
                     <div class="port output" data-port="q" style="top:42%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'q')"><span class="port-label">Q</span></div>
                     <div class="port output" data-port="nq" style="top:78%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'nq')"><span class="port-label">NQ</span></div>`;
             } else if (node.type === 'RAM') {
-                /**
-                 */
-                // [AUDIT: v1.25.49 | SEC_ARCH_LEAD] - Restructured RAM parametric bounds to eliminate I/O overlap and enforce linear bus stacking.
+                // [AUDIT: v1.25.59 | SEC_ARCH_LEAD] - Restored aligned I/O layout for RAM; din and out are horizontally synchronized to maximize space efficiency.
+                // [AUDIT: v1.25.59 | SEC_ARCH_LEAD] - Fixed pin order regression: LSB is now visually prioritized at the top of the component chassis.
                 const aBits = node.addressPins || 4;
                 const dBits = 8;
                 
-                const leftPins = aBits + 1 + dBits;
+                const leftPins = aBits + 1; 
                 const rightPins = dBits;
                 const maxPins = Math.max(leftPins, rightPins);
                 const heightCalc = (maxPins * 20 + 30);
@@ -130,29 +129,20 @@ const NodeRenderer = {
                 div.style.height = heightCalc + 'px';
                 div.style.width = node.customWidth ? node.customWidth + 'px' : '100px';
 
-                // [AUDIT: v1.25.03 | SEC_ARCH_LEAD] - Inverted physical pin layout rendering so MSB is visually higher on the chip chassis.
-                // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Injected native parametric coordinate calculation for RAM polarity matrices.
                 for (let i = 0; i < aBits; i++) {
-                    const visualIdx = node.flipPolarity ? i : (aBits - 1) - i;
+                    const visualIdx = i; // LSB at top
                     const tStyle = `top:calc(24px + ${visualIdx * 20}px)`;
                     portsHtml += `<div class="port input" data-port="in${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'in${i}')"><span class="port-label">A${i}</span></div>`;
                 }
                 
-                if (node.type === 'RAM') {
-                    const ctrlIdx = node.flipPolarity ? aBits : (leftPins - 1 - aBits);
-                    const ctrlY = ctrlIdx * 20 + 24;
-                    portsHtml += `<div class="port input" data-port="we" style="top:${ctrlY}px" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'we')"><span class="port-label">WE</span></div>`;
-                }
+                const ctrlY = aBits * 20 + 24;
+                portsHtml += `<div class="port input" data-port="we" style="top:${ctrlY}px" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'we')"><span class="port-label">WE</span></div>`;
 
                 for (let i = 0; i < dBits; i++) {
-                    const outIdx = node.flipPolarity ? i : (dBits - 1) - i;
-                    const outStyle = `top:calc(24px + ${outIdx * 20}px)`;
-                    portsHtml += `<div class="port output" data-port="out${i}" style="${outStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${i}')"><span class="port-label">D${i}</span></div>`;
-                    
-                    if (node.type === 'RAM') {
-                        const dinIdx = node.flipPolarity ? (aBits + 1 + i) : (aBits + 1 + dBits - 1 - i);
-                        portsHtml += `<div class="port input" data-port="din${i}" style="left:-6px; top:calc(24px + ${dinIdx * 20}px)" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'din${i}')"><span class="port-label" style="left:14px; text-align:left;">DI${i}</span></div>`;
-                    }
+                    const visualIdx = i; // LSB at top
+                    const tStyle = `top:calc(24px + ${visualIdx * 20}px)`;
+                    portsHtml += `<div class="port output" data-port="out${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${i}')"><span class="port-label">D${i}</span></div>`;
+                    portsHtml += `<div class="port input" data-port="din${i}" style="left:-6px; top:calc(24px + ${visualIdx * 20}px)" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'din${i}')"><span class="port-label" style="left:14px; text-align:left;">DI${i}</span></div>`;
                 }
             } else if (node.isCustom) {
                 const chipDef = Sim.library[node.type];

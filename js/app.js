@@ -126,7 +126,8 @@ window.onload = () => {
     // [AUDIT: v1.25.56 | SEC_ARCH_LEAD] - Abstracted local registry to IndexedDB, injected environment config, configured CORS pipeline intercepts, added manual retry mechanism, and deployed WebCrypto payload encryption.
     // [AUDIT: v1.25.57 | SEC_ARCH_LEAD] - Eradicated external relay dependencies; implemented topological array packing to natively enforce minimal URI footprint.
     // [AUDIT: v1.25.58 | SEC_ARCH_LEAD] - Excised address bus auto-scaling during payload ingestion to strictly preserve structural macro bounds.
-    window.LOADED_BSIM_VERSION = "1.25.58";
+    // [AUDIT: v1.25.59 | SEC_ARCH_LEAD] - Restored aligned RAM layout (din/out overlap) and corrected pin ordering to LSB-at-top to resolve UI regression and legacy inversion bug.
+    window.LOADED_BSIM_VERSION = "1.25.59";
 
     // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Purged legacy JIT DOM interceptor in favor of native parametric coordinate generation.
 

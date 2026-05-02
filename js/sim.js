@@ -1461,8 +1461,9 @@ const Sim = {
             if (n.type === 'RAM') {
                 const aBits = n.addressPins || 4;
                 const dBits = 8;
-                const leftPins = aBits + 1 + dBits;
+                const leftPins = aBits + 1;
                 const rightPins = dBits;
+                const maxPins = Math.max(leftPins, rightPins);
                 const strideL = leftPins > 1 ? ph / (leftPins - 1) : 0;
                 const strideR = rightPins > 1 ? ph / (rightPins - 1) : 0;
                 
@@ -1471,17 +1472,18 @@ const Sim = {
                     if (!pid) return;
                     if (pid.startsWith('out')) {
                         const idx = parseInt(pid.replace('out',''));
-                        const vIdx = n.flipPolarity ? idx : (rightPins - 1 - idx);
+                        const vIdx = idx; // LSB at top
                         p.style.top = (py + vIdx * strideR) + 'px';
                     } else if (pid.startsWith('din')) {
                         const idx = parseInt(pid.replace('din',''));
-                        const vIdx = n.flipPolarity ? (aBits + 1 + idx) : (aBits + 1 + dBits - 1 - idx);
-                        p.style.top = (py + vIdx * strideL) + 'px';
+                        const vIdx = idx; // LSB at top
+                        p.style.top = (py + vIdx * strideR) + 'px';
                     } else if (pid === 'we') {
+                        // WE is placed at the end of the left side (address block)
                         p.style.top = (py + aBits * strideL) + 'px';
                     } else if (pid.startsWith('in')) {
                         const idx = parseInt(pid.replace('in',''));
-                        const vIdx = n.flipPolarity ? idx : (aBits - 1 - idx);
+                        const vIdx = idx; // LSB at top
                         p.style.top = (py + vIdx * strideL) + 'px';
                     }
                 };
