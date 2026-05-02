@@ -80,47 +80,7 @@ window.onload = () => {
     InteractionHandler.initMarquee();
     InteractionHandler.initClipboardListeners();
 
-    // [AUDIT: v1.25.02 | SEC_ARCH_LEAD] - Injected native right-click context interceptor specifically targeting RAM/ROM components for rapid payload deployment.
-    document.getElementById('workspace').addEventListener('contextmenu', (e) => {
-        const gate = e.target.closest('.gate');
-        if (gate && window.Sim) {
-            const node = Sim.nodes.find(n => n.id === gate.id);
-            if (node && (node.type === 'RAM' || node.type === 'ROM')) {
-                e.preventDefault();
-                e.stopPropagation();
-                
-                const input = document.createElement('input');
-                input.type = 'file';
-                input.accept = '.bin';
-                input.onchange = async (ev) => {
-                    if (ev.target.files.length > 0) {
-                        try {
-                            const file = ev.target.files[0];
-                            const buffer = await file.arrayBuffer();
-                            node.memoryData = Array.from(new Uint8Array(buffer));
-                            node.dataUrl = file.name;
-                            
-                            // Auto-scale address pins monotonically if buffer exceeds current width
-                            const reqPins = Math.max(1, Math.ceil(Math.log2(buffer.byteLength)));
-                            if (reqPins > (node.addressPins || 4)) node.addressPins = reqPins;
-                            
-                            if (window.NodeRenderer) {
-                                gate.remove();
-                                NodeRenderer.renderNode(node);
-                                Sim.updateWireVisuals();
-                            }
-                            Sim.toast(`${node.type} payload flashed from ${file.name}.`, 'success');
-                            Sim.autoSave();
-                        } catch (err) {
-                            Sim.toast('Failed to mount memory buffer.', 'danger');
-                        }
-                    }
-                };
-                input.click();
-                return false;
-            }
-        }
-    }, { capture: true });
+    // [AUDIT: v1.25.04 | SEC_ARCH_LEAD] - Excised aggressive right-click interceptor; relegated binary upload to standard context menu dropdown.
 
     // Wire Preview Mouse Tracking
     window.addEventListener('mousemove', (e) => {
@@ -203,7 +163,9 @@ window.onload = () => {
     // [AUDIT: v1.25.01 | SEC_ARCH_LEAD] - Rolled back SharedArrayBuffer mutex to bypass Cross-Origin Isolation (COI) security faults on unconfigured servers.
     // [AUDIT: v1.25.02 | SEC_ARCH_LEAD] - Disambiguated global URL ingestion and implemented native Local File APIs for direct RAM/ROM binary payloads.
     // [AUDIT: v1.25.03 | SEC_ARCH_LEAD] - Inverted MSB/LSB visual pin rendering for memory primitives to enforce top-to-bottom spatial hierarchy.
-    window.LOADED_BSIM_VERSION = "1.25.03";
+    // [AUDIT: v1.25.04 | SEC_ARCH_LEAD] - Relegated RAM/ROM binary upload to the component context dropdown to prevent interaction overlap.
+    // [AUDIT: v1.25.05 | SEC_ARCH_LEAD] - Enforced 16MB spatial bounds clamping on memory payload ingestion to prevent Wasm heap overflow attacks.
+    window.LOADED_BSIM_VERSION = "1.25.05";
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Native integration finalized in history.js and sim.js.
     
