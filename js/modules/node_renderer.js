@@ -77,7 +77,7 @@ const NodeRenderer = {
             else if (node.type === '0') {
                 portsHtml = `
                     <div class="port output" data-port="out0" style="top:50%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out0')">
-                        <span class="port-label">GND</span>
+                        <span class="port-label">0</span>
                     </div>`;
             }
             else if (node.type === 'CLOCK') {
