@@ -80,6 +80,48 @@ window.onload = () => {
     InteractionHandler.initMarquee();
     InteractionHandler.initClipboardListeners();
 
+    // [AUDIT: v1.25.02 | SEC_ARCH_LEAD] - Injected native right-click context interceptor specifically targeting RAM/ROM components for rapid payload deployment.
+    document.getElementById('workspace').addEventListener('contextmenu', (e) => {
+        const gate = e.target.closest('.gate');
+        if (gate && window.Sim) {
+            const node = Sim.nodes.find(n => n.id === gate.id);
+            if (node && (node.type === 'RAM' || node.type === 'ROM')) {
+                e.preventDefault();
+                e.stopPropagation();
+                
+                const input = document.createElement('input');
+                input.type = 'file';
+                input.accept = '.bin';
+                input.onchange = async (ev) => {
+                    if (ev.target.files.length > 0) {
+                        try {
+                            const file = ev.target.files[0];
+                            const buffer = await file.arrayBuffer();
+                            node.memoryData = Array.from(new Uint8Array(buffer));
+                            node.dataUrl = file.name;
+                            
+                            // Auto-scale address pins monotonically if buffer exceeds current width
+                            const reqPins = Math.max(1, Math.ceil(Math.log2(buffer.byteLength)));
+                            if (reqPins > (node.addressPins || 4)) node.addressPins = reqPins;
+                            
+                            if (window.NodeRenderer) {
+                                gate.remove();
+                                NodeRenderer.renderNode(node);
+                                Sim.updateWireVisuals();
+                            }
+                            Sim.toast(`${node.type} payload flashed from ${file.name}.`, 'success');
+                            Sim.autoSave();
+                        } catch (err) {
+                            Sim.toast('Failed to mount memory buffer.', 'danger');
+                        }
+                    }
+                };
+                input.click();
+                return false;
+            }
+        }
+    }, { capture: true });
+
     // Wire Preview Mouse Tracking
     window.addEventListener('mousemove', (e) => {
         if (Sim.wiring.active) {
@@ -158,15 +200,10 @@ window.onload = () => {
     // [AUDIT: v1.24.89 | SEC_ARCH_LEAD] - Isolated NQ memory offsets for Wasm sequential components and purged redundant V8 polling loops.
     // [AUDIT: v1.24.90 | SEC_ARCH_LEAD] - Synchronized Wasm volatile memory back to Host arrays and purged JSON serialization from the simulation hot path.
     // [AUDIT: v1.24.91 | SEC_ARCH_LEAD] - Deployed Two-Phase Commit protocol in Wasm to eliminate sequential hazard race conditions and resolved V8 scheduler deadlocks.
-    // [AUDIT: v1.24.92 | SEC_ARCH_LEAD] - Upgraded Wasm to Three-Phase Commit (Shadow Registers) mirroring Verilog non-blocking assignments to eradicate zero-delay cascades.
-    // [AUDIT: v1.24.93 | SEC_ARCH_LEAD] - Power analysis switching counters, DWARF-aware Wasm symbol mapper, and hardware-agnostic temporal shims injected.
-    // [AUDIT: v1.24.94 | SEC_ARCH_LEAD] - Expanded Wasm linear memory allocation baseline to safely encompass the 24MB Power Analysis Region E.
-    // [AUDIT: v1.24.95 | SEC_ARCH_LEAD] - Deployed Asynchronous Worker Kernel, Wasm SIMD Vectorization, and Combinatorial Oscillation Watchdog.
-    // [AUDIT: v1.24.96 | SEC_ARCH_LEAD] - Parity Recovery: Reverted to non-shared memory to bypass Cross-Origin Isolation requirements for local deployment.
-    // [AUDIT: v1.24.97 | SEC_ARCH_LEAD] - Natively mapped explicit spatial boundaries and state mutation matrices for memory primitives.
-    // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Integrated architectural stability ports from experimental multi-Wasm branch.
-    // [AUDIT: v1.24.99 | SEC_ARCH_LEAD] - Expanded viewport zoom boundaries and synchronized global state versioning.
-    window.LOADED_BSIM_VERSION = "1.24.99";
+    // [AUDIT: v1.25.01 | SEC_ARCH_LEAD] - Rolled back SharedArrayBuffer mutex to bypass Cross-Origin Isolation (COI) security faults on unconfigured servers.
+    // [AUDIT: v1.25.02 | SEC_ARCH_LEAD] - Disambiguated global URL ingestion and implemented native Local File APIs for direct RAM/ROM binary payloads.
+    // [AUDIT: v1.25.03 | SEC_ARCH_LEAD] - Inverted MSB/LSB visual pin rendering for memory primitives to enforce top-to-bottom spatial hierarchy.
+    window.LOADED_BSIM_VERSION = "1.25.03";
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Native integration finalized in history.js and sim.js.
     

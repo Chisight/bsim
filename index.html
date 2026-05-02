@@ -6,7 +6,7 @@
     <title>bSim</title>
     <link rel="icon" type="image/svg+xml" href="assets/bSim-logo-nand.svg">
     <link rel="stylesheet" href="css/style.css">
-    <script>window.EXPECTED_BSIM_VERSION = "1.25.01";</script>
+    <script>window.EXPECTED_BSIM_VERSION = "1.25.03";</script>
 </head>
 
 <body oncontextmenu="return false;">
@@ -15,7 +15,7 @@
         <div class="nav-brand" style="display: flex; align-items: center;">
             <img src="assets/bSim-logo-big.svg" alt="bSim Logo"
                 style="height: 31.25px; margin-right: 8px; transition: transform 0.2s ease;">
-            <span style="font-size:10px; color:var(--wire-on); padding-top: 4px;">v1.25.01</span>
+            <span style="font-size:10px; color:var(--wire-on); padding-top: 4px;">v1.25.03</span>
         </div>
 
         <div class="menu-item has-sub">File
@@ -23,9 +23,9 @@
                 <div class="menu-item" onclick="Sim.uiNewProject()">New Workspace</div>
                 <div class="menu-item" onclick="Sim.uiNewChip()">Clear Board</div>
                 <div class="menu-item" onclick="ProjectManager.importProject()">Load .bsim</div>
-                <div class="menu-item" onclick="toggleSubMenu(this, event)">Import URL
+                <div class="menu-item" onclick="toggleSubMenu(this, event)">Import Workspace URL
                     <div class="sub-menu" style="padding: 8px; width: 150px; cursor: default;" onclick="event.stopPropagation()">
-                        <div style="font-size: 10px; color: #888; margin-bottom: 4px; text-transform: uppercase; font-weight: bold;">URL:</div>
+                        <div style="font-size: 10px; color: #888; margin-bottom: 4px; text-transform: uppercase; font-weight: bold;">.BSIM URL:</div>
                         <input type="text" id="import-url-val" placeholder="https://"
                             style="width: 100%; box-sizing: border-box; background: #111; color: #0f5; border: 1px solid #334; padding: 6px; font-size: 11px; margin-bottom: 6px; outline: none; border-radius: 4px; font-family: 'JetBrains Mono', monospace;"
                             onkeydown="if(event.key === 'Enter') { ProjectManager.importFromUrl(this.value); this.blur(); this.parentElement.style.display='none'; }">

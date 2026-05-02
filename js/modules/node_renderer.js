@@ -119,8 +119,10 @@ const NodeRenderer = {
                 div.style.height = heightCalc + 'px';
                 div.style.width = node.customWidth ? node.customWidth + 'px' : '100px';
 
+                // [AUDIT: v1.25.03 | SEC_ARCH_LEAD] - Inverted physical pin layout rendering so MSB is visually higher on the chip chassis.
                 for (let i = 0; i < aBits; i++) {
-                    const tStyle = `top:calc(24px + ${i * 20}px)`;
+                    const visualIdx = (aBits - 1) - i;
+                    const tStyle = `top:calc(24px + ${visualIdx * 20}px)`;
                     portsHtml += `<div class="port input" data-port="in${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'in${i}')"><span class="port-label">A${i}</span></div>`;
                 }
                 
@@ -130,11 +132,12 @@ const NodeRenderer = {
                 }
 
                 for (let i = 0; i < dBits; i++) {
-                    const tStyle = `top:calc(24px + ${i * 20}px)`;
+                    const visualIdx = (dBits - 1) - i;
+                    const tStyle = `top:calc(24px + ${visualIdx * 20}px)`;
                     portsHtml += `<div class="port output" data-port="out${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${i}')"><span class="port-label">D${i}</span></div>`;
                     
                     if (node.type === 'RAM') {
-                        portsHtml += `<div class="port input" data-port="din${i}" style="left:-6px; top:calc(24px + ${i * 20}px)" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'din${i}')"><span class="port-label" style="left:14px; text-align:left;">DI${i}</span></div>`;
+                        portsHtml += `<div class="port input" data-port="din${i}" style="left:-6px; top:calc(24px + ${visualIdx * 20}px)" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'din${i}')"><span class="port-label" style="left:14px; text-align:left;">DI${i}</span></div>`;
                     }
                 }
             } else if (node.isCustom) {
