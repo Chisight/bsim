@@ -67,6 +67,21 @@ const Sim = {
     _toastTimer: null,
     shortCircuitStrikes: 0,
     _netlistDirty: false,
+    
+    // [AUDIT: v1.25.40 | SEC_ARCH_LEAD] - Relocated fastEqual utility to prevent JIT de-optimization and recreation during high-frequency evaluation ticks.
+    _fastEqual(a, b) {
+        if (a === b) return true;
+        if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false;
+        if (Array.isArray(a)) {
+            if (!Array.isArray(b) || a.length !== b.length) return false;
+            for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+            return true;
+        }
+        const ka = Object.keys(a), kb = Object.keys(b);
+        if (ka.length !== kb.length) return false;
+        for (let k of ka) if (a[k] !== b[k]) return false;
+        return true;
+    },
 
     // [AUDIT: v1.24.52 | SEC_ARCH_LEAD] - Manual DOM/Memory synchronization escape hatch.
     forceLayoutSync() {
@@ -916,20 +931,6 @@ const Sim = {
         }
 
         if (!this.timing) this.timing = { node: 'ideal', delay: 0 };
-        // [AUDIT: v1.24.90 | SEC_ARCH_LEAD] - Fast shallow equality check to bypass CPU-heavy JSON stringification during V8 ticks.
-        const fastEqual = (a, b) => {
-            if (a === b) return true;
-            if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false;
-            if (Array.isArray(a)) {
-                if (!Array.isArray(b) || a.length !== b.length) return false;
-                for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-                return true;
-            }
-            const ka = Object.keys(a), kb = Object.keys(b);
-            if (ka.length !== kb.length) return false;
-            for (let k of ka) if (a[k] !== b[k]) return false;
-            return true;
-        };
 
         let iterations = 0;
         const MAX_ITERS = 1000; // Expanded ceiling for hierarchical stability
@@ -943,8 +944,9 @@ const Sim = {
                 const newVal = this.calculateNextState(node);
                 const rawNew = (typeof newVal === 'string' && newVal !== 'Z') ? JSON.parse(newVal) : newVal;
                 // if node value changed
-                if (!fastEqual(node.val, rawNew) || node._forcePropagate) {
-                    if (!fastEqual(node.val, rawNew)) node.toggles = (node.toggles || 0) + 1;
+                // [AUDIT: v1.25.40 | SEC_ARCH_LEAD] - Invoking bound prototype comparison for parity verification.
+                if (!this._fastEqual(node.val, rawNew) || node._forcePropagate) {
+                    if (!this._fastEqual(node.val, rawNew)) node.toggles = (node.toggles || 0) + 1;
                     node._forcePropagate = false;
                     // increment transition count
                     const flips = (this._transitions.get(node.id) || 0) + 1;

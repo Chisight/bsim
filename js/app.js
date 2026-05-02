@@ -121,7 +121,8 @@ window.onload = () => {
     // [AUDIT: v1.25.36 | SEC_ARCH_LEAD] - Reprogrammed node layout algorithms to preserve asymmetric RAM component matrices during translation cycles.
     // [AUDIT: v1.25.37 | SEC_ARCH_LEAD] - Injected native output pin (out0) for Constant Ground (0) primitive to enable Wasm-parity topological driver resolution.
     // [AUDIT: v1.25.39 | SEC_ARCH_LEAD] - Executed global codebase sanitation; purged deprecated ROM primitive and archived stale taxonomy/audit metadata to ARCHIVE_BLOAT.md.
-    window.LOADED_BSIM_VERSION = "1.25.39";
+    // [AUDIT: v1.25.40 | SEC_ARCH_LEAD] - Relocated high-frequency fastEqual utility to Sim object prototype to prevent hot-path recompilation overhead.
+    window.LOADED_BSIM_VERSION = "1.25.40";
 
     // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Purged legacy JIT DOM interceptor in favor of native parametric coordinate generation.
 
