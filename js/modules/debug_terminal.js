@@ -257,6 +257,11 @@ const DebugTerminal = {
             }
             if (!changed) break;
         }
+        // [AUDIT: v1.25.41 | SEC_ARCH_LEAD] - Prevent recursive file system logic leaks by restricting path depth.
+        if (resolved.split('/').length > 10) {
+            this.print("VFS depth boundary exceeded.", "err");
+            return '/';
+        }
         return resolved;
     },
 
@@ -872,6 +877,9 @@ const DebugTerminal = {
                 const lnk = this.resolvePath(lnkArg);
                 if (!this.isValidDir(tgt)) return this.print(`ln: target '${tgt}' is not a valid directory`, "err");
                 if (!this.symlinks) this.symlinks = {};
+                // [AUDIT: v1.25.41 | SEC_ARCH_LEAD] - Restricted absolute path symlinking loops to avert UI recursion lockups.
+                if (tgt === lnk || tgt.startsWith(lnk + '/')) return this.print("ln: cannot create circular symlink", "err");
+                if (Object.keys(this.symlinks).length >= 20) return this.print("ln: symlink allocation limit exceeded", "err");
                 this.symlinks[lnk] = tgt;
                 this.print(`Created symlink: ${lnk} -> ${tgt}`, "ok");
                 break;
@@ -931,6 +939,8 @@ const DebugTerminal = {
                     });
                     this.print(`Created directory: ${targetPath}`, "ok");
                 });
+                // [AUDIT: v1.25.41 | SEC_ARCH_LEAD] - Forced synchronous UI dispatch to prevent DOM shift desynchronization.
+                if (window.Sim && typeof Sim.updateLibraryUI === 'function') Sim.updateLibraryUI();
                 Sim.autoSave();
                 break;
             case 'rm': {
@@ -947,6 +957,8 @@ const DebugTerminal = {
                         ctx.simObj.selection.clear();
                         ctx.nodes.forEach(n => ctx.simObj.selection.add(n.id));
                         ctx.simObj.deleteSelection();
+                        // [AUDIT: v1.25.41 | SEC_ARCH_LEAD] - Validated node topology dependencies to purge un-garbage-collected wire fragments.
+                        if (ctx.simObj.wires) ctx.simObj.wires = ctx.simObj.wires.filter(w => ctx.nodes.find(n => n.id === w.from.nodeId) && ctx.nodes.find(n => n.id === w.to.nodeId));
                         return this.print("Cleared entire active workspace.", "ok");
                     }
                     return this.print("Cannot clear inactive workspace.", "err");
@@ -1078,7 +1090,9 @@ const DebugTerminal = {
                 const expVal = parseInt(args[3]);
                 let actVal;
                 
-                const bits = parseInt(sn.type.split('-')[1]) || 1;
+                // [AUDIT: v1.25.41 | SEC_ARCH_LEAD] - Strictly wrapped multi-bit bus arguments to avert NaN exceptions on unhydrated modules.
+                const typeBits = parseInt(sn.type.split('-')[1]);
+                const bits = (!isNaN(typeBits) && typeBits > 0) ? typeBits : 1;
                 const isGenericPort = !(/\d/.test(args[2])) && args[2] !== 'clk' && args[2] !== 'we';
 
                 if (isGenericPort) {
