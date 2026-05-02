@@ -9,9 +9,13 @@ self.onmessage = async (e) => {
     if (action === 'init') {
         try {
             // [AUDIT: v1.24.95 | SEC_ARCH_LEAD] - SharedArrayBuffer allows the UI thread to read memory without copying.
+            // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Dynamic Guard Band Memory Allocation via environment injection.
             const { instance } = await WebAssembly.instantiate(wasmBuffer, { 
                 env: { 
-                    memory: memory 
+                    memory: memory,
+                    SHADOW_BASE: 196608,
+                    PREV_CLK_BASE: 131072,
+                    NQ_BASE: 65536
                 } 
             });
             self.instance = instance;

@@ -47,25 +47,25 @@ const ProjectManager = {
             const fixNetlist = (wires, nodes) => {
                 if (!wires || !nodes) return;
                 wires.forEach(w => {
-                    [ {ep: w.from, isIn: false}, {ep: w.to, isIn: true} ].forEach(({ep, isIn}) => {
+                    [{ ep: w.from, isIn: false }, { ep: w.to, isIn: true }].forEach(({ ep, isIn }) => {
                         const cNode = nodes.find(n => n.id === ep.nodeId);
                         if (!cNode) return;
-                        
+
                         if (NATIVE.has(cNode.type)) {
                             const t = cNode.type;
                             if (isIn) {
                                 if (t === 'NOT' && (ep.portId === 'in0' || ep.portId === 'in')) ep.portId = 'a';
-                                else if (['AND','OR','NOR','XOR','XNOR','NAND'].includes(t)) {
+                                else if (['AND', 'OR', 'NOR', 'XOR', 'XNOR', 'NAND'].includes(t)) {
                                     if (ep.portId === 'in0' || ep.portId === 'in') ep.portId = 'a';
                                     if (ep.portId === 'in1') ep.portId = 'b';
-                                } else if (['IN-1','OUT-1','PROBE-1','CLOCK'].includes(t)) {
+                                } else if (['IN-1', 'OUT-1', 'PROBE-1', 'CLOCK'].includes(t)) {
                                     if (ep.portId === 'in') ep.portId = 'in0';
                                 }
                             } else {
-                                if (['NOT','AND','OR','NOR','XOR','XNOR','NAND'].includes(t)) {
+                                if (['NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'NAND'].includes(t)) {
                                     // [AUDIT: v1.23.96 | SEC_ARCH_LEAD] - Reverted native gate output mapping to strictly target DOM property 'q'.
                                     if (ep.portId === 'out0' || ep.portId === 'out') ep.portId = 'q';
-                                } else if (['IN-1','OUT-1','PROBE-1','CLOCK'].includes(t)) {
+                                } else if (['IN-1', 'OUT-1', 'PROBE-1', 'CLOCK'].includes(t)) {
                                     if (ep.portId === 'out') ep.portId = 'out0';
                                 }
                             }
@@ -77,11 +77,11 @@ const ProjectManager = {
                             const ioNodes = lib.nodes.filter(x => x.type.startsWith(isIn ? 'IN-' : 'OUT-') || (isIn && x.type.startsWith('PROBE-')));
                             // [AUDIT: v1.23.96 | SEC_ARCH_LEAD] - Apply secondary X-axis sorting to match DOM rendering parity.
                             ioNodes.sort((a, b) => (a.y - b.y) || (a.x - b.x));
-                            
+
                             const bPref = isIn ? 'in' : 'out';
                             let totalBits = 0;
                             ioNodes.forEach(n => totalBits += (parseInt(n.type.split('-')[1]) || 1));
-                            
+
                             // [AUDIT: v1.23.96 | SEC_ARCH_LEAD] - Skip migration if port is already a valid continuous bit index.
                             const portMatch = ep.portId ? ep.portId.match(new RegExp(`^${bPref}(\\d+)$`)) : null;
                             if (portMatch) {
@@ -148,7 +148,7 @@ const ProjectManager = {
                 for (let i = nodes.length - 1; i >= 0; i--) {
                     const n = nodes[i];
                     if (!n || !n.type) { nodes.splice(i, 1); continue; }
-                    
+
                     // Legacy Object Purge (Fixes old custom chip saves like brianx.bsim)
                     if (typeof n.val === 'object' && !Array.isArray(n.val) && n.val !== null) n.val = 0;
                     if (typeof n.state === 'object' && !Array.isArray(n.state) && n.state !== null) n.state = 0;
@@ -161,7 +161,7 @@ const ProjectManager = {
                         if (!Array.isArray(n.val)) n.val = new Array(bits).fill(n.val || 0);
                         if (!Array.isArray(n.state)) n.state = new Array(bits).fill(n.state || 0);
                     }
-                    
+
                     if (NATIVE.has(n.type)) n.isCustom = false;
                     else if (data.library && data.library[n.type]) n.isCustom = true;
                     if (n.type === 'CLOCK') {
@@ -174,15 +174,15 @@ const ProjectManager = {
                 }
             };
             const findNodeById = (id) => {
-                if (data.nodes) { const n = data.nodes.find(x => x.id === id); if(n) return n; }
+                if (data.nodes) { const n = data.nodes.find(x => x.id === id); if (n) return n; }
                 if (data.workspaceStack) {
-                    for(const ws of data.workspaceStack) {
-                        const n = ws.nodes.find(x => x.id === id); if(n) return n;
+                    for (const ws of data.workspaceStack) {
+                        const n = ws.nodes.find(x => x.id === id); if (n) return n;
                     }
                 }
                 if (data.library) {
-                    for(const c of Object.values(data.library)) {
-                        if (c.nodes) { const n = c.nodes.find(x => x.id === id); if(n) return n; }
+                    for (const c of Object.values(data.library)) {
+                        if (c.nodes) { const n = c.nodes.find(x => x.id === id); if (n) return n; }
                     }
                 }
                 return null;
@@ -201,9 +201,9 @@ const ProjectManager = {
             };
             if (data.nodes) p(data.nodes);
             if (data.wires) wClean(data.wires);
-            if (data.library) Object.values(data.library).forEach(c => { 
-                if(c.nodes) p(c.nodes); 
-                if(c.wires) wClean(c.wires);
+            if (data.library) Object.values(data.library).forEach(c => {
+                if (c.nodes) p(c.nodes);
+                if (c.wires) wClean(c.wires);
             });
             if (data.workspaceStack) {
                 data.workspaceStack.forEach(ws => {
@@ -246,7 +246,7 @@ const ProjectManager = {
         const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
         const rand = Math.random().toString(16).substr(2, 4).toUpperCase();
         const filename = `${safeName}_${date}_${rand}.bsim`;
-        
+
         let mainNodes = Sim.nodes;
         let mainWires = Sim.wires;
         if (Sim.workspaceStack && Sim.workspaceStack.length > 0) {
@@ -268,16 +268,16 @@ const ProjectManager = {
             }
         });
 
-        const project = { 
+        const project = {
             nodes: cNodes, wires: cWires, library: cLib,
             meta: { version: (window.LOADED_BSIM_VERSION || "1.24.46") + "-Modular", exportedAt: new Date().toISOString() }
         };
-        
+
         const blob = new Blob([JSON.stringify(project, null, 2)], { type: 'application/json' });
         const a = document.createElement('a');
         a.href = URL.createObjectURL(blob);
         a.download = filename;
-        document.body.appendChild(a); 
+        document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(a.href);
@@ -300,7 +300,7 @@ const ProjectManager = {
                 try {
                     let data = JSON.parse(re.target.result);
                     data = this._normalizeData(data);
-                    
+
                     // [AUDIT: v1.24.46 | SEC_ARCH_LEAD] - Purge global contextual states to prevent phantom tab desynchronization and editor lockups upon ingestion.
                     Sim.library = data.library || {};
                     Sim.nodes = [];
@@ -308,24 +308,24 @@ const ProjectManager = {
                     Sim.workspaceStack = [];
                     Sim.activeEditingChip = null;
                     Sim.activeSplitChip = null;
-                    
+
                     const exitBtn = document.getElementById('btn-exit-chip');
                     if (exitBtn) exitBtn.style.display = 'none';
 
                     document.getElementById('scene').innerHTML = '';
-                    
+
                     if (data.nodes) {
-                        data.nodes.forEach(n => { 
+                        data.nodes.forEach(n => {
                             const c = Sim._cleanNode(n);
                             if (c) {
-                                Sim.nodes.push(c); 
-                                if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(c); 
+                                Sim.nodes.push(c);
+                                if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(c);
                             }
                         });
                         Sim.wires = (data.wires || []).map(w => Sim._cleanWire(w)).filter(w => w !== null);
                         if (typeof WireRenderer !== 'undefined') WireRenderer.drawWires();
                     }
-                    
+
                     Sim.tabs = [{ id: 'tab-1', name: 'Main', nodes: Sim.nodes.map(n => Sim._cleanNode(n)), wires: Sim.wires.map(w => Sim._cleanWire(w)), historyStack: [], historyIndex: -1 }];
                     Sim.activeTabId = 'tab-1';
                     if (typeof Sim.updateTabsUI === 'function') Sim.updateTabsUI();
@@ -355,7 +355,7 @@ const ProjectManager = {
         const date = new Date().toISOString().slice(0, 10).replace(/-/g, '');
         const rand = Math.random().toString(16).substr(2, 4).toUpperCase();
         const filename = `${safeName}_${date}_${rand}.png`;
-        
+
         const canvas = document.createElement('canvas');
         const ctx = canvas.getContext('2d');
         const wr = document.getElementById('workspace').getBoundingClientRect();
@@ -396,12 +396,53 @@ const ProjectManager = {
             const a = document.createElement('a');
             a.download = filename;
             a.href = canvas.toDataURL('image/png');
-            document.body.appendChild(a); 
+            document.body.appendChild(a);
             a.click();
             document.body.removeChild(a);
             Sim.toast('Diagram exported to PNG.');
         };
         img.src = 'data:image/svg+xml;base64,' + btoa(unescape(encodeURIComponent(svgStr.replace(/var\(--wire-on\)/g, '#00ffaa').replace(/var\(--wire-off\)/g, '#883333'))));
+    },
+    /**
+     * @IO: REMOTE_IMPORT
+     * @INTENT: Fetch a .bsim project from a remote URL and ingest it into the local autosave slot.
+     */
+    async importFromUrl(url) {
+        try {
+            const res = await fetch(url);
+            if (!res.ok) throw new Error("HTTP " + res.status);
+            const data = await res.json();
+            localStorage.setItem('bsim_autosave', JSON.stringify(data));
+            location.reload();
+        } catch (e) {
+            console.error('[FATAL] Remote import failed:', e);
+            if (window.Sim && typeof Sim.toast === 'function') Sim.toast('Failed to load project from URL.', 'error');
+        }
+    },
+
+    /**
+     * @IO: SCREEN_CAPTURE
+     * @INTENT: Execute a high-fidelity workspace capture using the Screen Capture API for documentation.
+     */
+    async exportHighFidelity() {
+        try {
+            const stream = await navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: "browser" }, audio: false, preferCurrentTab: true });
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            await video.play();
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            stream.getTracks().forEach(track => track.stop());
+            const a = document.createElement('a');
+            a.download = `HiFi_Snapshot_${Date.now()}.png`;
+            a.href = canvas.toDataURL('image/png');
+            a.click();
+            if (window.Sim && typeof Sim.toast === 'function') Sim.toast('High-Fidelity Snapshot Exported.');
+        } catch (e) {
+            console.error('[FATAL] High-Fidelity export failed:', e);
+        }
     }
 };
 

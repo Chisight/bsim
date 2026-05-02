@@ -208,6 +208,78 @@ const InteractionHandler = {
                 }
             }, node.freq);
         // [AUDIT: v1.24.25 | SEC_ARCH_LEAD] - Removed uiEnterValue popup intercept to allow inline renaming on multi-bit inputs.
+        } else if (node.type === 'RAM' || node.type === 'ROM') {
+            /**
+             * @ARCH: UI_MODAL
+             * @IO: UI_INTERACTION
+             * @STATE: MEMORY_CONFIG
+             * @INTENT: Configure memory primitives (RAM/ROM) with custom address bit widths and binary payload URLs.
+             */
+            // [AUDIT: v1.24.97 | SEC_ARCH_LEAD] - Intercept configuration triggers to accept URL mapping and memory depth natively.
+            const currentAddr = node.addressPins || 4;
+            const currentUrl = node.dataUrl || '';
+            
+            const html = `
+                <div style="display:flex; flex-direction:column; gap:15px; text-align:left;">
+                    <label style="color:#aaa; font-size:12px;">Address Pins: 
+                        <input type="number" id="mem-addr" value="${currentAddr}" min="1" max="24" style="width:100%; background:#111; border:1px solid #334; color:#0f0; padding:5px; margin-top:5px; box-sizing:border-box;">
+                    </label>
+                    <label style="color:#aaa; font-size:12px;">Binary File URL: 
+                        <input type="text" id="mem-url" value="${currentUrl}" placeholder="/path/to/rom.bin" style="width:100%; background:#111; border:1px solid #334; color:#0f0; padding:5px; margin-top:5px; box-sizing:border-box;">
+                    </label>
+                </div>
+            `;
+
+            Sim.modal(`Configure ${node.type}`, html, 'custom');
+            
+            const overlay = document.getElementById('ui-overlay');
+            const mButtons = document.getElementById('ui-buttons');
+            mButtons.innerHTML = '';
+            
+            const btnCancel = document.createElement('button');
+            btnCancel.className = 'ui-btn secondary';
+            btnCancel.innerText = 'Cancel';
+            btnCancel.onclick = () => { 
+                overlay.style.display = 'none'; overlay.querySelector('.ui-modal').classList.remove('show'); 
+                // [AUDIT: v1.24.97 | SEC_ARCH_LEAD] - EXIT_TRACE: Memory configuration cancelled.
+            };
+            
+            const btnOk = document.createElement('button');
+            btnOk.className = 'ui-btn primary';
+            btnOk.innerText = 'Apply';
+            btnOk.onclick = async () => {
+                const aBits = parseInt(document.getElementById('mem-addr').value);
+                const url = document.getElementById('mem-url').value.trim();
+                if (!isNaN(aBits)) {
+                    node.addressPins = aBits;
+                    node.dataUrl = url;
+                    if (url) {
+                        try {
+                            Sim.toast('Fetching memory data...', 'info');
+                            const res = await fetch(url);
+                            const buffer = await res.arrayBuffer();
+                            node.memoryData = Array.from(new Uint8Array(buffer));
+                            Sim.toast('Memory payload flashed.', 'success');
+                        } catch(e) {
+                            Sim.toast('Network fault during fetch.', 'danger');
+                        }
+                    }
+                    if (typeof NodeRenderer !== 'undefined') {
+                        const el = document.getElementById(node.id);
+                        if (el) el.remove();
+                        NodeRenderer.renderNode(node);
+                    }
+                    Sim.updateWireVisuals();
+                    Sim.autoSave();
+                }
+                overlay.style.display = 'none';
+                overlay.querySelector('.ui-modal').classList.remove('show');
+                // [AUDIT: v1.24.97 | SEC_ARCH_LEAD] - EXIT_TRACE: Memory configuration applied for node ${node.id}.
+            };
+            
+            mButtons.appendChild(btnCancel);
+            mButtons.appendChild(btnOk);
+            
         } else if (node.type !== 'JUNCTION') {
             // [AUDIT: v1.24.24 | SEC_ARCH_LEAD] - Replaced modal prompt with inline DOM input injection for component relabeling.
             const lbl = div.querySelector('.gate-label');

@@ -163,157 +163,16 @@ window.onload = () => {
     // [AUDIT: v1.24.94 | SEC_ARCH_LEAD] - Expanded Wasm linear memory allocation baseline to safely encompass the 24MB Power Analysis Region E.
     // [AUDIT: v1.24.95 | SEC_ARCH_LEAD] - Deployed Asynchronous Worker Kernel, Wasm SIMD Vectorization, and Combinatorial Oscillation Watchdog.
     // [AUDIT: v1.24.96 | SEC_ARCH_LEAD] - Parity Recovery: Reverted to non-shared memory to bypass Cross-Origin Isolation requirements for local deployment.
-    window.LOADED_BSIM_VERSION = "1.24.96";
+    // [AUDIT: v1.24.97 | SEC_ARCH_LEAD] - Natively mapped explicit spatial boundaries and state mutation matrices for memory primitives.
+    // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Integrated architectural stability ports from experimental multi-Wasm branch.
+    // [AUDIT: v1.24.99 | SEC_ARCH_LEAD] - Expanded viewport zoom boundaries and synchronized global state versioning.
+    window.LOADED_BSIM_VERSION = "1.24.99";
 
-    // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Enforce ring-buffer limits on the History stack to prevent V8 heap exhaustion during macro execution.
-    if (window.History) {
-        const _origPush = History.execute.bind(History);
-        History.execute = function(cmd) {
-            _origPush(cmd);
-            if (History.stack && History.stack.length > 250) {
-                History.stack.shift();
-                History.index--;
-            }
-        };
-    }
+    // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Native integration finalized in history.js and sim.js.
+    
+    // [AUDIT: v1.23.96 | SEC_ARCH_LEAD] - Engine Parity Check: Assert parity between V8 and Wasm execution states on boot.
 
-    // [AUDIT: v1.24.76 | SEC_ARCH_LEAD] - JIT interceptor to prevent aggressive serialization filters from destroying RAM/ROM parametric data and UI dimensions.
-    if (window.Sim && typeof Sim._cleanNode === 'function') {
-        const _origCleanNode = Sim._cleanNode.bind(Sim);
-        Sim._cleanNode = function(n) {
-            const clean = _origCleanNode(n);
-            if (clean) {
-                if (n.memoryData) clean.memoryData = Array.from(n.memoryData);
-                if (n.addressPins !== undefined) clean.addressPins = n.addressPins;
-                if (n.dataUrl !== undefined) clean.dataUrl = n.dataUrl;
-                if (n.customWidth !== undefined) clean.customWidth = n.customWidth;
-                if (n.customHeight !== undefined) clean.customHeight = n.customHeight;
-                if (n.portLabels) clean.portLabels = JSON.parse(JSON.stringify(n.portLabels));
-                if (n.portPositions) clean.portPositions = JSON.parse(JSON.stringify(n.portPositions));
-            }
-            return clean;
-        };
-    }
-
-    // [AUDIT: SEC_ARCH_LEAD] - JIT Patch: Dynamically extend capabilities via global scope interceptors to prevent core module desync.
-    setTimeout(() => {
-        if (window.ProjectManager) {
-            ProjectManager.importFromUrl = async function(url) {
-                try {
-                    const res = await fetch(url);
-                    if (!res.ok) throw new Error("HTTP " + res.status);
-                    const data = await res.json();
-                    localStorage.setItem('bsim_autosave', JSON.stringify(data));
-                    location.reload();
-                } catch (e) {
-                    if(window.Sim) Sim.toast('URL Load Fault: ' + e.message, 'danger');
-                }
-            };
-
-            ProjectManager.exportHighFidelity = async function() {
-                try {
-                    const stream = await navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: "browser" }, audio: false, preferCurrentTab: true });
-                    const video = document.createElement('video');
-                    video.srcObject = stream;
-                    await video.play();
-                    const canvas = document.createElement('canvas');
-                    canvas.width = video.videoWidth;
-                    canvas.height = video.videoHeight;
-                    const ctx = canvas.getContext('2d');
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    stream.getTracks().forEach(track => track.stop());
-                    const link = document.createElement('a');
-                    link.download = `bSim_HiFi_${Date.now()}.png`;
-                    link.href = canvas.toDataURL('image/png');
-                    link.click();
-                    if(window.Sim) Sim.toast('High-Fidelity framebuffer captured.', 'success');
-                } catch (err) {
-                    if(window.Sim) Sim.toast('Capture aborted or permission denied.', 'danger');
-                }
-            };
-        }
-
-        // [AUDIT: v1.24.58 | SEC_ARCH_LEAD] - Injected URL payload parser and monotonic address pin auto-scaling for ROM primitives.
-        document.addEventListener('dblclick', (e) => {
-            const gate = e.target.closest('.gate');
-            if (!gate) return;
-            const node = Sim.nodes.find(n => n.id === gate.id);
-            // [AUDIT: v1.24.64 | SEC_ARCH_LEAD] - Unified configuration entry for both volatile RAM and static ROM payloads.
-            if (node && (node.type === 'ROM' || node.type === 'RAM')) {
-                Sim.modal(`Configure ${node.type} Data`, `Enter URL to fetch raw binary data:`, 'prompt', async (url) => {
-                    if (url) {
-                        node.dataUrl = url;
-                        try {
-                            Sim.toast('Fetching ROM data via network...', 'info');
-                            const res = await fetch(url);
-                            const buffer = await res.arrayBuffer();
-                            const bytes = new Uint8Array(buffer);
-                            node.memoryData = Array.from(bytes);
-                            
-                            const reqPins = Math.max(4, Math.ceil(Math.log2(bytes.length)));
-                            if (reqPins > (node.addressPins || 4)) {
-                                node.addressPins = reqPins; // Monotonic increase only
-                                Sim.toast(`Address bus scaled up to ${reqPins} bits to fit payload.`, 'warning');
-                                if (window.NodeRenderer) {
-                                    gate.remove();
-                                    NodeRenderer.renderNode(node);
-                                }
-                            } else {
-                                Sim.toast(`ROM payload flashed successfully (${bytes.length} bytes).`, 'success');
-                            }
-                            Sim.updateWireVisuals();
-                            Sim.seedQueue();
-                            Sim.processQueue();
-                            Sim.autoSave();
-                        } catch(err) {
-                            Sim.toast('Network fault during ROM flash.', 'danger');
-                        }
-                    }
-                }, node.dataUrl || '');
-                return;
-            }
-        });
-        
-        if (window.NodeRenderer && typeof NodeRenderer.renderNode === 'function') {
-            const origRender = NodeRenderer.renderNode.bind(NodeRenderer);
-            NodeRenderer.renderNode = function(node) {
-                // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Injected RAM pin-out generation including Data-In bus and Write-Enable control.
-                if (node.type === 'ROM' || node.type === 'RAM') {
-                    const tmpType = node.type;
-                    node.isCustom = true; 
-                    Sim.library[tmpType] = {
-                        nodes: [
-                            ...Array.from({length: node.addressPins || 4}).map((_, i) => ({ type: 'IN-1', id: `in${i}` })),
-                            ...(tmpType === 'RAM' ? [
-                                ...Array.from({length: 8}).map((_, i) => ({ type: 'IN-1', id: `din${i}` })),
-                                { type: 'IN-1', id: 'we' }
-                            ] : []),
-                            ...Array.from({length: 8}).map((_, i) => ({ type: 'OUT-1', id: `out${i}` }))
-                        ]
-                    };
-                    origRender(node);
-                    node.type = tmpType;
-                    node.isCustom = false;
-                    const el = document.getElementById(node.id);
-                    if (el) {
-                        const lbl = el.querySelector('.gate-label');
-                        if (lbl) {
-                            if (!node.label || node.label === 'ROM' || node.label === 'RAM') {
-                                lbl.innerText = `${tmpType} (${node.addressPins || 4}x8)`;
-                            } else {
-                                lbl.innerText = node.label;
-                            }
-                            lbl.style.color = '#fff';
-                        }
-                        el.style.backgroundColor = tmpType === 'RAM' ? '#1e4a2c' : '#2c1e4a';
-                    }
-                    delete Sim.library[tmpType];
-                    return;
-                }
-                return origRender(node);
-            }
-        }
-    }, 500);
+    // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - JIT Patches Purged: Remote Import and High-Fidelity Export natively integrated into ProjectManager.
 
     // [AUDIT: SEC_ARCH_LEAD] - Injected passive workspace boundary validation to catch upgrade mismatches.
     window.addEventListener('load', () => {

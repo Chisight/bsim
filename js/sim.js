@@ -21,8 +21,15 @@ const Sim = {
             return JSON.parse(JSON.stringify({
                 id: n.id, type: n.type, x: n.x, y: n.y, label: n.label,
                 val: n.val, state: n.state, outputs: n.outputs, isCustom: n.isCustom,
-                freq: n.freq, interval: n.interval, lastTick: n.lastTick, meta: n.meta,
+                freq: n.freq, interval: n.interval, lastTick: n.lastTick, 
+                // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Relational serialization: Strip deep meta instances to prevent bloat.
+                meta: n.meta ? { folder: n.meta.folder } : undefined,
                 customWidth: n.customWidth, customHeight: n.customHeight,
+                memoryData: n.memoryData ? Array.from(n.memoryData) : undefined,
+                addressPins: n.addressPins,
+                dataUrl: n.dataUrl,
+                portLabels: n.portLabels ? JSON.parse(JSON.stringify(n.portLabels)) : undefined,
+                portPositions: n.portPositions ? JSON.parse(JSON.stringify(n.portPositions)) : undefined,
                 pinX: n.pinX, pinY: n.pinY, pinW: n.pinW, pinH: n.pinH,
                 infoX: n.infoX, infoY: n.infoY, infoW: n.infoW, infoH: n.infoH,
                 labelX: n.labelX, labelY: n.labelY, labelW: n.labelW, labelH: n.labelH,
@@ -56,6 +63,19 @@ const Sim = {
         this.seedQueue();
         this.processQueue();
         this.toast('Layout Memory Flushed & Resynchronized', 'success');
+    },
+
+    // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Main-Thread Safe Atomic Mutex replacing synchronous Atomics.wait to prevent V8 pipeline crashes.
+    _topologyLock: new Int32Array(new SharedArrayBuffer(4)),
+    async mutateTopology(mutationFn) {
+        while (Atomics.compareExchange(this._topologyLock, 0, 0, 1) !== 0) {
+            await new Promise(resolve => setTimeout(resolve, 5));
+        }
+        try {
+            mutationFn();
+        } finally {
+            Atomics.store(this._topologyLock, 0, 0);
+        }
     },
 
     // Preferences Logic
@@ -488,6 +508,8 @@ const Sim = {
      * @INTENT: Aggregate signals for macro internal ports during hierarchical simulation.
      */
     _assembleChipInputs(chipDef, getDriveFn) {
+        // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - V8 Pipeline Crash Guards: Halt evaluation on unlinked custom definitions.
+        if (!chipDef || !chipDef.nodes) return {};
         const ext = {};
         const inNodes = chipDef.nodes.filter(n => n.type.startsWith('IN-')).sort((a, b) => (a.y - b.y) || (a.x - b.x));
         let cIn = 0;
@@ -513,6 +535,8 @@ const Sim = {
      * @INTENT: Distribute internal signals to macro output terminals.
      */
     _mapChipOutputs(chipDef, internalRes) {
+        // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - V8 Pipeline Crash Guards: Halt evaluation on unlinked custom definitions.
+        if (!chipDef || !chipDef.nodes) return {};
         const mapped = {};
         const outNodes = chipDef.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-')).sort((a, b) => (a.y - b.y) || (a.x - b.x));
         let cOut = 0;
@@ -1115,10 +1139,19 @@ const Sim = {
                     }
                 }
 
-                // Check if states match
-                if (JSON.stringify(v8State) !== JSON.stringify(wState)) {
+                // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Zero-Copy Parity Validation: Purged JSON.stringify for direct array index checks.
+                let parityMatch = true;
+                if (bits === 1) {
+                    if (v8State !== wState) parityMatch = false;
+                } else {
+                    for (let b = 0; b < bits; b++) {
+                        if (v8State[b] !== wState[b]) { parityMatch = false; break; }
+                    }
+                }
+
+                if (!parityMatch) {
                     // if not, log error and set passed to false
-                    console.error(`[FATAL] Parity Deviation at Cycle ${i} | Terminal: ${n.id} (${n.label}) | V8 Object: ${JSON.stringify(v8State)} | Wasm Linear: ${JSON.stringify(wState)}`);
+                    console.error(`[FATAL] Parity Deviation at Cycle ${i} | Terminal: ${n.id} (${n.label}) | V8 Object: ${v8State} | Wasm Linear: ${wState}`);
                     // set passed to false
                     passed = false;
                 }

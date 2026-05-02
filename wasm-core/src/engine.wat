@@ -7,6 +7,11 @@
 
 (module
   (import "env" "memory" (memory 1))
+  
+  ;; [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Dynamic Guard Band Memory Allocation injected via env imports.
+  (import "env" "SHADOW_BASE" (global $SHADOW_BASE i32))
+  (import "env" "PREV_CLK_BASE" (global $PREV_CLK_BASE i32))
+  (import "env" "NQ_BASE" (global $NQ_BASE i32))
 
   (global $REGION_A_BASE i32 (i32.const 0))      ;; start of node states
   ;; [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Expanded instruction boundary to 1MB to prevent macro flattening overflows.

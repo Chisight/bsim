@@ -35,9 +35,13 @@ const WasmEngine = {
                 shared: false 
             });
 
+            // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Dynamic Guard Band Memory Allocation via environment injection.
             const { instance } = await WebAssembly.instantiate(bytes, {
                 env: {
-                    memory: this.memory
+                    memory: this.memory,
+                    SHADOW_BASE: 196608,
+                    PREV_CLK_BASE: 131072,
+                    NQ_BASE: 65536
                 }
             });
             this.instance = instance;
@@ -460,10 +464,16 @@ const WasmEngine = {
             });
         }
 
-        // Append sequential gates and isolated cyclic nodes safely at the end
-        this.flatNodes.forEach(n => {
-            if (!sortedNodes.some(sn => sn.id === n.id)) sortedNodes.push(n);
-        });
+        // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - FAS-Optimized SCC Cycle-Breaking via in/out degree ratios.
+        let cyclicNodes = this.flatNodes.filter(n => !sortedNodes.some(sn => sn.id === n.id));
+        if (cyclicNodes.length > 0) {
+            cyclicNodes.sort((a, b) => {
+                const degA = (inDegree.get(a.id) || 0) / (adjList.get(a.id)?.size || 1);
+                const degB = (inDegree.get(b.id) || 0) / (adjList.get(b.id)?.size || 1);
+                return degB - degA;
+            });
+            sortedNodes.push(...cyclicNodes);
+        }
 
         // Helper to emit instructions into Region B
         const emitNAND = (target, a, b) => {
@@ -485,6 +495,9 @@ const WasmEngine = {
             const mapped = this.idMap.get(n.id);
             if (Array.isArray(mapped)) return; // multi-bit IO slot, skip
             const t = n.type;
+
+            // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Exclude static input nodes to prevent UI flickering and primitive overwrite.
+            if (t.startsWith('IN-') || t === '0' || t === '1') return;
 
             const getA = () => buildBusTree(resolveAllDriverIndices(n.id, 'a'));
             const getB = () => buildBusTree(resolveAllDriverIndices(n.id, 'b'));
