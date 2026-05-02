@@ -177,23 +177,8 @@ window.onload = () => {
     // [AUDIT: v1.25.17 | SEC_ARCH_LEAD] - Auto-scaled RAM/ROM address bus to dynamically encompass context-menu binary payloads.
     // [AUDIT: v1.25.18 | SEC_ARCH_LEAD] - Re-enabled native Wasm hardware acceleration for memory primitives.
     // [AUDIT: v1.25.19 | SEC_ARCH_LEAD] - Fixed Wasm compiler omission for multi-slot primitives and hardened runtime purity checks.
-    window.LOADED_BSIM_VERSION = "1.25.19";
-
-    // [AUDIT: v1.25.19 | SEC_ARCH_LEAD] - Hard-override purity checks to guarantee RAM/ROM stay in native execution mode without fallback.
-    if (window.Sim && typeof window.Sim.isPureNative === 'function') {
-        window.Sim.isPureNative = function() {
-            const KERNEL = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'ROM', 'RAM', '0', '1']);
-            for (let n of this.nodes) {
-                if (!KERNEL.has(n.type) && !n.isCustom) return false;
-                if (n.isCustom && this.library[n.type]) {
-                    for (let sub of this.library[n.type].nodes) {
-                        if (!KERNEL.has(sub.type) && !sub.type.startsWith('IN-') && !sub.type.startsWith('OUT-')) return false;
-                    }
-                }
-            }
-            return true;
-        };
-    }
+    // [AUDIT: v1.25.20 | SEC_ARCH_LEAD] - Centralized purity checks to Sim.isPureNative and eradicated local closure shadowing.
+    window.LOADED_BSIM_VERSION = "1.25.20";
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Native integration finalized in history.js and sim.js.
     

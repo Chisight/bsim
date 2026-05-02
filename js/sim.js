@@ -5,6 +5,17 @@
 const Sim = {
     nodes: [],
     wires: [],
+    
+    // [AUDIT: v1.25.20 | SEC_ARCH_LEAD] - Centralized purity validator to prevent local scope drift and ensure RAM/ROM evaluation parity.
+    isPureNative() {
+        const KERNEL = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'ROM', 'RAM', '0']);
+        const checkPure = (nodes) => nodes.every(n => {
+            if (KERNEL.has(n.type)) return true;
+            if (n.isCustom && this.library && this.library[n.type]) return checkPure(this.library[n.type].nodes);
+            return false;
+        });
+        return checkPure(this.nodes);
+    },
     library: {},
     workspaceStack: [],
     activeEditingChip: null,
@@ -107,16 +118,8 @@ const Sim = {
         const runQueue = () => {
             const now = performance.now();
             
-            // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Synchronized Wasm whitelist to include Memory Primitives for native execution.
-            // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Whitelisted '0' primitive for Wasm execution.
-            // [AUDIT: v1.25.15 | SEC_ARCH_LEAD] - Excluded ROM and RAM from Wasm whitelist due to missing kernel opcodes; forcing V8 parity fallback.
-            const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', '0']);
-            const checkPure = (nodes) => nodes.every(n => {
-                if (validWasmTypes.has(n.type)) return true;
-                if (n.isCustom && this.library[n.type]) return checkPure(this.library[n.type].nodes);
-                return false;
-            });
-            const isPureNative = checkPure(this.nodes);
+            // [AUDIT: v1.25.20 | SEC_ARCH_LEAD] - Transitioned to centralized purity validation.
+            const isPureNative = Sim.isPureNative();
 
             Sim.nodes.forEach(n => {
                 // [AUDIT: v1.24.55 | SEC_ARCH_LEAD] - Stripped restrictive Wasm-eligibility guard blocking temporal V8 clock evaluation. Both engines rely on V8 for real-time oscillator intervals.
@@ -762,16 +765,8 @@ const Sim = {
 
         // Wasm engine intercept
         if (this.useWasm && window.WasmEngine && WasmEngine.ready) {
-            // Synchronized native primitive whitelist
-            // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Synchronized Wasm whitelist to include Memory Primitives for native execution.
-            // [AUDIT: v1.25.15 | SEC_ARCH_LEAD] - Excluded ROM and RAM from Wasm whitelist due to missing kernel opcodes; forcing V8 parity fallback.
-            const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
-            const checkPure = (nodes) => nodes.every(n => {
-                if (validWasmTypes.has(n.type)) return true;
-                if (n.isCustom && this.library && this.library[n.type]) return checkPure(this.library[n.type].nodes);
-                return false;
-            });
-            const isPureNative = checkPure(this.nodes);
+            // [AUDIT: v1.25.20 | SEC_ARCH_LEAD] - Transitioned to centralized purity validation.
+            const isPureNative = this.isPureNative();
             
             // Sync HUD Engine Status
             this.updateHUD();
@@ -1057,15 +1052,8 @@ const Sim = {
         // Wait 50ms for the toast to render
         await new Promise(resolve => setTimeout(resolve, 50));
         // validate that the netlist is pure native
-        // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Synchronized Wasm whitelist to include Memory Primitives for native execution.
-        // [AUDIT: v1.25.15 | SEC_ARCH_LEAD] - Excluded ROM and RAM from Wasm whitelist due to missing kernel opcodes; forcing V8 parity fallback.
-        const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
-        const checkPure = (nodes) => nodes.every(n => {
-            if (validWasmTypes.has(n.type)) return true;
-            if (n.isCustom && this.library && this.library[n.type]) return checkPure(this.library[n.type].nodes);
-            return false;
-        });
-        const isPureNative = checkPure(this.nodes);
+        // [AUDIT: v1.25.20 | SEC_ARCH_LEAD] - Transitioned to centralized purity validation.
+        const isPureNative = this.isPureNative();
         // if not pure native, return toast
         if (!isPureNative) {
             // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - EXIT_TRACE: Diagnostics aborted, mixed-mode netlist detected.
@@ -1921,15 +1909,8 @@ const Sim = {
         else if (pos === 'top-left') { hud.style.top = '15px'; hud.style.left = '15px'; hud.style.right = 'auto'; hud.style.bottom = 'auto'; hud.style.textAlign = 'left'; }
         else if (pos === 'bottom-left') { hud.style.bottom = '15px'; hud.style.left = '15px'; hud.style.right = 'auto'; hud.style.top = 'auto'; hud.style.textAlign = 'left'; }
 
-        // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Synchronized Wasm whitelist to include Memory Primitives for native execution.
-        // [AUDIT: v1.25.15 | SEC_ARCH_LEAD] - Excluded ROM and RAM from Wasm whitelist due to missing kernel opcodes; forcing V8 parity fallback.
-        const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
-        const checkPure = (nodes) => nodes.every(n => {
-            if (validWasmTypes.has(n.type)) return true;
-            if (n.isCustom && this.library && this.library[n.type]) return checkPure(this.library[n.type].nodes);
-            return false;
-        });
-        const isPureNative = checkPure(this.nodes);
+        // [AUDIT: v1.25.20 | SEC_ARCH_LEAD] - Transitioned to centralized purity validation.
+        const isPureNative = this.isPureNative();
         
         let engineStatus = '';
         if (this.useWasm) {
