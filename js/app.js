@@ -181,7 +181,10 @@ window.onload = () => {
     // [AUDIT: v1.25.21 | SEC_ARCH_LEAD] - Implemented dynamic viewport bounds (100dvh) for mobile footer visibility and constrained custom macro sub-menus with Y-axis scrolling.
     // [AUDIT: v1.25.22 | SEC_ARCH_LEAD] - Exposed Native Ground (0) primitive to UI and hardened signal driver map for Wasm netlist.
     // [AUDIT: v1.25.23 | SEC_ARCH_LEAD] - Replaced macro moving modal with hierarchical context sub-menu and inline DOM mutator.
-    window.LOADED_BSIM_VERSION = "1.25.23";
+    // [AUDIT: v1.25.24 | SEC_ARCH_LEAD] - Scaled mobile touch targets for menu items and chips via dedicated media query.
+    // [AUDIT: v1.25.25 | SEC_ARCH_LEAD] - Implemented VFS symbolic linking and mapped library directories to the workspace home.
+    // [AUDIT: v1.25.26 | SEC_ARCH_LEAD] - Refactored symlink command parser to conform to the POSIX ln -s signature.
+    window.LOADED_BSIM_VERSION = "1.25.26";
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Native integration finalized in history.js and sim.js.
     
