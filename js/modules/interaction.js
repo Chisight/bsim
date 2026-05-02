@@ -270,11 +270,14 @@ const InteractionHandler = {
                     
                     // [AUDIT: v1.25.02 | SEC_ARCH_LEAD] - Priority execution for local file payloads over remote URL string.
                     try {
+                        // [AUDIT: v1.25.05 | SEC_ARCH_LEAD] - Enforced 16MB bounds on configuration modal execution paths to prevent buffer hijacking.
+                        const MAX_BYTES = 16777216;
                         if (fileInput && fileInput.files.length > 0) {
                             Sim.toast('Reading local memory file...', 'info');
                             const file = fileInput.files[0];
+                            if (file.size > MAX_BYTES) throw new Error('Payload exceeds 16MB hardware limit.');
                             const buffer = await file.arrayBuffer();
-                            node.memoryData = Array.from(new Uint8Array(buffer));
+                            node.memoryData = Array.from(new Uint8Array(buffer).subarray(0, MAX_BYTES));
                             node.dataUrl = file.name;
                             Sim.toast('Local memory payload flashed directly to heap.', 'success');
                         } else if (url) {
@@ -282,8 +285,11 @@ const InteractionHandler = {
                             Sim.toast('Fetching memory data via network...', 'info');
                             const res = await fetch(url);
                             if (!res.ok) throw new Error('HTTP ' + res.status);
+                            const contentLength = res.headers.get('content-length');
+                            if (contentLength && parseInt(contentLength) > MAX_BYTES) throw new Error('Remote payload exceeds 16MB hardware limit.');
                             const buffer = await res.arrayBuffer();
-                            node.memoryData = Array.from(new Uint8Array(buffer));
+                            if (buffer.byteLength > MAX_BYTES) throw new Error('Remote payload exceeds 16MB hardware limit.');
+                            node.memoryData = Array.from(new Uint8Array(buffer).subarray(0, MAX_BYTES));
                             Sim.toast('Network payload flashed.', 'success');
                         }
                     } catch(e) {
@@ -365,11 +371,16 @@ const InteractionHandler = {
             if (ev.target.files.length > 0) {
                 try {
                     const file = ev.target.files[0];
+                    // [AUDIT: v1.25.05 | SEC_ARCH_LEAD] - Injected strict 16MB spatial bounds checking on local payload ingestion to prevent Wasm memory overflow.
+                    const MAX_BYTES = 16777216; // 16MB max addressable hardware limit (24-bit)
+                    if (file.size > MAX_BYTES) throw new Error(`Payload size (${file.size} bytes) exceeds hardware limit.`);
+                    
                     const buffer = await file.arrayBuffer();
-                    node.memoryData = Array.from(new Uint8Array(buffer));
+                    const safeView = new Uint8Array(buffer).subarray(0, MAX_BYTES);
+                    node.memoryData = Array.from(safeView);
                     node.dataUrl = file.name;
                     
-                    const reqPins = Math.max(1, Math.ceil(Math.log2(buffer.byteLength)));
+                    const reqPins = Math.max(1, Math.ceil(Math.log2(safeView.byteLength)));
                     if (reqPins > (node.addressPins || 4)) node.addressPins = reqPins;
                     
                     if (window.NodeRenderer) {

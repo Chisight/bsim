@@ -164,7 +164,8 @@ window.onload = () => {
     // [AUDIT: v1.25.02 | SEC_ARCH_LEAD] - Disambiguated global URL ingestion and implemented native Local File APIs for direct RAM/ROM binary payloads.
     // [AUDIT: v1.25.03 | SEC_ARCH_LEAD] - Inverted MSB/LSB visual pin rendering for memory primitives to enforce top-to-bottom spatial hierarchy.
     // [AUDIT: v1.25.04 | SEC_ARCH_LEAD] - Relegated RAM/ROM binary upload to the component context dropdown to prevent interaction overlap.
-    window.LOADED_BSIM_VERSION = "1.25.04";
+    // [AUDIT: v1.25.05 | SEC_ARCH_LEAD] - Enforced 16MB spatial bounds clamping on memory payload ingestion to prevent Wasm heap overflow attacks.
+    window.LOADED_BSIM_VERSION = "1.25.05";
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Native integration finalized in history.js and sim.js.
     
