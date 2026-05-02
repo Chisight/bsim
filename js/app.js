@@ -123,9 +123,13 @@ window.onload = () => {
     // [AUDIT: v1.25.39 | SEC_ARCH_LEAD] - Executed global codebase sanitation; purged deprecated ROM primitive and archived stale taxonomy/audit metadata to ARCHIVE_BLOAT.md.
     // [AUDIT: v1.25.40 | SEC_ARCH_LEAD] - Relocated high-frequency fastEqual utility to Sim object prototype to prevent hot-path recompilation overhead.
     // [AUDIT: v1.25.41 | SEC_ARCH_LEAD] - Executed architectural stability directives: zero-copy parity alignment, depth-bound trace guards, and deterministic evaluation.
-    // [AUDIT: v1.25.56 | SEC_ARCH_LEAD] - Abstracted local registry to IndexedDB, injected environment config, configured CORS pipeline intercepts, added manual retry mechanism, and deployed WebCrypto payload encryption.
-    // [AUDIT: v1.25.57 | SEC_ARCH_LEAD] - Eradicated external relay dependencies; implemented topological array packing to natively enforce minimal URI footprint.
-    // [AUDIT: v1.25.58 | SEC_ARCH_LEAD] - Excised address bus auto-scaling during payload ingestion to strictly preserve structural macro bounds.
+    // [AUDIT: v1.25.42 | SEC_ARCH_LEAD] - Deployed command execution debouncer to mitigate upstream lag-induced duplicate inputs.
+    // [AUDIT: v1.25.43 | SEC_ARCH_LEAD] - Instituted UI synchronization, multi-bit bus parsing guards, and strict VFS allocation limits.
+    // [AUDIT: v1.25.44 | SEC_ARCH_LEAD] - Enforced Wasm memory expansion limits, optimized pin state retrieval, and standardized viewport panning.
+    // [AUDIT: v1.25.45 | SEC_ARCH_LEAD] - Aligned Ground primitive nomenclature: renamed port label from GND to 0.
+    // [AUDIT: v1.25.46 | SEC_ARCH_LEAD] - Implemented global netlist propagation for hierarchical macro renaming to avert stale reference traps.
+    // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Hardened macro lifecycle with cyclical dependency scanners, pre-flight deletion reference counters, and strict topology APIs.
+    // [AUDIT: v1.25.48 | SEC_ARCH_LEAD] - Preserved hierarchical folder collapse state across UI redraws.
     // [AUDIT: v1.25.59 | SEC_ARCH_LEAD] - Restored aligned RAM layout (din/out overlap) and corrected pin ordering to LSB-at-top to resolve UI regression and legacy inversion bug.
     window.LOADED_BSIM_VERSION = "1.25.59";
 
