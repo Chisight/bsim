@@ -170,7 +170,8 @@ window.onload = () => {
     // [AUDIT: v1.25.08 | SEC_ARCH_LEAD] - Disabled memory payload auto-scaling; implemented strict bounds clamping and HTTP Range network optimization.
     // [AUDIT: v1.25.09 | SEC_ARCH_LEAD] - Resolved Temporal Dead Zone (TDZ) initialization fault during Wasm scalar extraction.
     // [AUDIT: v1.25.10 | SEC_ARCH_LEAD] - Resolved unreachable code path in spatial coordinate extraction routine.
-    window.LOADED_BSIM_VERSION = "1.25.10";
+    // [AUDIT: v1.25.11 | SEC_ARCH_LEAD] - Implemented hard cache-busting on ingress scripts to resolve remote client state desynchronization.
+    window.LOADED_BSIM_VERSION = "1.25.11";
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Native integration finalized in history.js and sim.js.
     
