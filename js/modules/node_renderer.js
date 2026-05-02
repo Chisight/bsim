@@ -77,6 +77,12 @@ const NodeRenderer = {
         }
  else {
             if (node.type === 'JUNCTION') portsHtml = `<div class="port input output" data-port="j" style="top:50%;left:50%;transform:translate(-50%,-50%)" onmousedown="if(!Sim.wiring.active) return; event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'j')"></div>`;
+            else if (node.type === '0') {
+                portsHtml = `
+                    <div class="port output" data-port="out0" style="top:50%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out0')">
+                        <span class="port-label">GND</span>
+                    </div>`;
+            }
             else if (node.type === 'CLOCK') {
                 portsHtml = `
                     <div class="port output" data-port="out0" style="top:50%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out0')">

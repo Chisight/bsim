@@ -71,7 +71,7 @@ const WasmEngine = {
         // The bridge has zero knowledge of AND/OR/XOR/etc — if a user wants those
         // gates, they build them from NANDs in the library. Done.
         // [AUDIT: v1.24.73 | SEC_ARCH_LEAD] - Synchronized KERNEL primitives to prevent errant flattening of ROM/RAM modules.
-        const KERNEL = new Set(['NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'DFF', 'CLOCK', 'TFF', 'TRISTATE', 'JUNCTION', 'RAM']);
+        const KERNEL = new Set(['NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'DFF', 'CLOCK', 'TFF', 'TRISTATE', 'JUNCTION', 'RAM', '0']);
 
         let fNodes = [];
         let fWires = [];
@@ -262,7 +262,7 @@ const WasmEngine = {
                 // [AUDIT: v1.25.22 | SEC_ARCH_LEAD] - Whitelisted '0' primitive as a valid signal driver in Wasm netlist tracing.
                 // [AUDIT: v1.25.34 | SEC_ARCH_LEAD] - Excised ROM from Wasm netlist driver trace.
                 const NATIVE_GATES = new Set(['NAND', 'DFF', 'CLOCK', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'RAM', '0']);
-                if (node.type === 'CLOCK' && pId === 'out0') drivers.add(this.getSpecificIdx(nId, pId));
+                if ((node.type === 'CLOCK' || node.type === '0') && pId === 'out0') drivers.add(this.getSpecificIdx(nId, pId));
                 if (NATIVE_GATES.has(node.type) && (pId === 'q' || pId === 'nq' || pId === 'out' || (node.type === 'RAM' && pId.startsWith('out')))) drivers.add(this.getSpecificIdx(nId, pId));
                 if (node.type.startsWith('IN-') && !nId.includes(':')) drivers.add(this.getSpecificIdx(nId, pId));
             };
@@ -390,7 +390,7 @@ const WasmEngine = {
                 // [AUDIT: v1.25.22 | SEC_ARCH_LEAD] - Registered '0' primitive to Kahn's topological sort as an origin boundary.
                 // [AUDIT: v1.25.34 | SEC_ARCH_LEAD] - Purged ROM from Kahn's topological sort.
                 const NATIVE_GATES = new Set(['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'RAM', '0']);
-                if (NATIVE_GATES.has(node.type) && (currPortId === 'out' || currPortId === 'q' || currPortId === 'nq' || (node.type === 'RAM' && currPortId.startsWith('out')))) isOutput = true;
+                if (NATIVE_GATES.has(node.type) && (currPortId === 'out' || currPortId === 'out0' || currPortId === 'q' || currPortId === 'nq' || (node.type === 'RAM' && currPortId.startsWith('out')))) isOutput = true;
                 if (node.type.startsWith('IN-') && !currNodeId.includes(':')) isOutput = true;
                 // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Identify output nodes for topological sorting.
                 if (isOutput && !isPassThrough) {
@@ -792,7 +792,7 @@ const WasmEngine = {
                     // [AUDIT: v1.25.22 | SEC_ARCH_LEAD] - Extended physical driver probing constraints to include '0' primitive.
                     // [AUDIT: v1.25.34 | SEC_ARCH_LEAD] - Excised ROM from physical driver probing array.
                     const NATIVE_GATES = new Set(['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'RAM', '0']);
-                    if (NATIVE_GATES.has(cNode.type) && (cPort === 'out' || cPort === 'q' || cPort === 'nq' || (cNode.type === 'RAM' && cPort.startsWith('out')))) isDriver = true;
+                    if (NATIVE_GATES.has(cNode.type) && (cPort === 'out' || cPort === 'out0' || cPort === 'q' || cPort === 'nq' || (cNode.type === 'RAM' && cPort.startsWith('out')))) isDriver = true;
                     if (cNode.type.startsWith('IN-') && !cId.includes(':') && cPort.startsWith('out')) isDriver = true;
 
                     if (isDriver) return { id: cId, port: cPort };

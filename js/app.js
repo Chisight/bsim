@@ -131,7 +131,8 @@ window.onload = () => {
     // [AUDIT: v1.25.34 | SEC_ARCH_LEAD] - Corrected precision truncation fault in address bus scaling computation and excised deprecated ROM primitive.
     // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Purged legacy JIT DOM interceptor in favor of native parametric coordinate generation in NodeRenderer.
     // [AUDIT: v1.25.36 | SEC_ARCH_LEAD] - Reprogrammed node layout algorithms to preserve asymmetric RAM component matrices during translation cycles.
-    window.LOADED_BSIM_VERSION = "1.25.36";
+    // [AUDIT: v1.25.37 | SEC_ARCH_LEAD] - Injected native output pin (out0) for Constant Ground (0) primitive to enable Wasm-parity topological driver resolution.
+    window.LOADED_BSIM_VERSION = "1.25.37";
 
     // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Purged legacy JIT DOM interceptor in favor of native parametric coordinate generation.
 
