@@ -498,8 +498,10 @@ const WasmEngine = {
         // or an IO proxy. No compound gate types should appear here.
         sortedNodes.forEach(n => {
             const mapped = this.idMap.get(n.id);
-            if (Array.isArray(mapped)) return; // multi-bit IO slot, skip
             const t = n.type;
+            
+            // [AUDIT: v1.25.19 | SEC_ARCH_LEAD] - Eradicated array-exclusion trap that suppressed instruction emission for multi-slot memory and sequential primitives.
+            if (Array.isArray(mapped) && !(t === 'ROM' || t === 'RAM' || t === 'DFF' || t === 'TFF')) return; 
 
             // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Exclude static input nodes to prevent UI flickering and primitive overwrite.
             if (t.startsWith('IN-') || t === '1') return;
