@@ -130,8 +130,8 @@ window.onload = () => {
     // [AUDIT: v1.25.46 | SEC_ARCH_LEAD] - Implemented global netlist propagation for hierarchical macro renaming to avert stale reference traps.
     // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Hardened macro lifecycle with cyclical dependency scanners, pre-flight deletion reference counters, and strict topology APIs.
     // [AUDIT: v1.25.48 | SEC_ARCH_LEAD] - Preserved hierarchical folder collapse state across UI redraws.
-    // [AUDIT: v1.25.59 | SEC_ARCH_LEAD] - Restored aligned RAM layout (din/out overlap) and corrected pin ordering to LSB-at-top to resolve UI regression and legacy inversion bug.
-    window.LOADED_BSIM_VERSION = "1.25.59";
+    // [AUDIT: v1.25.60 | SEC_ARCH_LEAD] - Restored MSB-at-top ordering for RAM and Custom chips; eradicated "crooked" pin offsets by enforcing a rigid 20px vertical spacing grid.
+    window.LOADED_BSIM_VERSION = "1.25.60";
 
     // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Purged legacy JIT DOM interceptor in favor of native parametric coordinate generation.
 

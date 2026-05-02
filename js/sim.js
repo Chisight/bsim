@@ -1472,18 +1472,18 @@ const Sim = {
                     if (!pid) return;
                     if (pid.startsWith('out')) {
                         const idx = parseInt(pid.replace('out',''));
-                        const vIdx = idx; // LSB at top
+                        const vIdx = (dBits - 1) - idx; // MSB at top
                         p.style.top = (py + vIdx * strideR) + 'px';
                     } else if (pid.startsWith('din')) {
                         const idx = parseInt(pid.replace('din',''));
-                        const vIdx = idx; // LSB at top
+                        const vIdx = (dBits - 1) - idx; // MSB at top
                         p.style.top = (py + vIdx * strideR) + 'px';
                     } else if (pid === 'we') {
                         // WE is placed at the end of the left side (address block)
                         p.style.top = (py + aBits * strideL) + 'px';
                     } else if (pid.startsWith('in')) {
                         const idx = parseInt(pid.replace('in',''));
-                        const vIdx = idx; // LSB at top
+                        const vIdx = (aBits - 1) - idx; // MSB at top
                         p.style.top = (py + vIdx * strideL) + 'px';
                     }
                 };
