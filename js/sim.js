@@ -6,8 +6,6 @@ const Sim = {
     nodes: [],
     wires: [],
     
-    // [AUDIT: v1.25.20 | SEC_ARCH_LEAD] - Centralized purity validator to prevent local scope drift and ensure RAM/ROM evaluation parity.
-    // [AUDIT: v1.25.34 | SEC_ARCH_LEAD] - Excised deprecated ROM primitive from native kernel boundary.
     isPureNative() {
         return Engine.isPureNative(this.nodes, this.library);
     },
@@ -21,40 +19,8 @@ const Sim = {
     _netlistDirty: true, // [wasm] flag to indicate that the netlist needs to be recompiled
 
     // [AUDIT: v1.24.09 | SEC_ARCH_LEAD] - Centralized state sanitization methods to prevent reference crashes.
-    _cleanNode(n) {
-        if (!n || !n.id) return null;
-        try {
-            return JSON.parse(JSON.stringify({
-                id: n.id, type: n.type, x: n.x, y: n.y, label: n.label,
-                val: n.val, state: n.state, outputs: n.outputs, isCustom: n.isCustom,
-                freq: n.freq, interval: n.interval, lastTick: n.lastTick, 
-                // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Relational serialization: Strip deep meta instances to prevent bloat.
-                meta: n.meta ? { folder: n.meta.folder } : undefined,
-                customWidth: n.customWidth, customHeight: n.customHeight, flipPolarity: n.flipPolarity,
-                memoryData: n.memoryData ? Array.from(n.memoryData) : undefined,
-                addressPins: n.addressPins,
-                dataUrl: n.dataUrl,
-                portLabels: n.portLabels ? JSON.parse(JSON.stringify(n.portLabels)) : undefined,
-                portPositions: n.portPositions ? JSON.parse(JSON.stringify(n.portPositions)) : undefined,
-                pinX: n.pinX, pinY: n.pinY, pinW: n.pinW, pinH: n.pinH,
-                infoX: n.infoX, infoY: n.infoY, infoW: n.infoW, infoH: n.infoH,
-                labelX: n.labelX, labelY: n.labelY, labelW: n.labelW, labelH: n.labelH,
-                portY: n.portY, portH: n.portH, portLabelX: n.portLabelX,
-                _lastX: n._lastX, _lastY: n._lastY
-            }));
-        } catch (e) { console.error("Data sanitization fault on node:", e); return null; }
-    },
-
-    _cleanWire(w) {
-        if (!w || !w.from || !w.to) return null;
-        try {
-            return JSON.parse(JSON.stringify({
-                from: { nodeId: w.from.nodeId, portId: w.from.portId },
-                to: { nodeId: w.to.nodeId, portId: w.to.portId },
-                midX: w.midX, midY: w.midY, orthoDir: w.orthoDir
-            }));
-        } catch (e) { console.error("Data sanitization fault on wire:", e); return null; }
-    },
+    _cleanNode(n) { return ProjectManager._cleanNode(n); },
+    _cleanWire(w) { return ProjectManager._cleanWire(w); },
     showToasts: true,
     debugToasts: false,
     useWasm: true,
@@ -174,18 +140,7 @@ const Sim = {
             if (Sim.nodes.some(n => n.type === 'CLOCK') || Sim.eventQueue.size > 0) requestAnimationFrame(runQueue); else running = false;
         };
 
-        window.addEventListener('keydown', (e) => {
-            const overlay = document.getElementById('ui-overlay');
-            if (overlay && overlay.style.display === 'flex') {
-                if (e.key === 'Enter' && e.target.tagName !== 'TEXTAREA') {
-                    const btnOk = document.querySelector('#ui-buttons .ui-btn.primary, #ui-buttons .ui-btn.danger');
-                    if (btnOk) btnOk.click();
-                } else if (e.key === 'Escape') {
-                    const btnCancel = document.querySelector('#ui-buttons .ui-btn.secondary');
-                    if (btnCancel) btnCancel.click();
-                }
-            }
-        });
+        UIOrchestrator.initHandlers(this);
 
         View.init();
         this.loadAutoSave();
@@ -196,52 +151,6 @@ const Sim = {
         this.applyKeybinds();
         this.refreshTooltips();
         this.wakeQueue();
-
-        window.addEventListener('mousemove', (e) => {
-            // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Capture viewport-relative board coordinates for HUD telemetry.
-            const hc = document.getElementById('hud-coords');
-            if (hc && window.View) {
-                const scene = document.getElementById('scene');
-                if (scene) {
-                    const sr = scene.getBoundingClientRect();
-                    const bx = Math.round((e.clientX - sr.left) / View.scale);
-                    const by = Math.round((e.clientY - sr.top) / View.scale);
-                    hc.innerText = `${bx}, ${by}`;
-                }
-            }
-
-            if (!this.wiring.active) return;
-            const SNAP_R = 60;
-            let nearest = null, nearestDist = SNAP_R;
-            document.querySelectorAll('.port').forEach(portEl => {
-                const r = portEl.getBoundingClientRect();
-                const cx = r.left + r.width / 2, cy = r.top + r.height / 2;
-                const dist = Math.hypot(e.clientX - cx, e.clientY - cy);
-
-                if (dist < nearestDist) {
-                    const nodeEl = portEl.closest('.gate');
-                    if (nodeEl) {
-                        const isStartPort = (nodeEl.id === this.wiring.start.nodeId && portEl.dataset.port === this.wiring.start.portId);
-                        if (!isStartPort) {
-                            nearestDist = dist;
-                            nearest = { nodeId: nodeEl.id, portId: portEl.dataset.port, el: portEl };
-                        }
-                    }
-                }
-            });
-            this.wiring.mouseX = e.clientX;
-            this.wiring.mouseY = e.clientY;
-
-            // CLEAR PREVIOUS SNAP ALWAYS
-            if (this.wiring.snapTarget && this.wiring.snapTarget.el !== nearest?.el) {
-                this.wiring.snapTarget.el.classList.remove('snap-hover');
-            }
-
-            this.wiring.snapTarget = nearest;
-            if (nearest) nearest.el.classList.add('snap-hover');
-
-            this.updateWireVisuals();
-        });
     },
 
     /**
@@ -273,24 +182,7 @@ const Sim = {
     /**
      */
     applyKeybinds() {
-        window.addEventListener('keydown', (e) => {
-            if (e.target.tagName === 'INPUT') return;
-            const key = e.key.toLowerCase();
-            const code = e.code;
-            if ((e.ctrlKey || e.metaKey) && (key === 'z' || code === 'KeyZ')) { e.preventDefault(); History.undo(); }
-            if ((e.ctrlKey || e.metaKey) && (key === 'y' || code === 'KeyY')) { e.preventDefault(); History.redo(); }
-            if (key === 'delete' || key === 'backspace' || code === 'Delete' || code === 'Backspace') {
-                if (this.selection.size > 0) {
-                    if (this.confirmDelete) {
-                        this.modal('Delete Components', `Delete ${this.selection.size} selected items?`, 'danger', ok => { 
-                            if (ok) this.deleteSelection(); 
-                        });
-                    } else {
-                        this.deleteSelection();
-                    }
-                }
-            }
-        });
+        // [AUDIT: v1.26.01 | SEC_ARCH_LEAD] - Keybinds migrated to UIOrchestrator.initHandlers for centralized event management.
     },
 
     /**
@@ -311,276 +203,30 @@ const Sim = {
 
     /**
      */
-    copySelection() {
-        if (this.selection.size === 0) return;
-        const nodesToCopy = this.nodes.filter(n => this.selection.has(n.id));
-        const wiresToCopy = this.wires.filter(w => this.selection.has(w.from.nodeId) && this.selection.has(w.to.nodeId));
-        this._clipboard = { nodes: JSON.parse(JSON.stringify(nodesToCopy)), wires: JSON.parse(JSON.stringify(wiresToCopy)) };
-    },
-
-    /**
-     */
-    pasteSelection() {
-        if (!this._clipboard || !this._clipboard.nodes) return;
-        const idMap = {};
-        const newNodes = this._clipboard.nodes.map(n => {
-            const newId = 'node-' + Math.random().toString(36).substr(2, 9);
-            idMap[n.id] = newId;
-            n.x += 20; n.y += 20; // Cascade Logic
-            const cloned = JSON.parse(JSON.stringify(n));
-            cloned.id = newId; return cloned;
-        });
-        // [AUDIT: v1.24.77 | SEC_ARCH_LEAD] - Hardened PasteCommand wire instantiation to preserve user-defined midpoints and orthogonality properties.
-        const newWires = this._clipboard.wires.map(w => {
-            const nw = {
-                from: { nodeId: idMap[w.from.nodeId], portId: w.from.portId },
-                to: { nodeId: idMap[w.to.nodeId], portId: w.to.portId },
-                orthoDir: w.orthoDir
-            };
-            if (w.midX !== undefined) nw.midX = w.midX + 20;
-            if (w.midY !== undefined) nw.midY = w.midY + 20;
-            return nw;
-        });
-        History.execute(new PasteCommand(newNodes, newWires));
-        this.selection.forEach(id => document.getElementById(id)?.classList.remove('selected'));
-        this.selection.clear();
-        newNodes.forEach(n => { this.selection.add(n.id); document.getElementById(n.id)?.classList.add('selected'); });
-    },
+    copySelection() { return InteractionHandler.copySelection(); },
+    pasteSelection() { return InteractionHandler.pasteSelection(); },
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Align persistence telemetry with MRAP taxonomy.
      */
-    autoSave() {
-        if (this._autoSaveTimer) clearTimeout(this._autoSaveTimer);
-        this._autoSaveTimer = setTimeout(() => {
-            try {
-                const cNodes = this.nodes.map(n => this._cleanNode(n)).filter(n => n !== null);
-                const cWires = this.wires.map(w => this._cleanWire(w)).filter(w => w !== null);
-                
-                // [AUDIT: v1.24.90 | SEC_ARCH_LEAD] - Sync Wasm volatile RAM payloads back to JS Host hierarchy before serialization.
-                if (this.useWasm && window.WasmEngine && WasmEngine.ready) {
-                    WasmEngine.syncMemoryToHost(this.nodes);
-                }
-
-                const wsStack = (this.workspaceStack || []).map(ws => ({ 
-                    nodes: (ws.nodes || []).map(n => this._cleanNode(n)).filter(n => n !== null), 
-                    wires: (ws.wires || []).map(w => this._cleanWire(w)).filter(w => w !== null) 
-                }));
-                
-                if (this.activeEditingChip && wsStack.length > 0) {
-                    // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Preserved macro folder hierarchy upon autosave to prevent root directory drift.
-                    this.library[this.activeEditingChip] = { folder: this.library[this.activeEditingChip]?.folder || '', nodes: cNodes, wires: cWires };
-                }
-                
-                const safeLib = {};
-                Object.keys(this.library).forEach(k => {
-                    if (this.library[k]) {
-                        safeLib[k] = {
-                            nodes: (this.library[k].nodes || []).map(n => this._cleanNode(n)).filter(n => n !== null),
-                            wires: (this.library[k].wires || []).map(w => this._cleanWire(w)).filter(w => w !== null),
-                            folder: this.library[k].folder || ''
-                        };
-                    }
-                });
-
-                // [AUDIT: v1.23.99 | SEC_ARCH_LEAD] - Synchronize current active context into tab state before serialization.
-                const activeTab = this.tabs.find(t => t.id === this.activeTabId);
-                if (activeTab && this.workspaceStack.length === 0) {
-                    activeTab.nodes = cNodes;
-                    activeTab.wires = cWires;
-                    if (window.History) {
-                        activeTab.historyStack = History.stack;
-                        activeTab.historyIndex = History.index;
-                    }
-                }
-
-                const safeTabs = this.tabs.map(t => ({
-                    id: t.id, name: t.name,
-                    nodes: (t.id === this.activeTabId && this.workspaceStack.length === 0) ? cNodes : (t.nodes || []).map(n => this._cleanNode(n)).filter(n => n !== null),
-                    wires: (t.id === this.activeTabId && this.workspaceStack.length === 0) ? cWires : (t.wires || []).map(w => this._cleanWire(w)).filter(w => w !== null),
-                    historyStack: t.historyStack || [], historyIndex: t.historyIndex !== undefined ? t.historyIndex : -1,
-                    activeSplitChip: t.id === this.activeTabId ? this.activeSplitChip : t.activeSplitChip,
-                    splitDirection: t.id === this.activeTabId ? (document.getElementById('main')?.classList.contains('split-left') ? 'left' : (document.getElementById('main')?.classList.contains('split-right') ? 'right' : (this.activeSplitChip ? 'popup' : null))) : t.splitDirection
-                }));
-
-                const project = { 
-                    nodes: wsStack.length > 0 ? wsStack[0].nodes : cNodes, 
-                    wires: wsStack.length > 0 ? wsStack[0].wires : cWires, 
-                    library: safeLib, directories: this.directories || [], workspaceStack: wsStack, activeEditingChip: this.activeEditingChip,
-                    tabs: safeTabs, activeTabId: this.activeTabId,
-                    // [AUDIT: v1.24.37 | SEC_ARCH_LEAD] - Append extended UI preferences payload including animation overrides.
-                    // [AUDIT: v1.25.32 | SEC_ARCH_LEAD] - Appended polarity preferences payload.
-                    prefs: { snapNodes: this.snapNodes, snapWires: this.snapWires, confirmDelete: this.confirmDelete, showStats: this.showStats, showTooltips: this.showTooltips, tutorialMode: this.tutorialMode, hudPos: this.hudPos, toastPos: this.toastPos, disableAnimations: this.disableAnimations, portSize: this.portSize, dotSize: this.dotSize, uiScale: this.uiScale, polarity: this.polarity || {} } 
- 
-                };
-                localStorage.setItem('bsim_autosave', JSON.stringify(project));
-            } catch (e) {
-                console.error("[AutoSave] Serialization Failure:", e);
-            }
-        }, 500);
-    },
+    autoSave() { return ProjectManager.autoSave(); },
 
     /**
      */
-    loadAutoSave() {
-        try {
-            const raw = localStorage.getItem('bsim_autosave');
-            if (raw) {
-                let parsed = JSON.parse(raw);
-                if (window.ProjectManager) parsed = ProjectManager._normalizeData(parsed);
-                this.library = parsed.library || {};
-                if (parsed.prefs) Object.assign(this, parsed.prefs);
-                
-                this.workspaceStack = parsed.workspaceStack || [];
-                this.activeEditingChip = parsed.activeEditingChip || null;
-                this.directories = parsed.directories || [];
-                
-                // [AUDIT: v1.23.99 | SEC_ARCH_LEAD] - Hydrate multi-tab states from persistence blob.
-                if (parsed.tabs && parsed.tabs.length > 0) {
-                    this.tabs = parsed.tabs;
-                    this.activeTabId = parsed.activeTabId || this.tabs[0].id;
-                } else {
-                    this.tabs = [{ id: 'tab-1', name: 'Main', nodes: parsed.nodes || [], wires: [], historyStack: [], historyIndex: -1 }];
-                    this.activeTabId = 'tab-1';
-                }
-                
-                let activeNodes = parsed.nodes;
-                let activeWires = parsed.wires;
-                
-                if (this.workspaceStack.length === 0) {
-                    const t = this.tabs.find(x => x.id === this.activeTabId);
-                    if (t) {
-                        activeNodes = t.nodes; activeWires = t.wires;
-                        if (window.History) {
-                            History.stack = t.historyStack ? [...t.historyStack] : [];
-                            History.index = t.historyIndex !== undefined ? t.historyIndex : -1;
-                        }
-                        if (t.activeSplitChip) {
-                            setTimeout(() => {
-                                this.uiSplitEditor(t.splitDirection || 'right', t.activeSplitChip, true);
-                            }, 100);
-                        }
-                    }
-                }
-                
-                // Restore Chip Editor context if we refreshed while editing
-                if (this.activeEditingChip && this.library[this.activeEditingChip]) {
-                    activeNodes = this.library[this.activeEditingChip].nodes;
-                    activeWires = this.library[this.activeEditingChip].wires;
-                    const exitBtn = document.getElementById('btn-exit-chip');
-                    if (exitBtn) exitBtn.style.display = 'inline';
-                } else if (this.activeEditingChip) {
-                    // Fallback to prevent crash if library chip was somehow deleted while editing
-                    this.activeEditingChip = null;
-                    this.workspaceStack = [];
-                }
-
-                // [AUDIT: v1.24.09 | SEC_ARCH_LEAD] - Hydrate nodes using unified centralized sanitization.
-                if (Array.isArray(activeNodes)) {
-                    activeNodes.forEach(n => { 
-                        const c = this._cleanNode(n);
-                        if (c) {
-                            this.nodes.push(c); 
-                            if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(c); 
-                        }
-                    });
-                }
-                
-                // [AUDIT: v1.23.93 | SEC_ARCH_LEAD] - Legacy netlist migration: Auto-resolve absolute pin descriptors to sequential zero-indexed vectors for custom macros, and sanitize corrupted geometric midpoints.
-                const migrateWires = (wires, ctxNodes) => {
-                    if (!Array.isArray(wires)) return;
-                    wires.forEach(w => {
-                        const fromNode = ctxNodes.find(n => n.id === w.from.nodeId);
-                        const toNode = ctxNodes.find(n => n.id === w.to.nodeId);
-                        
-                        if (fromNode && fromNode.isCustom) {
-                            if (w.from.portId === 'in') w.from.portId = 'in0';
-                            if (w.from.portId === 'out') w.from.portId = 'out0';
-                            if (w.from.portId === 'a') w.from.portId = 'in0';
-                            if (w.from.portId === 'b') w.from.portId = 'in1';
-                        }
-                        if (toNode && toNode.isCustom) {
-                            if (w.to.portId === 'in') w.to.portId = 'in0';
-                            if (w.to.portId === 'out') w.to.portId = 'out0';
-                            if (w.to.portId === 'a') w.to.portId = 'in0';
-                            if (w.to.portId === 'b') w.to.portId = 'in1';
-                        }
-                        
-                        if (w.midX === null || isNaN(w.midX)) delete w.midX;
-                        if (w.midY === null || isNaN(w.midY)) delete w.midY;
-                    });
-                };
-                
-                migrateWires(activeWires, this.nodes);
-                if (this.library) {
-                    Object.values(this.library).forEach(chip => {
-                        if (chip && chip.wires && chip.nodes) migrateWires(chip.wires, chip.nodes);
-                    });
-                }
-
-                this.wires = Array.isArray(activeWires) ? JSON.parse(JSON.stringify(activeWires)) : [];
-                this.updateWireVisuals();
-                this.seedQueue();
-                this.processQueue();
-            }
-        } catch (e) {
-            console.error("[AutoSave] Load failed:", e);
-        }
-    },
+    loadAutoSave() { return ProjectManager.loadAutoSave(); },
 
     /**
      */
-    _assembleChipInputs(chipDef, getDriveFn) {
-        // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - V8 Pipeline Crash Guards: Halt evaluation on unlinked custom definitions.
-        if (!chipDef || !chipDef.nodes) return {};
-        const ext = {};
-        const inNodes = chipDef.nodes.filter(n => n.type.startsWith('IN-')).sort((a, b) => (a.y - b.y) || (a.x - b.x));
-        let cIn = 0;
-        inNodes.forEach(p => {
-            const bits = parseInt(p.type.split('-')[1]) || 1;
-            if (bits === 1) {
-                ext[p.id] = getDriveFn(`in${cIn++}`);
-            } else {
-                const arr = new Array(bits).fill(0);
-                for (let i = 0; i < bits; i++) {
-                    // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Map from top (MSB) to bottom (LSB) to fix upside-down bus assignment.
-                    arr[bits - 1 - i] = getDriveFn(`in${cIn++}`); 
-                }
-                ext[p.id] = arr;
-            }
-        });
-        return ext;
-    },
+    _assembleChipInputs(chipDef, getDriveFn) { return Engine._assembleChipInputs(this, chipDef, getDriveFn); },
 
     /**
      */
-    _mapChipOutputs(chipDef, internalRes) {
-        // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - V8 Pipeline Crash Guards: Halt evaluation on unlinked custom definitions.
-        if (!chipDef || !chipDef.nodes) return {};
-        const mapped = {};
-        const outNodes = chipDef.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-')).sort((a, b) => (a.y - b.y) || (a.x - b.x));
-        let cOut = 0;
-        outNodes.forEach(p => {
-            const bits = parseInt(p.type.split('-')[1]) || 1;
-            const val = internalRes[p.id];
-            if (bits === 1) {
-                mapped[`out${cOut++}`] = val;
-            } else {
-                for (let i = 0; i < bits; i++) {
-                    // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Restored reversed indexing to correct top-to-bottom MSB mapping flaw.
-                    mapped[`out${cOut++}`] = Array.isArray(val) ? val[bits - 1 - i] : val;
-                }
-            }
-        });
-        return mapped;
-    },
+    _mapChipOutputs(chipDef, internalRes) { return Engine._mapChipOutputs(chipDef, internalRes); },
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for logical signal evaluation.
      */
-    calculateNextState(node) {
-        return Engine.calculateNextState(this, node);
-    },
+    calculateNextState(node) { return Engine.calculateNextState(this, node); },
     // =========================================================================
     // FILE: browser-sim/modular-sim/js/sim.js
     // DESC: processes the queue of nodes that need to be evaluated
@@ -590,399 +236,16 @@ const Sim = {
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for simulation tick.
      */
     processQueue() {
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - JIT Interceptor for Dual-Engine Parity. Wasm macro expansion requires sequential proxy indices ('in0'), while V8 requires strict strings ('a').
-        if (!this._wasmPortPatched && this.wasmBridge && this.wasmBridge.syncLayout) {
-            this._wasmPortPatched = true;
-            
-            const origSync = this.wasmBridge.syncLayout.bind(this.wasmBridge);
-            this.wasmBridge.syncLayout = () => {
-                const mapWire = w => {
-                    let nw = { ...w, from: { ...w.from }, to: { ...w.to } };
-                    if (nw.to.portId === 'a') nw.to.portId = 'in0';
-                    if (nw.to.portId === 'b') nw.to.portId = 'in1';
-                    if (nw.from.portId === 'q') nw.from.portId = 'out0';
-                    if (nw.from.portId === 'nq') nw.from.portId = 'out1';
-                    return nw;
-                };
-                
-                const origWires = this.wires;
-                this.wires = this.wires.map(mapWire);
-                
-                const origLib = this.library;
-                if (this.library) {
-                    this.library = {};
-                    for (const [k, v] of Object.entries(origLib)) {
-                        this.library[k] = { ...v, wires: v.wires.map(mapWire) };
-                    }
-                }
-                
-                origSync();
-                
-                this.wires = origWires;
-                this.library = origLib;
-            };
-
-            const origGetIdx = this.wasmBridge.getSpecificIdx.bind(this.wasmBridge);
-            this.wasmBridge.getSpecificIdx = (nid, pid) => {
-                if (pid === 'a') pid = 'in0';
-                else if (pid === 'b') pid = 'in1';
-                else if (pid === 'q') pid = 'out0';
-                else if (pid === 'nq') pid = 'out1';
-                return origGetIdx(nid, pid);
-            };
-
-            console.warn('[Simulator] Pseudo-native ports isolated. Engine parity stabilized.');
-            // Force Wasm recompilation with patched layout parity
-            if (this.wires && this.wires.length > 0) this.wasmBridge.syncLayout();
-        }
-
-        // [AUDIT: v1.23.72 | SEC_ARCH_LEAD] - Data corruption sanitization. Purge invalid array states from single-bit logic primitives to prevent strict equality (===) evaluation failures.
-        if (!this._stateSanitized) {
-            this.nodes.forEach(n => {
-                if (Array.isArray(n.state) && n.state.length === 1) n.state = n.state[0];
-            });
-            this._stateSanitized = true;
-        }
-
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Purged destructive '7-num' legacy migration hack. Architectural topological parity natively restored.
-
-        if (!this.eventQueue || this.eventQueue.size === 0) {
-            return;
-        }
-
-        // Wasm engine intercept
-        if (this.useWasm && window.WasmEngine && WasmEngine.ready) {
-            // [AUDIT: v1.25.20 | SEC_ARCH_LEAD] - Transitioned to centralized purity validation.
-            const isPureNative = this.isPureNative();
-            
-            // Sync HUD Engine Status
-            this.updateHUD();
-
-            // [wasm] if pure native, compile netlist and execute tick
-            if (isPureNative) {
-                let changed = false;
-                // if netlist is dirty, compile it
-                if (this._netlistDirty) {
-                    // compile netlist
-                    WasmEngine.syncLayout(this.nodes, this.wires);
-                    // mark netlist as not dirty
-                    this._netlistDirty = false;
-                }
-                // inject DOM Hardware States -> Wasm Memory
-                this.nodes.forEach(n => {
-                    // update input nodes state to Wasm Memory
-                    if (n.type.startsWith('IN-') || n.type === 'CLOCK') {
-                        if (JSON.stringify(n.val) !== JSON.stringify(n.state)) {
-                            n.val = Array.isArray(n.state) ? [...n.state] : n.state;
-                            this.updateNodeVisual(n);
-                            changed = true;
-                        }
-                        // push the state into wasm memory
-                        WasmEngine.writeState(n.id, n.state);
-                    }
-                });
-
-                // execute high frequency tick based on structural depth ceiling
-                const execDepth = Math.max(20, this.nodes.length);
-                
-                // [AUDIT: v1.24.52 | SEC_ARCH_LEAD] - V8 Fallback Hook: Evaluate pure-JS Clock dependencies outside Wasm.
-                this.nodes.filter(n => n.type === 'CLOCK').forEach(n => {
-                    this.calculateNextState(n);
-                    WasmEngine.writeState(n.id, n.state);
-                });
-                // [AUDIT: v1.24.92 | SEC_ARCH_LEAD] - Upgraded to Three-Phase Commit (Settle -> Latch Shadow -> Commit) mirroring Verilog non-blocking assignments.
-                for (let i = 0; i < execDepth; i++) {
-                    WasmEngine.executeTick(0);
-                }
-                WasmEngine.executeTick(1);
-                WasmEngine.executeTick(2);
-
-                // extract Wasm Memory -> DOM Hardware States
-                this.nodes.forEach(n => {
-                    // read from memory and update node state if changed
-                    const NATIVE_GATES = new Set(['NAND', 'CLOCK', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'TRISTATE']);
-                    if (NATIVE_GATES.has(n.type) && !n.isCustom) {
-                        let newVal = WasmEngine.readState(n.id);
-                        if (newVal === 2 && n.type === 'TRISTATE') newVal = 'Z';
-                        // [AUDIT: v1.24.90 | SEC_ARCH_LEAD] - Purged JSON.stringify overhead from Wasm scalar extraction.
-                        if (n.val !== newVal || n._forcePropagate) {
-                            n._forcePropagate = false;
-                            n.val = newVal;
-                            changed = true;
-                            this.updateNodeVisual(n);
-                        }
-                    } else if ((n.type === 'DFF' || n.type === 'TFF') && !n.isCustom) {
-                        const newVal = WasmEngine.readState(n.id);
-                        if (newVal && newVal.length >= 2) {
-                            // [AUDIT: v1.24.90 | SEC_ARCH_LEAD] - High-performance object comparison for Wasm sequential extraction.
-                            if (!n.val || n.val.q !== newVal[0] || n.val.nq !== newVal[1] || n._forcePropagate) {
-                                n._forcePropagate = false;
-                                n.val = { q: newVal[0], nq: newVal[1] };
-                                changed = true;
-                                this.updateNodeVisual(n);
-                            }
-                        }
-                    } else if (n.type === 'RAM' && !n.isCustom) {
-                        // [AUDIT: v1.25.07 | SEC_ARCH_LEAD] - Hardware memory extraction parity implemented for DOM node visual synchronization.
-                        const newVal = WasmEngine.readState(n.id);
-                        if (newVal && newVal.length === 8) {
-                            const outObj = {};
-                            let isDiff = !n.val || n._forcePropagate;
-                            for (let i = 0; i < 8; i++) {
-                                outObj[`out${i}`] = newVal[i];
-                                if (!isDiff && n.val[`out${i}`] !== newVal[i]) isDiff = true;
-                            }
-                            // [AUDIT: v1.25.09 | SEC_ARCH_LEAD] - Purged undefined fastEqual reference; implemented zero-dependency inline differential verification.
-                            if (isDiff) {
-                                n._forcePropagate = false;
-                                n.val = outObj;
-                                changed = true;
-                                this.updateNodeVisual(n);
-                            }
-                        }
-                    }
-                });
-
-                // resolve output terminals and extract custom chip bounds
-                this.nodes.forEach(n => {
-                    if (n.isCustom && this.library[n.type]) {
-                        if (!n.outputs) n.outputs = {};
-                        let chipChanged = false;
-                        let rawInnerState = {};
-                        this.library[n.type].nodes.forEach(inner => {
-                            if (inner.type.startsWith('OUT-') || inner.type.startsWith('PROBE-')) {
-                                const bits = parseInt(inner.type.split('-')[1]) || 1;
-                                let outVal;
-                                if (bits === 1) {
-                                    outVal = WasmEngine.readPinState(`${n.id}:${inner.id}`, 'in0');
-                                } else {
-                                    outVal = new Array(bits).fill(0);
-                                    for (let b = 0; b < bits; b++) {
-                                        outVal[b] = WasmEngine.readPinState(`${n.id}:${inner.id}`, `in${b}`);
-                                    }
-                                }
-                                rawInnerState[inner.id] = outVal;
-                            }
-                        });
-                        
-                        const mappedOuts = this._mapChipOutputs(this.library[n.type], rawInnerState);
-                        if (JSON.stringify(n.outputs) !== JSON.stringify(mappedOuts) || n._forcePropagate) {
-                            n.outputs = mappedOuts;
-                            n._forcePropagate = false;
-                            n.val = JSON.parse(JSON.stringify(n.outputs));
-                            this.updateNodeVisual(n);
-                            changed = true;
-                        }
-                    }
-
-                    // resolve output terminals
-                    if (n.type.startsWith('OUT-') || n.type.startsWith('PROBE-')) {
-                        const bits = parseInt(n.type.split('-')[1]) || 1;
-                        if (bits === 1) {
-                            const drive = WasmEngine.readPinState(n.id, 'in0');
-                            const val = (drive === 2 || drive === 'Z' || drive === null) ? 'Z' : ((drive === 1 || drive === true) ? 1 : 0);
-                            if (n.val !== val || n._forcePropagate) {
-                                n._forcePropagate = false;
-                                n.val = val;
-                                this.updateNodeVisual(n);
-                                changed = true;
-                            }
-                        } else {
-                            const nextState = new Array(bits).fill(0);
-                            for (let b = 0; b < bits; b++) {
-                                const drive = WasmEngine.readPinState(n.id, `in${b}`);
-                                nextState[b] = (drive === 2 || drive === 'Z' || drive === null) ? 'Z' : ((drive === 1 || drive === true) ? 1 : 0);
-                            }
-                            if (JSON.stringify(n.state) !== JSON.stringify(nextState) || n._forcePropagate) {
-                                n._forcePropagate = false;
-                                n.state = nextState;
-                                n.val = [...nextState];
-                                this.updateNodeVisual(n);
-                                changed = true;
-                            }
-                        }
-                    }
-                });
-                // update HUD if any node changed state
-                if (changed) {
-                    this.updateHUD();
-                }
-                WireRenderer.drawWires();
-                // clear the queue
-                this.eventQueue.clear();
-                return;
-            }
-        }
-        if (!this.timing) this.timing = { node: 'ideal', delay: 0 };
         Engine.processQueue(this);
-
-        // update HUD
-        this.updateHUD();
     },
 
-    // [wasm] parity check
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Telemetry taxonomy taxonomy correction for parity diagnostic module.
      */
-    async runWasmParityCheck(iterations = 1000) {
-        // check if WasmEngine is loaded
-        if (!window.WasmEngine || !WasmEngine.ready) {
-            return this.toast('Wasm Engine not linked.', 'danger');
-        }
-        // show toast notification
-        this.toast('Diagnostics Running. Press F12 to monitor console.', 'warning');
-        // Yield execution to allow the DOM to repaint the toast notification
-        await new Promise(resolve => requestAnimationFrame(resolve));
-        // Wait 50ms for the toast to render
-        await new Promise(resolve => setTimeout(resolve, 50));
-        // validate that the netlist is pure native
-        // [AUDIT: v1.25.20 | SEC_ARCH_LEAD] - Transitioned to centralized purity validation.
-        const isPureNative = this.isPureNative();
-        // if not pure native, return toast
-        if (!isPureNative) {
-            return this.toast('Parity check requires native logic components only.', 'warning');
-        }
-        // start console group
-        console.group(`[Diagnostics] Wasm vs V8 State Parity Sweep (${iterations} Cycles)`);
-        // compile netlist
-        WasmEngine.syncLayout(this.nodes, this.wires);
-        // get input terminals
-        const inputNodes = this.nodes.filter(n => n.type.startsWith('IN-'));
-        // get output terminals
-        const outputNodes = this.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-'));
-        // if no input or output terminals, return toast
-        if (inputNodes.length === 0 || outputNodes.length === 0) {
-            // end console group
-            console.groupEnd();
-            return this.toast('Diagnostics require at least 1 input and 1 output terminal.', 'warning');
-        }
-        // passed flag
-        let passed = true;
-        // snapshot of current state
-        const snapshot = JSON.stringify(this.nodes.map(n => ({ id: n.id, val: n.val, state: n.state })));
-        // for each iteration
-        for (let i = 0; i < iterations; i++) {
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Inject async yield to prevent main-thread starvation and browser watchdog thermal trips.
-            if (i % 25 === 0) await new Promise(resolve => setTimeout(resolve, 0));
-
-            // 1. Inject Randomized Entropy
-            inputNodes.forEach(n => {
-                // get number of bits from node type
-                const bits = parseInt(n.type.split('-')[1]) || 1;
-                // if single bit, set to random 0 or 1
-                if (bits === 1) {
-                    // set node state to random 0 or 1
-                    n.state = Math.random() > 0.5 ? 1 : 0;
-                    // set node value to state
-                    n.val = n.state;
-                } else {
-                    // if multi-bit, set to random array of 0s and 1s
-                    n.state = Array.from({ length: bits }, () => Math.random() > 0.5 ? 1 : 0);
-                    // set node value to state
-                    n.val = [...n.state];
-                }
-                // write state to Wasm memory
-                WasmEngine.writeState(n.id, n.state);
-            });
-
-            // 2. Execute Wasm Array for 20 cycles to propagate signals
-            for (let t = 0; t < 20; t++) {
-                WasmEngine.executeTick(0);
-            }
-            WasmEngine.executeTick(1);
-            WasmEngine.executeTick(2);
-
-            // 3. Execute V8 Object Graph for 20 cycles to propagate signals
-            for (let step = 0; step < 20; step++) {
-                // for each node
-                this.nodes.forEach(n => {
-                    // skip input nodes
-                    if (n.type.startsWith('IN-')) return;
-                    // calculate next state
-                    const next = this.calculateNextState(n);
-                    // update node state
-                    n.val = (typeof next === 'string' && next !== 'Z') ? JSON.parse(next) : next;
-                });
-            }
-
-            // 4. Assert State Parity
-            outputNodes.forEach(n => {
-                // get number of bits from node type
-                const bits = parseInt(n.type.split('-')[1]) || 1;
-                // read V8 state
-                let v8State;
-                // if single bit
-                if (bits === 1) {
-                    // if single bit, set to random 0 or 1
-                    v8State = this.getDrivingSignal(n.id, 'in0');
-                    // map High-Z floats to 2, otherwise 1/0
-                    v8State = (v8State === null || v8State === 'Z') ? 2 : ((v8State === 1 || v8State === true) ? 1 : 0);
-                } else {
-                    // if multi-bit, set to random array of 0s and 1s
-                    v8State = new Array(bits).fill(0);
-                    // for each bit
-                    for (let b = 0; b < bits; b++) {
-                        // get driving signal
-                        const drive = this.getDrivingSignal(n.id, `in${b}`);
-                        // set state mapping High-Z
-                        v8State[b] = (drive === null || drive === 'Z') ? 2 : ((drive === 1 || drive === true) ? 1 : 0);
-                    }
-                }
-
-                // Read Wasm state using the flattened graph tracer
-                let wState;
-                if (bits === 1) {
-                    wState = WasmEngine.readPinState(n.id, 'in0');
-                } else {
-                    wState = new Array(bits).fill(0);
-                    for (let b = 0; b < bits; b++) {
-                        wState[b] = WasmEngine.readPinState(n.id, `in${b}`);
-                    }
-                }
-
-                // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Zero-Copy Parity Validation: Purged JSON.stringify for direct array index checks.
-                let parityMatch = true;
-                if (bits === 1) {
-                    if (v8State !== wState) parityMatch = false;
-                } else {
-                    for (let b = 0; b < bits; b++) {
-                        if (v8State[b] !== wState[b]) { parityMatch = false; break; }
-                    }
-                }
-
-                if (!parityMatch) {
-                    // if not, log error and set passed to false
-                    console.error(`[FATAL] Parity Deviation at Cycle ${i} | Terminal: ${n.id} (${n.label}) | V8 Object: ${v8State} | Wasm Linear: ${wState}`);
-                    // set passed to false
-                    passed = false;
-                }
-            });
-            // if failed, break
-            if (!passed) break;
-        }
-
-        const saved = JSON.parse(snapshot);
-        this.nodes.forEach(n => {
-            const s = saved.find(x => x.id === n.id);
-            if (s) { n.val = s.val; n.state = s.state; }
-        });
-
-        if (passed) {
-            console.log('%c[Diagnostics] SUCCESS: 100% Cryptographic Parity Confirmed.', 'color: #00ffaa; font-weight: bold;');
-            alert("WASM Parity Validated. Check F12 Console.");
-        } else {
-            console.error('[Diagnostics] FAILED: Architecture divergence detected. Halting execution.');
-            alert("Parity Deviation Detected. Check F12 Console for exact byte offsets.");
-        }
-
-        console.groupEnd();
-        // show toast notification
-        this.toast(passed ? 'Parity Suite: PASSED' : 'Parity Suite: FAILED (Check Console)', passed ? 'success' : 'danger');
-        // update wire visuals
-        this.updateWireVisuals();
+    runWasmParityCheck(iterations = 1000) {
+        return Engine.runWasmParityCheck(this, iterations);
     },
 
-    // simulate internal circuit (sub-circuit simulation)
     /**
      */
     simulateInternalCircuit(chipTypeOrMeta, externalInputs) {
@@ -1297,15 +560,7 @@ const Sim = {
     /**
      */
     updateWireVisuals() {
-        this._netlistDirty = true; // Forces WASM engine to recognize the new layout
-        // [AUDIT: v1.23.93 | SEC_ARCH_LEAD] - JIT validation: Purge corrupted routing coordinates before SVG dispatch.
-        if (this.wires) {
-            this.wires.forEach(w => {
-                if (w.midX === null || isNaN(w.midX)) delete w.midX;
-                if (w.midY === null || isNaN(w.midY)) delete w.midY;
-            });
-        }
-        if (typeof WireRenderer !== 'undefined') WireRenderer.drawWires();
+        return UIOrchestrator.updateWireVisuals(this);
     },
 
     /**
@@ -1387,64 +642,15 @@ const Sim = {
         return Engine.getSignal(this, nodeId, portId);
     },
 
-    /**
-     * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for driving signal resolution.
-     */
     getDrivingSignal(nodeId, portId, visited = new Set()) {
-        if (visited.has(netKey)) return null;
-        visited.add(netKey);
-
-        // Bi-directional topological net traversal
-        let connectedWires = this.wires.filter(w => 
-            (w.to.nodeId === nodeId && w.to.portId === portId) || 
-            (w.from.nodeId === nodeId && w.from.portId === portId)
-        );
-
-        if (connectedWires.length === 0) return null;
-
-        // [AUDIT: v1.24.80 | SEC_ARCH_LEAD] - Implemented V8 TTL bus resolution (1 > 0 > Z) to enforce engine parity with Wasm OP_BUS_RESOLVE.
-        let resolved = null;
-
-        for (const w of connectedWires) {
-            const peerNodeId = (w.to.nodeId === nodeId && w.to.portId === portId) ? w.from.nodeId : w.to.nodeId;
-            const peerPortId = (w.to.nodeId === nodeId && w.to.portId === portId) ? w.from.portId : w.to.portId;
-
-            const peerNode = this.nodes.find(n => n.id === peerNodeId);
-            if (!peerNode) continue;
-
-            let isPeerOutput = false;
-            if (peerNode.type.startsWith('IN-') || peerNode.type === 'CLOCK') isPeerOutput = true;
-            if (peerNode.isCustom && peerPortId.startsWith('out')) isPeerOutput = true;
-            // [AUDIT: v1.25.22 | SEC_ARCH_LEAD] - Injected '0' primitive into driver resolution whitelist for V8 evaluation parity.
-            // [AUDIT: v1.25.34 | SEC_ARCH_LEAD] - Excised ROM from driver resolution.
-            const NATIVE_GATES = new Set(['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'RAM']);
-            if (NATIVE_GATES.has(peerNode.type) && (peerPortId === 'out' || peerPortId === 'q' || peerPortId === 'nq' || (peerNode.type === 'RAM' && peerPortId.startsWith('out')))) isPeerOutput = true;
-
-            let sig = null;
-            if (peerNode.type === 'JUNCTION' || !isPeerOutput) {
-                // Keep tracing laterally across the net
-                sig = this.getDrivingSignal(peerNodeId, peerPortId, visited);
-            } else {
-                // Terminate trace at valid logical driver
-                sig = this.getSignal(peerNodeId, peerPortId);
-            }
-
-            if (sig === 1 || sig === true) return 1; // High signal dominates the bus, short-circuit trace.
-            if (sig === 0 || sig === false) resolved = 0; // Low signal overrides High-Z, but trace continues to check for High.
-        }
-        
-        return resolved;
+        return Engine.getDrivingSignal(this, nodeId, portId, visited);
     },
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for full simulation reset.
      */
     seedQueue() { 
-        this._transitions.clear(); 
-        this.nodes.forEach(n => { n._oscillating = false; n._forcePropagate = true; }); 
-        this.eventQueue = new Set(this.nodes); 
-        // [AUDIT: v1.24.91 | SEC_ARCH_LEAD] - Force wake lock on scheduler to prevent stalled evaluation of newly instantiated clock sources.
-        if (this.wakeQueue) this.wakeQueue();
+        return Engine.seedQueue(this);
     },
     /**
      */
@@ -1596,149 +802,7 @@ const Sim = {
     /**
      */
     updateLibraryUI() {
-        // 1. Ensure Context Menu DOM Element Exists
-        let menu = document.getElementById('context-menu');
-        if (!menu) {
-            menu = document.createElement('div');
-            menu.id = 'context-menu';
-            menu.style.cssText = 'position:fixed; background:#1a1a23; border:1px solid #334; box-shadow:0 10px 25px rgba(0,0,0,0.6); border-radius:6px; padding:5px 0; z-index:10000; display:none; min-width:140px;';
-            document.body.appendChild(menu);
-
-            document.addEventListener('click', (e) => {
-                if (e.button !== 2 && menu) menu.style.display = 'none';
-            });
-        }
-
-        // 2. Target exact container to prevent overwriting footer label
-        const lib = document.getElementById('chip-lib');
-        if (!lib) return;
-
-        // [AUDIT: v1.25.48 | SEC_ARCH_LEAD] - Capture hierarchical folder collapse state prior to UI flush to preserve workspace layout.
-        const collapsedFolders = new Set();
-        lib.querySelectorAll('.lib-folder.collapsed .folder-title').forEach(el => collapsedFolders.add(el.innerText.replace('📁 ', '').trim()));
-
-        // 3. Inject Chips (Native first, then Custom Library)
-        lib.innerHTML = '';
-
-        const nativeLib = [
-            { label: 'NAND', type: 'NAND' },
-            { label: 'TRISTATE', type: 'TRISTATE' },
-            { label: 'INPUT', type: 'INPUT' },
-            { label: 'OUTPUT', type: 'OUTPUT' },
-            { label: 'CLOCK', type: 'CLOCK' },
-            // [AUDIT: v1.24.90 | SEC_ARCH_LEAD] - Transitioned base memory primitive in UI to RAM.
-            { label: 'RAM', type: 'RAM' },
-            // [AUDIT: v1.25.22 | SEC_ARCH_LEAD] - Exposed Ground (0) primitive to context menu.
-            { label: '0', type: '0' }
-        ];
-
-        // [AUDIT: v1.25.27 | SEC_ARCH_LEAD] - Encapsulated native primitives inside a collapsible hierarchical directory.
-        // [AUDIT: v1.25.29 | SEC_ARCH_LEAD] - Reverted nomenclature to 'primitives' to resolve previous user-initiated misspelling.
-        const primFolder = document.createElement('div');
-        // [AUDIT: v1.25.48 | SEC_ARCH_LEAD] - Restore native primitive folder collapse state.
-        primFolder.className = 'lib-folder' + (collapsedFolders.has('primitives') ? ' collapsed' : '');
-        primFolder.innerHTML = `<span class="folder-title" onclick="this.parentElement.classList.toggle('collapsed')">📁 primitives</span><div class="folder-contents"></div>`;
-        lib.appendChild(primFolder);
-        const primContainer = primFolder.querySelector('.folder-contents');
-
-        nativeLib.forEach(it => {
-            const span = document.createElement('span');
-            span.className = 'status-chip native';
-            span.innerText = it.label;
-            span.onclick = (e) => {
-                if (it.type === 'INPUT' || it.type === 'OUTPUT') {
-                    e.stopPropagation();
-                    const prefix = it.type === 'INPUT' ? 'IN' : 'OUT';
-
-                    menu.style.display = 'block';
-                    menu.style.left = e.clientX + 'px';
-                    menu.style.top = (e.clientY - 120) + 'px'; // Show above the footer
-
-                    menu.innerHTML = `
-                        <div class="menu-item" onclick="Sim.addNode('${prefix}-1'); document.getElementById('context-menu').style.display='none';">1-Bit Port</div>
-                        <div class="menu-item" onclick="Sim.addNode('${prefix}-4'); document.getElementById('context-menu').style.display='none';">4-Bit Port</div>
-                        <div class="menu-item" onclick="Sim.addNode('${prefix}-8'); document.getElementById('context-menu').style.display='none';">8-Bit Port</div>
-                    `;
-                } else {
-                    this.addNode(it.type);
-                }
-            };
-            primContainer.appendChild(span);
-        });
-
-        // 4. Inject Custom Library Chips (Hierarchical VFS Rendering)
-        const groups = { '': [] };
-        Object.keys(this.library).forEach(name => {
-            const folder = this.library[name].folder || '';
-            if (!groups[folder]) groups[folder] = [];
-            groups[folder].push(name);
-        });
-
-        // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Dynamic collapsible folder instantiation for macro library.
-        Object.keys(groups).sort().forEach(folder => {
-            let container = lib;
-            if (folder !== '') {
-                const fDiv = document.createElement('div');
-                // [AUDIT: v1.25.48 | SEC_ARCH_LEAD] - Restore custom macro folder collapse state.
-                fDiv.className = 'lib-folder' + (collapsedFolders.has(folder) ? ' collapsed' : '');
-                fDiv.innerHTML = `<span class="folder-title" onclick="this.parentElement.classList.toggle('collapsed')">📁 ${folder}</span><div class="folder-contents"></div>`;
-                lib.appendChild(fDiv);
-                container = fDiv.querySelector('.folder-contents');
-            }
-
-            groups[folder].sort().forEach(name => {
-                const span = document.createElement('span');
-                span.className = 'status-chip custom';
-                span.innerText = name;
-
-                if (name === this.activeEditingChip) {
-                    span.style.opacity = '0.3';
-                    span.title = 'Cannot place a chip inside itself';
-                    span.onclick = () => this.toast('Cannot place a chip inside itself', 'warning');
-                    span.ondblclick = () => this.toast('Already editing this chip', 'warning');
-                } else {
-                    span.onclick = () => this.addNode(name);
-                    span.ondblclick = () => { if (typeof this.uiEditChip === 'function') this.uiEditChip(name); };
-                }
-
-                span.oncontextmenu = (e) => {
-                    e.preventDefault();
-                    menu.style.display = 'block';
-
-                    menu.style.left = e.clientX + 'px';
-                    menu.style.top = e.clientY + 'px';
-
-                    // [AUDIT: v1.25.23 | SEC_ARCH_LEAD] - Injected hierarchical folder context sub-menu for rapid macro sorting via inline DOM mutation.
-                    const existingFolders = Object.keys(groups).filter(f => f !== '').map(f => 
-                        `<div class="menu-item" onclick="Sim.library['${name}'].folder='${f}'; Sim.updateLibraryUI(); Sim.autoSave(); document.getElementById('context-menu').style.display='none';">📁 ${f}</div>`
-                    ).join('');
-                    
-                    const moveMenu = `
-                        <div class="menu-item has-sub keep-open" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color='#4a9eff'" onmouseout="this.style.color='#aaa'">
-                            Move
-                            <div class="sub-menu">
-                                ${existingFolders}
-                                <div class="menu-item" style="color:#00ffaa;" onclick="event.stopPropagation(); this.innerHTML='<input type=&quot;text&quot; placeholder=&quot;New Folder...&quot; style=&quot;width:100%;box-sizing:border-box;background:#111;color:#fff;border:1px solid #00ffaa;font-size:10px;padding:4px;outline:none;&quot; onclick=&quot;event.stopPropagation()&quot; onkeydown=&quot;if(event.key===\\'Enter\\'){ Sim.library[\\'${name}\\'].folder=this.value.trim(); Sim.updateLibraryUI(); Sim.autoSave(); document.getElementById(\\'context-menu\\').style.display=\\'none\\'; } else if(event.key===\\'Escape\\'){ document.getElementById(\\'context-menu\\').style.display=\\'none\\'; }&quot; onblur=&quot;if(this.value.trim()!==\\'\\'){ Sim.library[\\'${name}\\'].folder=this.value.trim(); Sim.updateLibraryUI(); Sim.autoSave(); } document.getElementById(\\'context-menu\\').style.display=\\'none\\';&quot;>'; this.querySelector('input').focus();">↳ New Folder...</div>
-                                <div class="menu-item" style="color:#ff4757; border-top:1px solid #334; margin-top:4px; padding-top:4px;" onclick="Sim.library['${name}'].folder=''; Sim.updateLibraryUI(); Sim.autoSave(); document.getElementById('context-menu').style.display='none';">✖ Root</div>
-                            </div>
-                        </div>
-                    `;
-
-                    // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Deprecated direct mutable access to Sim.library keys; enforced strict API layer for topology changes.
-                    menu.innerHTML = '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.uiEditChip(\'' + name + '\')">Edit Internals</div>' +
-                        '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#aaa; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#4a9eff\'" onmouseout="this.style.color=\'#aaa\'" onclick="Sim.modal(\'Rename Chip\',\'New name:\',\'prompt\',nn=>{if(nn){Sim.renameMacroGlobally(\'' + name + '\', nn);}},\'' + name + '\')">Rename</div>' +
-                        moveMenu +
-                        '<div class="menu-item" style="padding:8px 15px; font-size:11px; color:#ff4757; cursor:pointer; font-weight:600; text-transform:uppercase;" onmouseover="this.style.color=\'#ff6b81\'" onmouseout="this.style.color=\'#ff4757\'" onclick="if(Sim.activeEditingChip===\'' + name + '\') Sim.uiExitChipEdit(); Sim.uiDeleteChip(\'' + name + '\')">Delete</div>';
-                        
-                    // [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Smart boundary collision detection for library items.
-                    menu.classList.remove('open-left', 'open-up');
-                    const rect = menu.getBoundingClientRect();
-                    if (rect.right > window.innerWidth) { menu.style.left = (window.innerWidth - rect.width - 5) + 'px'; menu.classList.add('open-left'); }
-                    if (rect.bottom > window.innerHeight) { menu.style.top = (window.innerHeight - rect.height - 5) + 'px'; menu.classList.add('open-up'); }
-                };
-                container.appendChild(span);
-            });
-        });
+        return UIOrchestrator.updateLibraryUI(this);
     },
 
     /**
@@ -1862,116 +926,14 @@ const Sim = {
     /**
      */
     modal(title, content, type, callback, val) {
-        const overlay = document.getElementById('ui-overlay');
-        const mTitle = document.getElementById('ui-title');
-        const mMsg = document.getElementById('ui-msg');
-        const mInputCont = document.getElementById('ui-input-container');
-        const mInput = document.getElementById('ui-input-el');
-        const mButtons = document.getElementById('ui-buttons');
-
-        mTitle.innerText = title;
-        mMsg.innerHTML = content;
-        mInputCont.style.display = type === 'prompt' ? 'block' : 'none';
-        if (type === 'prompt') mInput.value = val || '';
-
-        mButtons.innerHTML = '';
-        const btnCancel = document.createElement('button');
-        btnCancel.className = 'ui-btn secondary';
-        btnCancel.innerText = 'Cancel';
-        btnCancel.onclick = () => { overlay.style.display = 'none'; overlay.querySelector('.ui-modal').classList.remove('show'); if (callback) callback(null); };
-
-        const btnOk = document.createElement('button');
-        btnOk.className = 'ui-btn ' + (type === 'danger' ? 'danger' : 'primary');
-        btnOk.innerText = (type === 'danger' || title.toLowerCase().includes('delete')) ? 'Confirm' : 'OK';
-        btnOk.onclick = () => { overlay.style.display = 'none'; overlay.querySelector('.ui-modal').classList.remove('show'); if (callback) callback(type === 'prompt' ? mInput.value : true); };
-
-        mInput.onkeydown = (e) => { if (e.key === 'Enter') btnOk.click(); };
-
-        if (type !== 'alert' && type !== 'custom') mButtons.appendChild(btnCancel);
-        if (type !== 'custom') mButtons.appendChild(btnOk);
-
-        overlay.style.display = 'flex';
-        setTimeout(() => overlay.querySelector('.ui-modal').classList.add('show'), 10);
-        if (type === 'prompt') { mInput.focus(); mInput.select(); }
+        return UIOrchestrator.modal(this, title, content, type, callback, val);
     },
 
     /**
      * [AUDIT: v1.23.92 | SEC_ARCH_LEAD] - Overhauled toast engine with global positioning persistence and interaction capture.
      */
     toast(msg, type = 'info', duration = 3000) {
-        if (!this.showToasts) {
-            return;
-        }
-        if (type === 'debug' && !this.debugToasts) {
-            return;
-        }
-
-        let el = document.getElementById('ui-toast-el');
-        if (!el) {
-            el = document.createElement('div');
-            el.id = 'ui-toast-el'; el.className = 'ui-toast';
-            document.body.appendChild(el);
-
-            let holdTimer;
-            let isDragging = false;
-            let offsetX, offsetY;
-
-            el.addEventListener('mousedown', (e) => {
-                if (e.target.tagName === 'SPAN') return; // Bypass button clicks
-                holdTimer = setTimeout(() => {
-                    isDragging = true;
-                    el.classList.add('draggable');
-                    el.classList.add('dragging');
-                    const rect = el.getBoundingClientRect();
-                    offsetX = e.clientX - rect.left;
-                    offsetY = e.clientY - rect.top;
-                }, 1000);
-            });
-
-            window.addEventListener('mousemove', (e) => {
-                if (!isDragging) return;
-                el.style.left = (e.clientX - offsetX) + 'px';
-                el.style.top = (e.clientY - offsetY) + 'px';
-                el.style.bottom = 'auto';
-                el.style.transform = 'none';
-            });
-
-            window.addEventListener('mouseup', (e) => {
-                clearTimeout(holdTimer);
-                if (isDragging) {
-                    isDragging = false;
-                    el.classList.remove('draggable');
-                    el.classList.remove('dragging');
-                    const rect = el.getBoundingClientRect();
-                    Sim.toastPos = { left: rect.left, top: rect.top };
-                    Sim.autoSave(); 
-                }
-            });
-            
-            el.addEventListener('mouseleave', () => {
-                if (!isDragging) clearTimeout(holdTimer);
-            });
-        }
-        
-        el.innerHTML = msg; // innerHTML allows nested action buttons
-        el.className = `ui-toast show toast-${type}`;
-        
-        if (this.toastPos) {
-            el.style.left = this.toastPos.left + 'px';
-            el.style.top = this.toastPos.top + 'px';
-            el.style.bottom = 'auto';
-            el.style.transform = 'none';
-        } else {
-            el.style.left = '50%';
-            el.style.bottom = '80px';
-            el.style.top = 'auto';
-            el.style.transform = 'translateX(-50%)';
-        }
-
-        clearTimeout(this._toastTimer);
-        if (duration > 0) {
-            this._toastTimer = setTimeout(() => el.classList.remove('show'), duration);
-        }
+        return UIOrchestrator.toast(this, msg, type, duration);
     },
 
     /**
@@ -2035,17 +997,7 @@ const Sim = {
      * [AUDIT: v1.23.99 | SEC_ARCH_LEAD] - Multi-tab context switching logic.
      */
     updateTabsUI() {
-        const tb = document.getElementById('tab-bar');
-        if (!tb) return;
-        let html = '';
-        this.tabs.forEach((t, i) => {
-            html += `<div class="tab ${t.id === this.activeTabId ? 'active' : ''}" onclick="Sim.uiSwitchTab('${t.id}')">
-                ${t.name}
-                ${this.tabs.length > 1 ? `<span class="tab-close" onclick="event.stopPropagation(); Sim.uiCloseTab('${t.id}')">✖</span>` : ''}
-            </div>`;
-        });
-        html += `<div class="tab-btn" onclick="Sim.uiNewTab()">+</div>`;
-        tb.innerHTML = html;
+        return UIOrchestrator.updateTabsUI(this);
     },
 
     uiNewTab() {

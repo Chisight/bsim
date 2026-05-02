@@ -257,17 +257,14 @@ const InteractionHandler = {
                         const MAX_BYTES = Math.pow(2, aBits);
                         if (fileInput && fileInput.files.length > 0) {
                             Sim.toast('Reading local memory file...', 'info');
-// [AUDIT: v1.25.15 | SEC_ARCH_LEAD] - Pad memory payload to hardware boundary to prevent out-of-bounds evaluation faults.
                             const file = fileInput.files[0];
                             const buffer = await file.arrayBuffer();
                             const safeView = new Uint8Array(MAX_BYTES);
                             safeView.set(new Uint8Array(buffer).subarray(0, MAX_BYTES));
                             node.memoryData = Array.from(safeView);
                             node.dataUrl = file.name;
-                            // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Mark netlist dirty to force Wasm heap synchronization on next tick.
                             Sim._netlistDirty = true;
                             
-                            // [AUDIT: v1.25.06 | SEC_ARCH_LEAD] - Injected hardware-level diagnostic telemetry for local RAM/ROM payload ingestion.
                             const logMsg = `[MEM_CTRL] Local Flash: ${node.type} [${node.id}] <- ${file.name} (${safeView.byteLength} bytes)`;
                             if (window.DebugTerminal && typeof window.DebugTerminal.log === 'function') window.DebugTerminal.log(logMsg, 'sys');
                             console.info(logMsg);
@@ -277,18 +274,14 @@ const InteractionHandler = {
                         } else if (url) {
                             node.dataUrl = url;
                             Sim.toast('Fetching memory data via network...', 'info');
-                            // [AUDIT: v1.25.08 | SEC_ARCH_LEAD] - Implemented HTTP Range requests to preserve network bandwidth and prevent heap overflow.
-// [AUDIT: v1.25.15 | SEC_ARCH_LEAD] - Pad remote memory payload to hardware boundary to prevent out-of-bounds evaluation faults.
                             const res = await fetch(url, { headers: { 'Range': `bytes=0-${MAX_BYTES - 1}` } });
                             if (!res.ok && res.status !== 206) throw new Error('HTTP ' + res.status);
                             const buffer = await res.arrayBuffer();
                             const safeView = new Uint8Array(MAX_BYTES);
                             safeView.set(new Uint8Array(buffer).subarray(0, MAX_BYTES));
                             node.memoryData = Array.from(safeView);
-                            // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Mark netlist dirty to force Wasm heap synchronization on next tick.
                             Sim._netlistDirty = true;
                             
-                            // [AUDIT: v1.25.06 | SEC_ARCH_LEAD] - Injected hardware-level diagnostic telemetry for remote RAM/ROM payload ingestion.
                             const logMsg = `[MEM_CTRL] Remote Flash: ${node.type} [${node.id}] <- ${url} (${safeView.byteLength} bytes)`;
                             if (window.DebugTerminal && typeof window.DebugTerminal.log === 'function') window.DebugTerminal.log(logMsg, 'sys');
                             console.info(logMsg);
@@ -314,7 +307,6 @@ const InteractionHandler = {
             mButtons.appendChild(btnOk);
             
         } else if (node.type !== 'JUNCTION') {
-            // [AUDIT: v1.24.24 | SEC_ARCH_LEAD] - Replaced modal prompt with inline DOM input injection for component relabeling.
             const lbl = div.querySelector('.gate-label');
             if (!lbl || lbl.querySelector('input')) return;
 
@@ -354,6 +346,44 @@ const InteractionHandler = {
             input.focus();
             input.select();
         }
+    },
+
+    /**
+     */
+    copySelection() {
+        if (Sim.selection.size === 0) return;
+        const nodesToCopy = Sim.nodes.filter(n => Sim.selection.has(n.id));
+        const wiresToCopy = Sim.wires.filter(w => Sim.selection.has(w.from.nodeId) && Sim.selection.has(w.to.nodeId));
+        Sim._clipboard = { nodes: JSON.parse(JSON.stringify(nodesToCopy)), wires: JSON.parse(JSON.stringify(wiresToCopy)) };
+    },
+
+    /**
+     */
+    pasteSelection() {
+        if (!Sim._clipboard || !Sim._clipboard.nodes) return;
+        const idMap = {};
+        const newNodes = Sim._clipboard.nodes.map(n => {
+            const newId = 'node-' + Math.random().toString(36).substr(2, 9);
+            idMap[n.id] = newId;
+            n.x += 20; n.y += 20; // Cascade Logic
+            const cloned = JSON.parse(JSON.stringify(n));
+            cloned.id = newId; return cloned;
+        });
+        // [AUDIT: v1.24.77 | SEC_ARCH_LEAD] - Hardened PasteCommand wire instantiation to preserve user-defined midpoints and orthogonality properties.
+        const newWires = Sim._clipboard.wires.map(w => {
+            const nw = {
+                from: { nodeId: idMap[w.from.nodeId], portId: w.from.portId },
+                to: { nodeId: idMap[w.to.nodeId], portId: w.to.portId },
+                orthoDir: w.orthoDir
+            };
+            if (w.midX !== undefined) nw.midX = w.midX + 20;
+            if (w.midY !== undefined) nw.midY = w.midY + 20;
+            return nw;
+        });
+        History.execute(new PasteCommand(newNodes, newWires));
+        Sim.selection.forEach(id => document.getElementById(id)?.classList.remove('selected'));
+        Sim.selection.clear();
+        newNodes.forEach(n => { Sim.selection.add(n.id); document.getElementById(n.id)?.classList.add('selected'); });
     },
 
     /**

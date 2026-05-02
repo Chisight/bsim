@@ -206,6 +206,211 @@ const ProjectManager = {
     },
 
     /**
+     * [AUDIT: v1.24.09 | SEC_ARCH_LEAD] - Centralized state sanitization methods to prevent reference crashes.
+     */
+    _cleanNode(n) {
+        if (!n || !n.id) return null;
+        try {
+            return JSON.parse(JSON.stringify({
+                id: n.id, type: n.type, x: n.x, y: n.y, label: n.label,
+                val: n.val, state: n.state, outputs: n.outputs, isCustom: n.isCustom,
+                freq: n.freq, interval: n.interval, lastTick: n.lastTick, 
+                meta: n.meta ? { folder: n.meta.folder } : undefined,
+                customWidth: n.customWidth, customHeight: n.customHeight, flipPolarity: n.flipPolarity,
+                memoryData: n.memoryData ? Array.from(n.memoryData) : undefined,
+                addressPins: n.addressPins,
+                dataUrl: n.dataUrl,
+                portLabels: n.portLabels ? JSON.parse(JSON.stringify(n.portLabels)) : undefined,
+                portPositions: n.portPositions ? JSON.parse(JSON.stringify(n.portPositions)) : undefined,
+                pinX: n.pinX, pinY: n.pinY, pinW: n.pinW, pinH: n.pinH,
+                infoX: n.infoX, infoY: n.infoY, infoW: n.infoW, infoH: n.infoH,
+                labelX: n.labelX, labelY: n.labelY, labelW: n.labelW, labelH: n.labelH,
+                portY: n.portY, portH: n.portH, portLabelX: n.portLabelX,
+                _lastX: n._lastX, _lastY: n._lastY
+            }));
+        } catch (e) { console.error("Data sanitization fault on node:", e); return null; }
+    },
+
+    _cleanWire(w) {
+        if (!w || !w.from || !w.to) return null;
+        try {
+            return JSON.parse(JSON.stringify({
+                from: { nodeId: w.from.nodeId, portId: w.from.portId },
+                to: { nodeId: w.to.nodeId, portId: w.to.portId },
+                midX: w.midX, midY: w.midY, orthoDir: w.orthoDir
+            }));
+        } catch (e) { console.error("Data sanitization fault on wire:", e); return null; }
+    },
+
+    /**
+     * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Align persistence telemetry with MRAP taxonomy.
+     */
+    autoSave() {
+        if (Sim._autoSaveTimer) clearTimeout(Sim._autoSaveTimer);
+        Sim._autoSaveTimer = setTimeout(() => {
+            try {
+                const cNodes = Sim.nodes.map(n => this._cleanNode(n)).filter(n => n !== null);
+                const cWires = Sim.wires.map(w => this._cleanWire(w)).filter(w => w !== null);
+                
+                if (Sim.useWasm && window.WasmEngine && WasmEngine.ready) {
+                    WasmEngine.syncMemoryToHost(Sim.nodes);
+                }
+
+                const wsStack = (Sim.workspaceStack || []).map(ws => ({ 
+                    nodes: (ws.nodes || []).map(n => this._cleanNode(n)).filter(n => n !== null), 
+                    wires: (ws.wires || []).map(w => this._cleanWire(w)).filter(w => w !== null) 
+                }));
+                
+                if (Sim.activeEditingChip && wsStack.length > 0) {
+                    Sim.library[Sim.activeEditingChip] = { folder: Sim.library[Sim.activeEditingChip]?.folder || '', nodes: cNodes, wires: cWires };
+                }
+                
+                const safeLib = {};
+                Object.keys(Sim.library).forEach(k => {
+                    if (Sim.library[k]) {
+                        safeLib[k] = {
+                            nodes: (Sim.library[k].nodes || []).map(n => this._cleanNode(n)).filter(n => n !== null),
+                            wires: (Sim.library[k].wires || []).map(w => this._cleanWire(w)).filter(w => w !== null),
+                            folder: Sim.library[k].folder || ''
+                        };
+                    }
+                });
+
+                const activeTab = Sim.tabs.find(t => t.id === Sim.activeTabId);
+                if (activeTab && Sim.workspaceStack.length === 0) {
+                    activeTab.nodes = cNodes;
+                    activeTab.wires = cWires;
+                    if (window.History) {
+                        activeTab.historyStack = History.stack;
+                        activeTab.historyIndex = History.index;
+                    }
+                }
+
+                const safeTabs = Sim.tabs.map(t => ({
+                    id: t.id, name: t.name,
+                    nodes: (t.id === Sim.activeTabId && Sim.workspaceStack.length === 0) ? cNodes : (t.nodes || []).map(n => this._cleanNode(n)).filter(n => n !== null),
+                    wires: (t.id === Sim.activeTabId && Sim.workspaceStack.length === 0) ? cWires : (t.wires || []).map(w => this._cleanWire(w)).filter(w => w !== null),
+                    historyStack: t.historyStack || [], historyIndex: t.historyIndex !== undefined ? t.historyIndex : -1,
+                    activeSplitChip: t.id === Sim.activeTabId ? Sim.activeSplitChip : t.activeSplitChip,
+                    splitDirection: t.id === Sim.activeTabId ? (document.getElementById('main')?.classList.contains('split-left') ? 'left' : (document.getElementById('main')?.classList.contains('split-right') ? 'right' : (Sim.activeSplitChip ? 'popup' : null))) : t.splitDirection
+                }));
+
+                const project = { 
+                    nodes: wsStack.length > 0 ? wsStack[0].nodes : cNodes, 
+                    wires: wsStack.length > 0 ? wsStack[0].wires : cWires, 
+                    library: safeLib, directories: Sim.directories || [], workspaceStack: wsStack, activeEditingChip: Sim.activeEditingChip,
+                    tabs: safeTabs, activeTabId: Sim.activeTabId,
+                    prefs: { snapNodes: Sim.snapNodes, snapWires: Sim.snapWires, confirmDelete: Sim.confirmDelete, showStats: Sim.showStats, showTooltips: Sim.showTooltips, tutorialMode: Sim.tutorialMode, hudPos: Sim.hudPos, toastPos: Sim.toastPos, disableAnimations: Sim.disableAnimations, portSize: Sim.portSize, dotSize: Sim.dotSize, uiScale: Sim.uiScale, polarity: Sim.polarity || {} } 
+                };
+                localStorage.setItem('bsim_autosave', JSON.stringify(project));
+            } catch (e) {
+                console.error("[AutoSave] Serialization Failure:", e);
+            }
+        }, 500);
+    },
+
+    loadAutoSave() {
+        try {
+            const raw = localStorage.getItem('bsim_autosave');
+            if (raw) {
+                let parsed = JSON.parse(raw);
+                parsed = this._normalizeData(parsed);
+                Sim.library = parsed.library || {};
+                if (parsed.prefs) Object.assign(Sim, parsed.prefs);
+                
+                Sim.workspaceStack = parsed.workspaceStack || [];
+                Sim.activeEditingChip = parsed.activeEditingChip || null;
+                Sim.directories = parsed.directories || [];
+                
+                if (parsed.tabs && parsed.tabs.length > 0) {
+                    Sim.tabs = parsed.tabs;
+                    Sim.activeTabId = parsed.activeTabId || Sim.tabs[0].id;
+                } else {
+                    Sim.tabs = [{ id: 'tab-1', name: 'Main', nodes: parsed.nodes || [], wires: [], historyStack: [], historyIndex: -1 }];
+                    Sim.activeTabId = 'tab-1';
+                }
+                
+                let activeNodes = parsed.nodes;
+                let activeWires = parsed.wires;
+                
+                if (Sim.workspaceStack.length === 0) {
+                    const t = Sim.tabs.find(x => x.id === Sim.activeTabId);
+                    if (t) {
+                        activeNodes = t.nodes; activeWires = t.wires;
+                        if (window.History) {
+                            History.stack = t.historyStack ? [...t.historyStack] : [];
+                            History.index = t.historyIndex !== undefined ? t.historyIndex : -1;
+                        }
+                        if (t.activeSplitChip) {
+                            setTimeout(() => {
+                                Sim.uiSplitEditor(t.splitDirection || 'right', t.activeSplitChip, true);
+                            }, 100);
+                        }
+                    }
+                }
+                
+                if (Sim.activeEditingChip && Sim.library[Sim.activeEditingChip]) {
+                    activeNodes = Sim.library[Sim.activeEditingChip].nodes;
+                    activeWires = Sim.library[Sim.activeEditingChip].wires;
+                    const exitBtn = document.getElementById('btn-exit-chip');
+                    if (exitBtn) exitBtn.style.display = 'inline';
+                } else if (Sim.activeEditingChip) {
+                    Sim.activeEditingChip = null;
+                    Sim.workspaceStack = [];
+                }
+
+                if (Array.isArray(activeNodes)) {
+                    activeNodes.forEach(n => { 
+                        const c = this._cleanNode(n);
+                        if (c) {
+                            Sim.nodes.push(c); 
+                            if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(c); 
+                        }
+                    });
+                }
+                
+                const migrateWires = (wires, ctxNodes) => {
+                    if (!Array.isArray(wires)) return;
+                    wires.forEach(w => {
+                        const fromNode = ctxNodes.find(n => n.id === w.from.nodeId);
+                        const toNode = ctxNodes.find(n => n.id === w.to.nodeId);
+                        
+                        if (fromNode && fromNode.isCustom) {
+                            if (w.from.portId === 'in') w.from.portId = 'in0';
+                            if (w.from.portId === 'out') w.from.portId = 'out0';
+                            if (w.from.portId === 'a') w.from.portId = 'in0';
+                            if (w.from.portId === 'b') w.from.portId = 'in1';
+                        }
+                        if (toNode && toNode.isCustom) {
+                            if (w.to.portId === 'in') w.to.portId = 'in0';
+                            if (w.to.portId === 'out') w.to.portId = 'out0';
+                            if (w.to.portId === 'a') w.to.portId = 'in0';
+                            if (w.to.portId === 'b') w.to.portId = 'in1';
+                        }
+                        
+                        if (w.midX === null || isNaN(w.midX)) delete w.midX;
+                        if (w.midY === null || isNaN(w.midY)) delete w.midY;
+                    });
+                };
+                
+                migrateWires(activeWires, Sim.nodes);
+                if (Sim.library) {
+                    Object.values(Sim.library).forEach(chip => {
+                        if (chip && chip.wires && chip.nodes) migrateWires(chip.wires, chip.nodes);
+                    });
+                }
+
+                Sim.wires = Array.isArray(activeWires) ? JSON.parse(JSON.stringify(activeWires)) : [];
+                Sim.updateWireVisuals();
+                Sim.seedQueue();
+                Sim.processQueue();
+            }
+        } catch (e) {
+            console.error("[Persistence] Load Failure:", e);
+        }
+    },
+
+    /**
      */
     exportProject(name) {
         if (name instanceof Event || typeof name !== 'string' || name.trim() === '') {

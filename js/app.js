@@ -131,7 +131,8 @@ window.onload = () => {
     // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Hardened macro lifecycle with cyclical dependency scanners, pre-flight deletion reference counters, and strict topology APIs.
     // [AUDIT: v1.25.48 | SEC_ARCH_LEAD] - Preserved hierarchical folder collapse state across UI redraws.
     // [AUDIT: v1.25.60 | SEC_ARCH_LEAD] - Restored MSB-at-top ordering for RAM and Custom chips; eradicated "crooked" pin offsets by enforcing a rigid 20px vertical spacing grid.
-    window.LOADED_BSIM_VERSION = "1.25.60";
+    // [AUDIT: v1.26.01 | SEC_ARCH_LEAD] - Phase 2 Modularization: Decoupled UI Orchestration, rendering engines, and notification subsystems from the simulator core.
+    window.LOADED_BSIM_VERSION = "1.26.01";
 
     // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Purged legacy JIT DOM interceptor in favor of native parametric coordinate generation.
 

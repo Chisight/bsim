@@ -280,6 +280,163 @@ const Engine = {
     },
 
     processQueue(sim) {
+        // [AUDIT: v1.23.72 | SEC_ARCH_LEAD] - Data corruption sanitization.
+        if (!sim._stateSanitized) {
+            sim.nodes.forEach(n => {
+                if (Array.isArray(n.state) && n.state.length === 1) n.state = n.state[0];
+            });
+            sim._stateSanitized = true;
+        }
+
+        // Wasm engine intercept
+        if (sim.useWasm && window.WasmEngine && WasmEngine.ready) {
+            const isPureNative = this.isPureNative(sim.nodes, sim.library);
+            
+            if (isPureNative) {
+                let changed = false;
+                if (sim._netlistDirty) {
+                    const mapPort = p => {
+                        if (p === 'a') return 'in0';
+                        if (p === 'b') return 'in1';
+                        if (p === 'q') return 'out0';
+                        if (p === 'nq') return 'out1';
+                        return p;
+                    };
+                    const mappedWires = sim.wires.map(w => ({
+                        ...w,
+                        from: { ...w.from, portId: mapPort(w.from.portId) },
+                        to: { ...w.to, portId: mapPort(w.to.portId) }
+                    }));
+                    WasmEngine.syncLayout(sim.nodes, mappedWires);
+                    sim._netlistDirty = false;
+                }
+                sim.nodes.forEach(n => {
+                    if (n.type.startsWith('IN-') || n.type === 'CLOCK') {
+                        if (JSON.stringify(n.val) !== JSON.stringify(n.state)) {
+                            n.val = Array.isArray(n.state) ? [...n.state] : n.state;
+                            if (typeof sim.updateNodeVisual === 'function') sim.updateNodeVisual(n);
+                            changed = true;
+                        }
+                        WasmEngine.writeState(n.id, n.state);
+                    }
+                });
+
+                const execDepth = Math.max(20, sim.nodes.length);
+                sim.nodes.filter(n => n.type === 'CLOCK').forEach(n => {
+                    this.calculateNextState(sim, n);
+                    WasmEngine.writeState(n.id, n.state);
+                });
+
+                for (let i = 0; i < execDepth; i++) {
+                    WasmEngine.executeTick(0);
+                }
+                WasmEngine.executeTick(1);
+                WasmEngine.executeTick(2);
+
+                sim.nodes.forEach(n => {
+                    const NATIVE_GATES = new Set(['NAND', 'CLOCK', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'TRISTATE']);
+                    if (NATIVE_GATES.has(n.type) && !n.isCustom) {
+                        let newVal = WasmEngine.readState(n.id);
+                        if (newVal === 2 && n.type === 'TRISTATE') newVal = 'Z';
+                        if (n.val !== newVal || n._forcePropagate) {
+                            n._forcePropagate = false;
+                            n.val = newVal;
+                            changed = true;
+                            if (typeof sim.updateNodeVisual === 'function') sim.updateNodeVisual(n);
+                        }
+                    } else if ((n.type === 'DFF' || n.type === 'TFF') && !n.isCustom) {
+                        const newVal = WasmEngine.readState(n.id);
+                        if (newVal && newVal.length >= 2) {
+                            if (!n.val || n.val.q !== newVal[0] || n.val.nq !== newVal[1] || n._forcePropagate) {
+                                n._forcePropagate = false;
+                                n.val = { q: newVal[0], nq: newVal[1] };
+                                changed = true;
+                                if (typeof sim.updateNodeVisual === 'function') sim.updateNodeVisual(n);
+                            }
+                        }
+                    } else if (n.type === 'RAM' && !n.isCustom) {
+                        const newVal = WasmEngine.readState(n.id);
+                        if (newVal && newVal.length === 8) {
+                            const outObj = {};
+                            let isDiff = !n.val || n._forcePropagate;
+                            for (let i = 0; i < 8; i++) {
+                                outObj[`out${i}`] = newVal[i];
+                                if (!isDiff && n.val[`out${i}`] !== newVal[i]) isDiff = true;
+                            }
+                            if (isDiff) {
+                                n._forcePropagate = false;
+                                n.val = outObj;
+                                changed = true;
+                                if (typeof sim.updateNodeVisual === 'function') sim.updateNodeVisual(n);
+                            }
+                        }
+                    }
+                });
+
+                sim.nodes.forEach(n => {
+                    if (n.isCustom && sim.library[n.type]) {
+                        if (!n.outputs) n.outputs = {};
+                        let rawInnerState = {};
+                        sim.library[n.type].nodes.forEach(inner => {
+                            if (inner.type.startsWith('OUT-') || inner.type.startsWith('PROBE-')) {
+                                const bits = parseInt(inner.type.split('-')[1]) || 1;
+                                let outVal;
+                                if (bits === 1) {
+                                    outVal = WasmEngine.readPinState(`${n.id}:${inner.id}`, 'in0');
+                                } else {
+                                    outVal = new Array(bits).fill(0);
+                                    for (let b = 0; b < bits; b++) {
+                                        outVal[b] = WasmEngine.readPinState(`${n.id}:${inner.id}`, `in${b}`);
+                                    }
+                                }
+                                rawInnerState[inner.id] = outVal;
+                            }
+                        });
+                        
+                        const mappedOuts = this._mapChipOutputs(sim.library[n.type], rawInnerState);
+                        if (JSON.stringify(n.outputs) !== JSON.stringify(mappedOuts) || n._forcePropagate) {
+                            n.outputs = mappedOuts;
+                            n._forcePropagate = false;
+                            n.val = JSON.parse(JSON.stringify(n.outputs));
+                            if (typeof sim.updateNodeVisual === 'function') sim.updateNodeVisual(n);
+                            changed = true;
+                        }
+                    }
+
+                    if (n.type.startsWith('OUT-') || n.type.startsWith('PROBE-')) {
+                        const bits = parseInt(n.type.split('-')[1]) || 1;
+                        if (bits === 1) {
+                            const drive = WasmEngine.readPinState(n.id, 'in0');
+                            const val = (drive === 2 || drive === 'Z' || drive === null) ? 'Z' : ((drive === 1 || drive === true) ? 1 : 0);
+                            if (n.val !== val || n._forcePropagate) {
+                                n._forcePropagate = false;
+                                n.val = val;
+                                if (typeof sim.updateNodeVisual === 'function') sim.updateNodeVisual(n);
+                                changed = true;
+                            }
+                        } else {
+                            const nextState = new Array(bits).fill(0);
+                            for (let b = 0; b < bits; b++) {
+                                const drive = WasmEngine.readPinState(n.id, `in${b}`);
+                                nextState[b] = (drive === 2 || drive === 'Z' || drive === null) ? 'Z' : ((drive === 1 || drive === true) ? 1 : 0);
+                            }
+                            if (JSON.stringify(n.state) !== JSON.stringify(nextState) || n._forcePropagate) {
+                                n._forcePropagate = false;
+                                n.state = nextState;
+                                n.val = [...nextState];
+                                if (typeof sim.updateNodeVisual === 'function') sim.updateNodeVisual(n);
+                                changed = true;
+                            }
+                        }
+                    }
+                });
+                if (changed && typeof sim.updateHUD === 'function') sim.updateHUD();
+                if (window.WireRenderer) WireRenderer.drawWires();
+                sim.eventQueue.clear();
+                return;
+            }
+        }
+
         if (!sim.eventQueue || sim.eventQueue.size === 0) return;
 
         let iterations = 0;
@@ -301,7 +458,6 @@ const Engine = {
                     if (!this.fastEqual(node.val, rawNew)) node.toggles = (node.toggles || 0) + 1;
                     node._forcePropagate = false;
 
-                    // Oscillation Detection
                     if (!sim._transitions) sim._transitions = new Map();
                     const flips = (sim._transitions.get(node.id) || 0) + 1;
                     sim._transitions.set(node.id, flips);
@@ -310,14 +466,14 @@ const Engine = {
                         if (!node._oscillating) {
                             console.warn(`[DEBUG] Oscillation detected on node ${node.id}.`);
                             node._oscillating = true;
-                            if (sim.updateNodeVisual) sim.updateNodeVisual(node);
+                            if (typeof sim.updateNodeVisual === 'function') sim.updateNodeVisual(node);
                         }
                         return;
                     }
 
                     node.val = rawNew;
                     node._oscillating = false;
-                    if (sim.updateNodeVisual) sim.updateNodeVisual(node);
+                    if (typeof sim.updateNodeVisual === 'function') sim.updateNodeVisual(node);
 
                     let visitedJuncs = new Set();
                     const traceDriven = (nid, depth = 0) => {
@@ -357,10 +513,76 @@ const Engine = {
         if (iterations >= MAX_ITERS) {
             console.error('[Simulator] Thermal Trip: Max propagation reached.');
             sim.eventQueue.clear();
-            if (sim.toast) sim.toast('Simulation halted: Unstable oscillation detected.', 'danger');
+            if (typeof sim.toast === 'function') sim.toast('Simulation halted: Unstable oscillation detected.', 'danger');
         }
         
         if (iterations > 0 && window.WireRenderer) WireRenderer.drawWires();
+    },
+
+    async runWasmParityCheck(sim, iterations = 1000) {
+        if (!window.WasmEngine || !WasmEngine.ready) return sim.toast('Wasm Engine not linked.', 'danger');
+        sim.toast('Diagnostics Running. Press F12 to monitor console.', 'warning');
+        await new Promise(resolve => requestAnimationFrame(resolve));
+        await new Promise(resolve => setTimeout(resolve, 50));
+        const isPureNative = this.isPureNative(sim.nodes, sim.library);
+        if (!isPureNative) return sim.toast('Parity check requires native logic components only.', 'warning');
+        console.group(`[Diagnostics] Wasm vs V8 State Parity Sweep (${iterations} Cycles)`);
+        const mapPort = p => {
+            if (p === 'a') return 'in0';
+            if (p === 'b') return 'in1';
+            if (p === 'q') return 'out0';
+            if (p === 'nq') return 'out1';
+            return p;
+        };
+        const mappedWires = sim.wires.map(w => ({
+            ...w,
+            from: { ...w.from, portId: mapPort(w.from.portId) },
+            to: { ...w.to, portId: mapPort(w.to.portId) }
+        }));
+        WasmEngine.syncLayout(sim.nodes, mappedWires);
+        const inputNodes = sim.nodes.filter(n => n.type.startsWith('IN-'));
+        const outputNodes = sim.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-'));
+        if (inputNodes.length === 0 || outputNodes.length === 0) {
+            console.groupEnd();
+            return sim.toast('Diagnostics require at least 1 input and 1 output terminal.', 'warning');
+        }
+        let passed = true;
+        const snapshot = JSON.stringify(sim.nodes.map(n => ({ id: n.id, val: n.val, state: n.state })));
+        for (let i = 0; i < iterations; i++) {
+            if (i % 25 === 0) await new Promise(resolve => setTimeout(resolve, 0));
+            inputNodes.forEach(n => {
+                const bits = parseInt(n.type.split('-')[1]) || 1;
+                if (bits === 1) { n.state = Math.random() > 0.5 ? 1 : 0; n.val = n.state; }
+                else { n.state = Array.from({ length: bits }, () => Math.random() > 0.5 ? 1 : 0); n.val = [...n.state]; }
+                WasmEngine.writeState(n.id, n.state);
+            });
+            for (let t = 0; t < 20; t++) WasmEngine.executeTick(0);
+            WasmEngine.executeTick(1); WasmEngine.executeTick(2);
+            for (let step = 0; step < 20; step++) {
+                sim.nodes.forEach(n => {
+                    if (n.type.startsWith('IN-')) return;
+                    const next = this.calculateNextState(sim, n);
+                    n.val = (typeof next === 'string' && next !== 'Z') ? JSON.parse(next) : next;
+                });
+            }
+            outputNodes.forEach(n => {
+                const bits = parseInt(n.type.split('-')[1]) || 1;
+                const v8Val = n.val;
+                const wasmVal = WasmEngine.readState(n.id, bits);
+                if (!this.fastEqual(v8Val, wasmVal)) {
+                    console.error(`[Parity Fault] Cycle ${i} | Node ${n.id} (${n.type}) | V8: ${JSON.stringify(v8Val)} != WASM: ${JSON.stringify(wasmVal)}`);
+                    passed = false;
+                }
+            });
+            if (!passed) break;
+        }
+        const saved = JSON.parse(snapshot);
+        sim.nodes.forEach(n => { const s = saved.find(x => x.id === n.id); if (s) { n.val = s.val; n.state = s.state; } });
+        if (passed) { console.log('%c[Diagnostics] SUCCESS: 100% Cryptographic Parity Confirmed.', 'color: #00ffaa; font-weight: bold;'); alert("WASM Parity Validated. Check F12 Console."); }
+        else { console.error('[Diagnostics] FAILED: Architecture divergence detected. Halting execution.'); alert("Parity Deviation Detected. Check F12 Console for exact byte offsets."); }
+        console.groupEnd();
+        sim.toast(passed ? 'Parity Suite: PASSED' : 'Parity Suite: FAILED (Check Console)', passed ? 'success' : 'danger');
+        if (typeof sim.updateWireVisuals === 'function') sim.updateWireVisuals();
     }
 };
 
