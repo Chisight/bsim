@@ -6,8 +6,9 @@ const View = {
     x: 0,
     y: 0,
     scale: 1.0,
-    zoomIdx: 2,
-    zoomLevels: [0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
+    // [AUDIT: v1.24.99 | SEC_ARCH_LEAD] - Expanded lower bounds of viewport scaling matrix to support high-density macro visualization.
+    zoomIdx: 4,
+    zoomLevels: [0.1, 0.25, 0.5, 0.75, 1.0, 1.25, 1.5, 2.0],
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for viewport controller initialization.

@@ -165,7 +165,8 @@ window.onload = () => {
     // [AUDIT: v1.24.96 | SEC_ARCH_LEAD] - Parity Recovery: Reverted to non-shared memory to bypass Cross-Origin Isolation requirements for local deployment.
     // [AUDIT: v1.24.97 | SEC_ARCH_LEAD] - Natively mapped explicit spatial boundaries and state mutation matrices for memory primitives.
     // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Integrated architectural stability ports from experimental multi-Wasm branch.
-    window.LOADED_BSIM_VERSION = "1.24.98";
+    // [AUDIT: v1.24.99 | SEC_ARCH_LEAD] - Expanded viewport zoom boundaries and synchronized global state versioning.
+    window.LOADED_BSIM_VERSION = "1.24.99";
 
     // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - JIT Memory Interceptor: Native integration finalized in history.js and sim.js.
     
