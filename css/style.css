@@ -379,6 +379,16 @@ footer::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px
 #context-menu.open-left .sub-menu { left: auto; right: 100%; }
 #context-menu.open-up .sub-menu { top: auto; bottom: -1px; }
 
+/* [AUDIT: v1.25.24 | SEC_ARCH_LEAD] - Scaled mobile touch targets for interaction surfaces to prevent physical misclicks. */
+@media (max-width: 768px) {
+    .menu-item { padding: 14px 20px; font-size: 13px; }
+    nav .menu-item { padding: 10px 16px; font-size: 13px; }
+    nav .sub-menu .menu-item { padding: 14px 20px; font-size: 13px; }
+    .sub-menu { min-width: 200px; }
+    .status-chip { padding: 10px 18px; font-size: 13px; }
+    .tab { padding: 10px 18px; font-size: 13px; }
+}
+
 .status-chip { 
     background: #22222b; padding: 5px 14px; border-radius: 5px; 
     border: 1px solid #334; cursor: pointer; font-weight: 700; font-size: 11px; 

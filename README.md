@@ -1,7 +1,7 @@
-# bSim v1.25.23 - Professional Modular Logic Simulator
+# bSim v1.25.24 - Professional Modular Logic Simulator
 
 > [!IMPORTANT]
-> **Architectural Status v1.25.23**: This version represents the stable hardened baseline. Significant engine hardening has been implemented to resolve memory synchronization faults, register core architectural primitives like Constant Ground (0), and finalize hierarchical macro folder management via inline context sub-menus.
+> **Architectural Status v1.25.24**: This version represents the stable hardened baseline. Significant engine hardening has been implemented to resolve memory synchronization faults, register core architectural primitives like Constant Ground (0), and scale mobile touch targets for professional accessibility.
 
 **bSim** is a high-performance, modular digital logic simulator engineered for the web. Built on an atomic NAND-foundation, it provides professional-grade tools for circuit design, hierarchical macro synthesis, and high-frequency Wasm-accelerated simulation.
 
@@ -14,7 +14,7 @@ bSim's simulation kernel is a masterpiece of modern web engineering, utilizing a
 ### 🚀 Simulation Engine
 - **Standard Wasm Kernel**: O(1) signal propagation using a linear instruction set compiled from native netlists.
 - **V8 Fallback**: A robust object-graph simulator for rapid prototyping and complex mixed-mode debugging.
-- **Hybrid Parity**: (v1.25.23) Full opcode dispatchers including the native **Opcode 9 (CONST_0)** for grounding and centralized Wasm memory evaluation.
+- **Hybrid Parity**: (v1.25.24) Full opcode dispatchers including the native **Opcode 9 (CONST_0)** for grounding and centralized Wasm memory evaluation.
 - **Memory Sync**: Forced heap synchronization for RAM/ROM primitives via netlist-dirty signaling and hardware-level instruction emission.
 
 ### 🛡️ Multi-Phase Commit Protocol
@@ -30,9 +30,9 @@ The bSim engine operates on a deterministic pipeline to ensure physical hardware
 Design complex integrated circuits and encapsulate them into reusable chips. bSim handles deep recursion and bit-mapped bus ports with high efficiency.
 
 ### 📱 Mobile-First Responsive UI
-(v1.25.23) Optimized for productivity across all form factors.
+(v1.25.24) Optimized for productivity across all form factors.
 - **Adaptive Sidebar**: Collapsible mobile overlay with touch-optimized toggles.
-- **Parametric Rendering**: Standardized component dimensions (IN-8, RAM, ROM) for clean topological alignment.
+- **Precision Touch**: Scaled hitboxes and touch targets (44px min) for high-density mobile interaction.
 - **Macro Management**: Hierarchical folder sub-menus with inline DOM mutation for rapid library organization.
 
 ### 🖥️ Modular Debug Terminal
@@ -50,7 +50,7 @@ An integrated Linux-style CLI for low-level telemetry and netlist manipulation.
 
 ```text
 browser-sim/
-├── index.html          # Main entry point (v1.25.23 Architecture)
+├── index.html          # Main entry point (v1.25.24 Architecture)
 ├── wasm-core/          # WebAssembly source (WAT) for high-speed kernels
 ├── css/
 │   └── style.css       # Responsive UI & Design System (MRAP_V1 Protocol)
