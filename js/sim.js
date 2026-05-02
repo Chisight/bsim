@@ -9,13 +9,7 @@ const Sim = {
     // [AUDIT: v1.25.20 | SEC_ARCH_LEAD] - Centralized purity validator to prevent local scope drift and ensure RAM/ROM evaluation parity.
     // [AUDIT: v1.25.34 | SEC_ARCH_LEAD] - Excised deprecated ROM primitive from native kernel boundary.
     isPureNative() {
-        const KERNEL = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'RAM', '0']);
-        const checkPure = (nodes) => nodes.every(n => {
-            if (KERNEL.has(n.type)) return true;
-            if (n.isCustom && this.library && this.library[n.type]) return checkPure(this.library[n.type].nodes);
-            return false;
-        });
-        return checkPure(this.nodes);
+        return Engine.isPureNative(this.nodes, this.library);
     },
     library: {},
     workspaceStack: [],
@@ -70,17 +64,7 @@ const Sim = {
     
     // [AUDIT: v1.25.40 | SEC_ARCH_LEAD] - Relocated fastEqual utility to prevent JIT de-optimization and recreation during high-frequency evaluation ticks.
     _fastEqual(a, b) {
-        if (a === b) return true;
-        if (a === null || b === null || typeof a !== 'object' || typeof b !== 'object') return false;
-        if (Array.isArray(a)) {
-            if (!Array.isArray(b) || a.length !== b.length) return false;
-            for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
-            return true;
-        }
-        const ka = Object.keys(a), kb = Object.keys(b);
-        if (ka.length !== kb.length) return false;
-        for (let k of ka) if (a[k] !== b[k]) return false;
-        return true;
+        return Engine.fastEqual(a, b);
     },
 
     // [AUDIT: v1.24.52 | SEC_ARCH_LEAD] - Manual DOM/Memory synchronization escape hatch.
@@ -595,109 +579,7 @@ const Sim = {
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for logical signal evaluation.
      */
     calculateNextState(node) {
-        if (node.isCustom) {
-            // [AUDIT: v1.24.79 | SEC_ARCH_LEAD] - Polyfilled instance memory for V8 hierarchical state retention, enforcing engine parity for nested sequential logic.
-            if (!node.meta && this.library[node.type]) {
-                node.meta = JSON.parse(JSON.stringify(this.library[node.type]));
-            }
-            const chipDef = node.meta || this.library[node.type];
-            if (!chipDef) return JSON.stringify(node.val);
-            const ext = this._assembleChipInputs(chipDef, (portId) => this.getDrivingSignal(node.id, portId));
-            const internalRes = this.simulateInternalCircuit(chipDef, ext);
-            node.outputs = this._mapChipOutputs(chipDef, internalRes);
-            return node.outputs;
-        }
-        // primitive gates
-        switch (node.type) {
-            case 'NAND':
-            case 'AND':
-            case 'OR':
-            case 'NOR':
-            case 'XOR':
-            case 'XNOR': {
-                const sigA = this.getDrivingSignal(node.id, 'a');
-                const sigB = this.getDrivingSignal(node.id, 'b');
-                const a = (sigA === 1 || sigA === true) ? 1 : 0;
-                const b = (sigB === 1 || sigB === true) ? 1 : 0;
-                if (node.type === 'NAND') return (a && b) ? 0 : 1;
-                if (node.type === 'AND') return (a && b) ? 1 : 0;
-                if (node.type === 'OR') return (a || b) ? 1 : 0;
-                if (node.type === 'NOR') return (a || b) ? 0 : 1;
-                if (node.type === 'XOR') return (a !== b) ? 1 : 0;
-                if (node.type === 'XNOR') return (a === b) ? 1 : 0;
-            }
-            case 'NOT': {
-                const a = (this.getDrivingSignal(node.id, 'a') === 1 || this.getDrivingSignal(node.id, 'a') === true) ? 1 : 0;
-                return a ? 0 : 1;
-            }
-            // CLOCK
-            case 'CLOCK': return node.state;
-            // JUNCTION
-            case 'JUNCTION': return this.getDrivingSignal(node.id, 'j');
-            /**
-             * [AUDIT: v1.25.14 | SEC_ARCH_LEAD]
-             */
-            case '0': return 0;
-            // TRISTATE
-            case 'TRISTATE': {
-                const data = this.getDrivingSignal(node.id, 'in');
-                const enable = this.getDrivingSignal(node.id, 'en');
-                return (enable === 1) ? data : 'Z';
-            }
-            // DFF
-            case 'DFF': {
-                const clk = this.getDrivingSignal(node.id, 'clk');
-                const d = this.getDrivingSignal(node.id, 'd');
-                const valClk = (clk === 1 || clk === true) ? 1 : 0;
-                const valD = (d === 1 || d === true) ? 1 : 0;
-                if (valClk === 1 && node.lastClk === 0) { node.state = valD; }
-                node.lastClk = valClk;
-                return { q: node.state, nq: node.state === 1 ? 0 : 1 };
-            }
-            // TFF
-            case 'TFF': {
-                const clk = this.getDrivingSignal(node.id, 'clk');
-                const t = this.getDrivingSignal(node.id, 't');
-                const valClk = (clk === 1 || clk === true) ? 1 : 0;
-                const valT = (t === 1 || t === true) ? 1 : 0;
-                if (valClk === 1 && node.lastClk === 0 && valT === 1) { node.state = node.state === 1 ? 0 : 1; }
-                node.lastClk = valClk;
-                return { q: node.state, nq: node.state === 1 ? 0 : 1 };
-            }
-            // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Implemented Synchronous R/W cycle for V8 RAM fallback.
-            case 'RAM': {
-                let addr = 0;
-                const pins = node.addressPins || 4;
-                for (let i = 0; i < pins; i++) {
-                    const bit = this.getDrivingSignal(node.id, `in${i}`);
-                    if (bit === 1 || bit === true) addr |= (1 << i);
-                }
-                const we = this.getDrivingSignal(node.id, 'we');
-                if (we === 1 || we === true) {
-                    let din = 0;
-                    for (let i = 0; i < 8; i++) {
-                        if (this.getDrivingSignal(node.id, `din${i}`) === 1) din |= (1 << i);
-                    }
-                    if (!node.memoryData) node.memoryData = [];
-                    node.memoryData[addr] = din;
-                }
-                const data = (node.memoryData && node.memoryData.length > addr) ? node.memoryData[addr] : 0;
-                const outObj = {};
-                for (let i = 0; i < 8; i++) outObj[`out${i}`] = (data & (1 << i)) ? 1 : 0;
-                return outObj;
-            }
-        }
-        // output nodes
-        if (node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
-            const bits = parseInt(node.type.split('-')[1]) || 1;
-            const state = new Array(bits).fill(0);
-            for (let i = 0; i < bits; i++) state[i] = this.getDrivingSignal(node.id, `in${i}`);
-            // [AUDIT: v1.25.41 | SEC_ARCH_LEAD] - Eradicated CPU-heavy JSON.stringify serialization overhead to assert strict zero-copy runtime parity.
-            return bits === 1 ? state[0] : state;
-        }
-        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Prevent ReferenceError on untrapped generic nodes.
-        const finalVal = node.val !== undefined ? node.val : null;
-        return finalVal;
+        return Engine.calculateNextState(this, node);
     },
     // =========================================================================
     // FILE: browser-sim/modular-sim/js/sim.js
@@ -931,103 +813,9 @@ const Sim = {
                 return;
             }
         }
-
         if (!this.timing) this.timing = { node: 'ideal', delay: 0 };
+        Engine.processQueue(this);
 
-        let iterations = 0;
-        const MAX_ITERS = 1000; // Expanded ceiling for hierarchical stability
-        // process the queue
-        while (this.eventQueue.size > 0 && iterations < MAX_ITERS) {
-            iterations++;
-            const nextQueue = new Set();
-            
-            // [AUDIT: v1.25.41 | SEC_ARCH_LEAD] - Upgraded event queue processing to enforce deterministic topological evaluation across asynchronous logic gates.
-            const sortedEvents = Array.from(this.eventQueue).sort((a, b) => {
-                const isSeqA = ['DFF', 'TFF', 'CLOCK', 'RAM'].includes(a.type) ? 1 : 0;
-                const isSeqB = ['DFF', 'TFF', 'CLOCK', 'RAM'].includes(b.type) ? 1 : 0;
-                return isSeqA - isSeqB;
-            });
-
-            // for each node in the queue
-            sortedEvents.forEach(node => {
-                // calculate next state
-                const newVal = this.calculateNextState(node);
-                const rawNew = (typeof newVal === 'string' && newVal !== 'Z') ? JSON.parse(newVal) : newVal;
-                // if node value changed
-                // [AUDIT: v1.25.40 | SEC_ARCH_LEAD] - Invoking bound prototype comparison for parity verification.
-                if (!this._fastEqual(node.val, rawNew) || node._forcePropagate) {
-                    if (!this._fastEqual(node.val, rawNew)) node.toggles = (node.toggles || 0) + 1;
-                    node._forcePropagate = false;
-                    // increment transition count
-                    const flips = (this._transitions.get(node.id) || 0) + 1;
-                    // update transition count
-                    this._transitions.set(node.id, flips);
-                    // if node oscillates too many times, mark it as oscillating
-                    if (flips > this.MAX_TRANSITIONS) {
-                        // if node is not already oscillating, mark it as oscillating
-                        if (!node._oscillating) {
-                            // log oscillation
-                            console.warn(`[DEBUG] Oscillation detected on node ${node.id}.`);
-                            // mark as oscillating
-                            node._oscillating = true;
-                            // update node visual
-                            this.updateNodeVisual(node);
-                        }
-                        return;
-                    }
-                    // update node value
-                    node.val = rawNew;
-                    // mark as not oscillating
-                    node._oscillating = false;
-                    // update node visual
-                    this.updateNodeVisual(node);
-                    // add driven nodes to queue
-                    // add driven nodes to queue bidirectionally (fixes backwards wiring)
-                    let visitedJuncs = new Set();
-                    // [AUDIT: v1.25.41 | SEC_ARCH_LEAD] - Implemented depth-bound guards in traceDriven to avert recursion stack exhaustion faults.
-                    const traceDriven = (nid, depth = 0) => {
-                        if (depth > 100) return;
-                        this.wires.forEach(w => {
-                            if (w.from.nodeId === nid) {
-                                const ds = this.nodes.find(n => n.id === w.to.nodeId);
-                                if (ds) {
-                                    nextQueue.add(ds);
-                                    if (ds.type === 'JUNCTION' && !visitedJuncs.has(ds.id)) {
-                                        visitedJuncs.add(ds.id);
-                                        traceDriven(ds.id, depth + 1);
-                                    }
-                                }
-                            } else if (w.to.nodeId === nid) {
-                                const ds = this.nodes.find(n => n.id === w.from.nodeId);
-                                if (ds) {
-                                    nextQueue.add(ds);
-                                    if (ds.type === 'JUNCTION' && !visitedJuncs.has(ds.id)) {
-                                        visitedJuncs.add(ds.id);
-                                        traceDriven(ds.id, depth + 1);
-                                    }
-                                }
-                            }
-                        });
-                    };
-                    traceDriven(node.id);
-                    // if editing chip is null and tutorial engine is available, check progress
-                    if (this.activeEditingChip === null && window.TutorialEngine) {
-                        TutorialEngine.checkProgress();
-                    }
-                }
-            });
-            // update event queue
-            this.eventQueue = nextQueue;
-        }
-        if (iterations >= MAX_ITERS) {
-            console.error('[Simulator] Thermal Trip: Max propagation iterations reached. Halting execution to prevent main-thread lockup.');
-            this.eventQueue.clear(); // Atomic clear to break infinite requestAnimationFrame cycle
-            this.toast('Simulation halted: Unstable oscillation detected.', 'danger');
-        }
-        // performance optimization: only draw if changes occurred
-        if (iterations > 0) {
-            WireRenderer.drawWires();
-        }
         // update HUD
         this.updateHUD();
     },
@@ -1198,159 +986,7 @@ const Sim = {
     /**
      */
     simulateInternalCircuit(chipTypeOrMeta, externalInputs) {
-        // debug message
-        if (this.debugToasts) console.debug(`[SimTrace] Executing Sub-Circuit: ${typeof chipTypeOrMeta === 'string' ? chipTypeOrMeta : 'Custom'} | Inputs:`, externalInputs);
-        
-        // [AUDIT: v1.24.79 | SEC_ARCH_LEAD] - Eradicated O(N) deep-copy instantiation loop. Sub-circuits now mutate persistent instance state memory to support nested sequential logic.
-        let meta = typeof chipTypeOrMeta === 'string' ? this.library[chipTypeOrMeta] : (chipTypeOrMeta.nodes ? chipTypeOrMeta : chipTypeOrMeta.meta);
-        if (!meta) return {};
-
-        // Fallback protection: If evaluating from a raw string reference without instance state, instantiate an ephemeral copy to protect the library blueprint.
-        if (typeof chipTypeOrMeta === 'string') {
-            meta = JSON.parse(JSON.stringify(meta));
-        }
-
-        meta.nodes.forEach(inner => {
-            if (inner.type.startsWith('IN-')) {
-                const bits = parseInt(inner.type.split('-')[1]) || 1;
-                const val = externalInputs[inner.id];
-                inner.state = (val !== undefined) ? val : (bits > 1 ? new Array(bits).fill(0) : 0);
-            }
-        });
-
-        const getDrive = (nid, pid, visited = new Set()) => {
-            const netKey = `${nid}:${pid}`;
-            // if visited, return null
-            if (visited.has(netKey)) return null;
-            // add to visited
-            visited.add(netKey);
-
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Apply bidirectional topological net traversal for internal chip simulation.
-            let wires = meta.wires.filter(w => 
-                (w.to.nodeId === nid && w.to.portId === pid) || 
-                (w.from.nodeId === nid && w.from.portId === pid)
-            );
-
-            if (wires.length === 0) return null;
-
-            for (const w of wires) {
-                const srcNodeId = (w.to.nodeId === nid && w.to.portId === pid) ? w.from.nodeId : w.to.nodeId;
-                const srcPortId = (w.to.nodeId === nid && w.to.portId === pid) ? w.from.portId : w.to.portId;
-
-                const srcNode = meta.nodes.find(n => n.id === srcNodeId);
-                if (!srcNode) continue;
-
-                let isPeerOutput = false;
-                if (srcNode.type.startsWith('IN-') || srcNode.type === 'CLOCK') isPeerOutput = true;
-                if (srcNode.isCustom && srcPortId.startsWith('out')) isPeerOutput = true;
-                const NATIVE_GATES = new Set(['NAND', 'DFF', 'TRISTATE', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR']);
-                if (NATIVE_GATES.has(srcNode.type) && (srcPortId === 'out' || srcPortId === 'q' || srcPortId === 'nq')) isPeerOutput = true;
-
-                if (srcNode.type === 'JUNCTION' || !isPeerOutput) {
-                    const sig = getDrive(srcNodeId, srcPortId, visited);
-                    if (sig !== null) return sig;
-                } else {
-                    const sig = getVal(srcNodeId, srcPortId);
-                    if (sig !== null) return sig;
-                }
-            }
-            return null;
-        };
-
-        const getVal = (nid, pid) => {
-            const src = meta.nodes.find(n => n.id === nid);
-            if (!src) return null;
-            if (src.type.startsWith('IN-')) {
-                const idx = parseInt(pid.replace(/\D/g, '')) || 0;
-                const res = Array.isArray(src.state) ? src.state[idx] : src.state;
-                return (res === undefined) ? null : res;
-            }
-            if (src.isCustom && src.outputs) {
-                const res = src.outputs[pid];
-                return (res === undefined) ? null : res;
-            }
-            return (src.val === undefined) ? null : src.val;
-        };
-
-        for (let iter = 0; iter < 500; iter++) {
-            let changed = false;
-            meta.nodes.forEach(inner => {
-                if (inner.type.startsWith('IN-')) return;
-                let nVal = 0;
-                if (inner.isCustom) {
-                    if (!inner.meta && this.library[inner.type]) {
-                        inner.meta = JSON.parse(JSON.stringify(this.library[inner.type]));
-                    }
-                    const innerChip = inner.meta || this.library[inner.type];
-                    if (innerChip) {
-                        const ins = this._assembleChipInputs(innerChip, (portId) => getDrive(inner.id, portId));
-                        const rawOuts = this.simulateInternalCircuit(innerChip, ins);
-                        inner.outputs = this._mapChipOutputs(innerChip, rawOuts);
-                        nVal = inner.outputs;
-                    }
-                } else if (['NAND', 'AND', 'OR', 'NOR', 'XOR', 'XNOR'].includes(inner.type)) {
-                    const a = getDrive(inner.id, 'a') === 1 ? 1 : 0;
-                    const b = getDrive(inner.id, 'b') === 1 ? 1 : 0;
-                    if (inner.type === 'NAND') nVal = (a && b) ? 0 : 1;
-                    else if (inner.type === 'AND') nVal = (a && b) ? 1 : 0;
-                    else if (inner.type === 'OR') nVal = (a || b) ? 1 : 0;
-                    else if (inner.type === 'NOR') nVal = (a || b) ? 0 : 1;
-                    else if (inner.type === 'XOR') nVal = (a !== b) ? 1 : 0;
-                    else if (inner.type === 'XNOR') nVal = (a === b) ? 1 : 0;
-                } else if (inner.type === 'NOT') {
-                    const a = getDrive(inner.id, 'a') === 1 ? 1 : 0;
-                    nVal = a ? 0 : 1;
-                } else if (inner.type === 'TRISTATE') {
-                    const d = getDrive(inner.id, 'in'), e = getDrive(inner.id, 'en');
-                    nVal = (e === 1) ? d : 'Z';
-                } else if (inner.type === 'DFF') {
-                    const clk = getDrive(inner.id, 'clk');
-                    const d = getDrive(inner.id, 'd');
-                    if (clk === 1 && inner.lastClk === 0) { inner.state = (d === 1) ? 1 : 0; }
-                    inner.lastClk = clk;
-                    nVal = { q: inner.state, nq: inner.state === 1 ? 0 : 1 };
-                } else if (inner.type === 'TFF') {
-                    const clk = getDrive(inner.id, 'clk');
-                    const t = getDrive(inner.id, 't');
-                    if (clk === 1 && inner.lastClk === 0 && t === 1) { inner.state = inner.state === 1 ? 0 : 1; }
-                    inner.lastClk = clk;
-                    nVal = { q: inner.state, nq: inner.state === 1 ? 0 : 1 };
-                } else if (inner.type === 'JUNCTION') {
-                    nVal = getDrive(inner.id, 'j');
-                } else if (inner.type === 'RAM') {
-                    // [AUDIT: v1.24.73 | SEC_ARCH_LEAD] - Internal macro sub-simulation logic applied for RAM.
-                    let addr = 0;
-                    const pins = inner.addressPins || 4;
-                    for (let i = 0; i < pins; i++) if (getDrive(inner.id, `in${i}`) === 1) addr |= (1 << i);
-                    if (getDrive(inner.id, 'we') === 1) {
-                        let din = 0;
-                        for (let i = 0; i < 8; i++) if (getDrive(inner.id, `din${i}`) === 1) din |= (1 << i);
-                        if (!inner.memoryData) inner.memoryData = [];
-                        inner.memoryData[addr] = din;
-                    }
-                    const data = (inner.memoryData && inner.memoryData.length > addr) ? inner.memoryData[addr] : 0;
-                    const outObj = {};
-                    for (let i = 0; i < 8; i++) outObj[`out${i}`] = (data & (1 << i)) ? 1 : 0;
-                    nVal = outObj;
-                } else if (inner.type.startsWith('OUT-') || inner.type.startsWith('PROBE-')) {
-                    const bits = parseInt(inner.type.split('-')[1]) || 1;
-                    if (bits === 1) {
-                        nVal = getDrive(inner.id, 'in0');
-                    } else {
-                        nVal = new Array(bits).fill(0);
-                        for (let b = 0; b < bits; b++) {
-                            nVal[b] = getDrive(inner.id, `in${b}`);
-                        }
-                    }
-                }
-                if (JSON.stringify(inner.val) !== JSON.stringify(nVal)) { inner.val = nVal; changed = true; }
-            });
-            if (!changed) break;
-        }
-        const res = {};
-        meta.nodes.filter(n => n.type.startsWith('OUT-') || n.type.startsWith('PROBE-')).forEach(out => res[out.id] = out.val === undefined ? 0 : out.val);
-        if (this.debugToasts) console.debug(`[SimTrace] Sub-Circuit Result: ${typeof chipTypeOrMeta === 'string' ? chipTypeOrMeta : 'Custom'} | Outputs:`, res);
-        return res;
+        return Engine.simulateInternalCircuit(this, chipTypeOrMeta, externalInputs);
     },
 
     /**
@@ -1748,41 +1384,13 @@ const Sim = {
     /**
      */
     getSignal(nodeId, portId) {
-        const node = this.nodes.find(n => n.id === nodeId);
-        if (!node) return null;
-
-        if (node.type.includes('-8') || node.type.includes('-4')) {
-            const idx = parseInt(portId.replace(/\D/g, '')) || 0;
-            const res = Array.isArray(node.state) ? node.state[idx] : node.state;
-            return (res === undefined) ? null : res;
-        }
-
-        if (node.type === 'JUNCTION') return this.getDrivingSignal(node.id, 'j');
-
-        // Tristate High-Impedance handling
-        if (node.type === 'TRISTATE') return node.val === 'Z' ? null : node.val;
-
-        // Custom chips store structured outputs in node.val
-        if (node.val !== null && typeof node.val === 'object' && !Array.isArray(node.val)) {
-            if (node.val[portId] !== undefined) return node.val[portId];
-        }
-
-        if (node.outputs && typeof node.outputs === 'object' && node.outputs[portId] !== undefined) return node.outputs[portId];
-
-        return node.val === undefined ? null : node.val;
+        return Engine.getSignal(this, nodeId, portId);
     },
 
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for driving signal resolution.
      */
     getDrivingSignal(nodeId, portId, visited = new Set()) {
-        const netKey = `${nodeId}:${portId}`;
-        
-        // [AUDIT: v1.24.04 | SEC_ARCH_LEAD] - Intercept net evaluation for CLI forced signal overriding.
-        if (this._forcedNets && this._forcedNets[netKey] !== undefined) {
-            return this._forcedNets[netKey];
-        }
-
         if (visited.has(netKey)) return null;
         visited.add(netKey);
 
