@@ -418,6 +418,31 @@ const ProjectManager = {
             console.error('[FATAL] Remote import failed:', e);
             if (window.Sim && typeof Sim.toast === 'function') Sim.toast('Failed to load project from URL.', 'error');
         }
+    },
+
+    /**
+     * @IO: SCREEN_CAPTURE
+     * @INTENT: Execute a high-fidelity workspace capture using the Screen Capture API for documentation.
+     */
+    async exportHighFidelity() {
+        try {
+            const stream = await navigator.mediaDevices.getDisplayMedia({ video: { displaySurface: "browser" }, audio: false, preferCurrentTab: true });
+            const video = document.createElement('video');
+            video.srcObject = stream;
+            await video.play();
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth; canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            stream.getTracks().forEach(track => track.stop());
+            const a = document.createElement('a');
+            a.download = `HiFi_Snapshot_${Date.now()}.png`;
+            a.href = canvas.toDataURL('image/png');
+            a.click();
+            if (window.Sim && typeof Sim.toast === 'function') Sim.toast('High-Fidelity Snapshot Exported.');
+        } catch (e) {
+            console.error('[FATAL] High-Fidelity export failed:', e);
+        }
     }
 };
 
