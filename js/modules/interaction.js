@@ -279,6 +279,8 @@ const InteractionHandler = {
                             const safeView = new Uint8Array(buffer).subarray(0, MAX_BYTES);
                             node.memoryData = Array.from(safeView);
                             node.dataUrl = file.name;
+                            // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Mark netlist dirty to force Wasm heap synchronization on next tick.
+                            Sim._netlistDirty = true;
                             
                             // [AUDIT: v1.25.06 | SEC_ARCH_LEAD] - Injected hardware-level diagnostic telemetry for local RAM/ROM payload ingestion.
                             const logMsg = `[MEM_CTRL] Local Flash: ${node.type} [${node.id}] <- ${file.name} (${safeView.byteLength} bytes)`;
@@ -296,6 +298,8 @@ const InteractionHandler = {
                             const buffer = await res.arrayBuffer();
                             const safeView = new Uint8Array(buffer).subarray(0, MAX_BYTES);
                             node.memoryData = Array.from(safeView);
+                            // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Mark netlist dirty to force Wasm heap synchronization on next tick.
+                            Sim._netlistDirty = true;
                             
                             // [AUDIT: v1.25.06 | SEC_ARCH_LEAD] - Injected hardware-level diagnostic telemetry for remote RAM/ROM payload ingestion.
                             const logMsg = `[MEM_CTRL] Remote Flash: ${node.type} [${node.id}] <- ${url} (${safeView.byteLength} bytes)`;
@@ -391,6 +395,8 @@ const InteractionHandler = {
                     const safeView = new Uint8Array(buffer).subarray(0, MAX_BYTES);
                     node.memoryData = Array.from(safeView);
                     node.dataUrl = file.name;
+                    // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Mark netlist dirty to force Wasm heap synchronization on next tick.
+                    Sim._netlistDirty = true;
                     
                     if (window.NodeRenderer) {
                         const el = document.getElementById(nodeId);
@@ -410,8 +416,10 @@ const InteractionHandler = {
                         Sim.toast(`${node.type} payload flashed from ${file.name}.`, 'success');
                     }
                     Sim.autoSave();
+                    // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - EXIT_TRACE: Memory buffer mounted and netlist marked dirty for Wasm sync.
                 } catch (err) {
                     Sim.toast('Failed to mount memory buffer.', 'danger');
+                    // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - EXIT_TRACE: Memory mount failed.
                 }
             }
         };

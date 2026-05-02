@@ -502,7 +502,19 @@ const WasmEngine = {
             const t = n.type;
 
             // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Exclude static input nodes to prevent UI flickering and primitive overwrite.
-            if (t.startsWith('IN-') || t === '0' || t === '1') return;
+            if (t.startsWith('IN-') || t === '1') return;
+
+            /**
+             * [AUDIT: v1.25.14 | SEC_ARCH_LEAD]
+             * @ARCH: WASM_BRIDGE
+             * @STATE: OPCODE_DISPATCH
+             * @INTENT: Emit Opcode 9 (CONST_0) for Constant Ground primitives to ensure native Wasm execution.
+             */
+            if (t === '0') {
+                const slot = this.getSpecificIdx(n.id, 'out0');
+                emitOP(slot, 0, 0, 9);
+                return;
+            }
 
             const getA = () => buildBusTree(resolveAllDriverIndices(n.id, 'a'));
             const getB = () => buildBusTree(resolveAllDriverIndices(n.id, 'b'));
