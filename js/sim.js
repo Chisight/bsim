@@ -1,6 +1,6 @@
 /**
  * Browser-Sim Core Engine
- * Version: 1.26.20
+ * Version: 1.26.22
  */
 const Sim = {
     nodes: [],
@@ -575,7 +575,6 @@ const Sim = {
             x: (r.left - sr.left + r.width / 2) / View.scale,
             y: (r.top - sr.top + r.height / 2) / View.scale
         };
-        // [AUDIT: v1.25.10 | SEC_ARCH_LEAD] - Resolved unreachable code path blocking extraction trace.
         return coords;
     },
 
@@ -1149,6 +1148,41 @@ const Sim = {
      * [AUDIT: SEC_ARCH_LEAD] - Entry trace for parametric node edit mode.
      */
     // [AUDIT: v1.24.43 | SEC_ARCH_LEAD] - Injected nomenclature translation layer to intercept legacy pin-dots dispatches.
+    // [AUDIT: v1.26.22 | SEC_ARCH_LEAD] - Injected finite state machine for multi-pin selection phase prior to parametric mutation.
+    enterPinSelectMode(nodeId, mode) {
+        const node = this.nodes.find(n => n.id === nodeId);
+        if (!node) return;
+        this._pinSelectState = { nodeId, mode, selected: new Set() };
+        document.body.classList.add('edit-mode-active');
+        this.toast(`Select pins to ${mode}. Click background to confirm. Drag to multi-select.`, 'info', 0);
+    },
+    commitPinSelection() {
+        const state = this._pinSelectState;
+        if (!state) return;
+        if (state.mode === 'scale' && state.selected.size < 2) {
+            this.toast('Select at least 2 pins to scale.', 'warning');
+            return;
+        }
+        if (state.selected.size === 0) {
+            this.cancelPinMutate();
+            return;
+        }
+        this._pinMutateState = { ...state };
+        this._pinSelectState = null;
+        this.toast(`Click and drag anywhere to ${state.mode}. Double-click background to finish.`, 'info', 0);
+    },
+    cancelPinMutate() {
+        this._pinSelectState = null;
+        this._pinMutateState = null;
+        document.body.classList.remove('edit-mode-active');
+        document.querySelectorAll('.port').forEach(el => {
+            el.classList.remove('selected-pin');
+            el.style.boxShadow = '';
+        });
+        this.toast('Pin edit finished.', 'success');
+        this.autoSave();
+    },
+
     enterNodeEditMode(nodeId, mode) {
         if (mode === 'pin-dots') mode = 'pin-leds';
         const node = this.nodes.find(n => n.id === nodeId);

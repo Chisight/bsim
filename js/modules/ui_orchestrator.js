@@ -19,6 +19,7 @@ const UIOrchestrator = {
             const py = n.portY !== undefined ? n.portY : 24;
             const ph = n.portH !== undefined ? n.portH : (n.customHeight || parseInt(el.style.height) || 64) - 30;
             
+            // [AUDIT: v1.26.22 | SEC_ARCH_LEAD] - Injected parametric layout overrides bypassing fixed topology matrices for granular pin placement.
             if (n.type === 'RAM') {
                 const aBits = n.addressPins || 4;
                 const dBits = 8;
@@ -30,30 +31,26 @@ const UIOrchestrator = {
                 const applyPin = (p) => {
                     const pid = p.dataset.port;
                     if (!pid) return;
-                    // [AUDIT: v1.26.20 | SEC_ARCH_LEAD] - Apply dynamic parametric scaling and unhinged offsets to absolute terminal logic.
-                    const scale = n.pinScaleFactor || 1;
-                    const cStrideR = strideR * scale;
-                    const cStrideL = strideL * scale;
-                    const pOff = (n.pinOffsets && n.pinOffsets[pid]) || { x: 0, y: 0 };
-                    
+                    if (n.pinOverrides && n.pinOverrides[pid]) {
+                        if (n.pinOverrides[pid].y !== undefined) p.style.top = n.pinOverrides[pid].y + 'px';
+                        if (n.pinOverrides[pid].x !== undefined) p.style.left = n.pinOverrides[pid].x + 'px';
+                        return;
+                    }
+                    p.style.left = '';
                     if (pid.startsWith('out')) {
                         const idx = parseInt(pid.replace('out',''));
                         const vIdx = (dBits - 1) - idx; 
-                        p.style.top = (py + vIdx * cStrideR + pOff.y) + 'px';
-                        if (pOff.x) p.style.left = pOff.x + 'px';
+                        p.style.top = (py + vIdx * strideR) + 'px';
                     } else if (pid.startsWith('din')) {
                         const idx = parseInt(pid.replace('din',''));
                         const vIdx = (dBits - 1) - idx;
-                        p.style.top = (py + vIdx * cStrideR + pOff.y) + 'px';
-                        if (pOff.x) p.style.left = pOff.x + 'px';
+                        p.style.top = (py + vIdx * strideR) + 'px';
                     } else if (pid === 'we') {
-                        p.style.top = (py + aBits * cStrideL + pOff.y) + 'px';
-                        if (pOff.x) p.style.left = pOff.x + 'px';
+                        p.style.top = (py + aBits * strideL) + 'px';
                     } else if (pid.startsWith('in')) {
                         const idx = parseInt(pid.replace('in',''));
                         const vIdx = (aBits - 1) - idx;
-                        p.style.top = (py + vIdx * cStrideL + pOff.y) + 'px';
-                        if (pOff.x) p.style.left = pOff.x + 'px';
+                        p.style.top = (py + vIdx * strideL) + 'px';
                     }
                 };
                 el.querySelectorAll('.port').forEach(applyPin);
@@ -63,6 +60,13 @@ const UIOrchestrator = {
                     const total = ports.length;
                     if (total === 0) return;
                     ports.forEach((p, i) => {
+                        const pid = p.dataset.port;
+                        if (n.pinOverrides && n.pinOverrides[pid]) {
+                            if (n.pinOverrides[pid].y !== undefined) p.style.top = n.pinOverrides[pid].y + 'px';
+                            if (n.pinOverrides[pid].x !== undefined) p.style.left = n.pinOverrides[pid].x + 'px';
+                            return;
+                        }
+                        p.style.left = '';
                         const topPct = total === 1 ? 0.5 : ((i + 0.5) / total);
                         p.style.top = (py + topPct * ph) + 'px';
                     });

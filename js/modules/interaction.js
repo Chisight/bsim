@@ -53,6 +53,9 @@ const InteractionHandler = {
                     ${((node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) && !node.type.endsWith('-1')) ? `<div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'info'); document.getElementById('context-menu').style.display='none';">↳ Edit Readout Layout</div>` : ''}
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'label'); document.getElementById('context-menu').style.display='none';">↳ Edit Label Layout</div>
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'icon'); document.getElementById('context-menu').style.display='none';">↳ Edit Icon Scale</div>
+                    // [AUDIT: v1.26.22 | SEC_ARCH_LEAD] - Injected parametric spatial override states into UI interface context layer.
+                    <div class="menu-item" style="padding-left:15px; color:#00ffaa;" onclick="Sim.enterPinSelectMode('${node.id}', 'relocate'); document.getElementById('context-menu').style.display='none';">↳ Relocate Pin(s)</div>
+                    <div class="menu-item" style="padding-left:15px; color:#00ffaa;" onclick="Sim.enterPinSelectMode('${node.id}', 'scale'); document.getElementById('context-menu').style.display='none';">↳ Scale Pin(s)</div>
                 `;
             }
 
@@ -667,6 +670,10 @@ const InteractionHandler = {
                 Sim.exitNodeEditMode();
                 return;
             }
+            if (Sim._pinMutateState) {
+                Sim.cancelPinMutate();
+                return;
+            }
         });
 
         ws.addEventListener('mousedown', (e) => {
@@ -738,6 +745,61 @@ const InteractionHandler = {
                 }
             }
 
+            // [AUDIT: v1.26.22 | SEC_ARCH_LEAD] - State machine interception for topological pin grouping phase.
+            if (Sim._pinSelectState) {
+                if (e.target.classList.contains('port')) {
+                    const pid = e.target.dataset.port;
+                    if (Sim._pinSelectState.selected.has(pid)) {
+                        Sim._pinSelectState.selected.delete(pid);
+                        e.target.style.boxShadow = '';
+                    } else {
+                        Sim._pinSelectState.selected.add(pid);
+                        e.target.style.boxShadow = '0 0 5px #00ffaa';
+                    }
+                    e.stopPropagation();
+                    return;
+                } else if (e.button === 0) {
+                    Sim.commitPinSelection();
+                    e.stopPropagation();
+                    return;
+                }
+            }
+
+            if (Sim._pinMutateState && e.button === 0) {
+                // Initialize parametric vector transformation tracking
+                Sim._pinDrag = {
+                    startX: e.clientX,
+                    startY: e.clientY,
+                    nodeId: Sim._pinMutateState.nodeId,
+                    mode: Sim._pinMutateState.mode,
+                    ports: Array.from(Sim._pinMutateState.selected),
+                    bases: {}
+                };
+                const node = Sim.nodes.find(n => n.id === Sim._pinDrag.nodeId);
+                if (!node.pinOverrides) node.pinOverrides = {};
+                
+                const nodeEl = document.getElementById(node.id);
+                let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+                
+                Sim._pinDrag.ports.forEach(pid => {
+                    const pEl = nodeEl.querySelector(`[data-port="${pid}"]`);
+                    if (pEl) {
+                        const bx = parseFloat(pEl.style.left) || (pEl.classList.contains('input') ? -6 : nodeEl.offsetWidth - 6);
+                        const by = parseFloat(pEl.style.top) || 0;
+                        Sim._pinDrag.bases[pid] = { x: bx, y: by };
+                        
+                        if (bx < minX) minX = bx; if (bx > maxX) maxX = bx;
+                        if (by < minY) minY = by; if (by > maxY) maxY = by;
+                    }
+                });
+                
+                Sim._pinDrag.centerY = (minY + maxY) / 2;
+                Sim._pinDrag.centerX = (minX + maxX) / 2;
+
+                e.stopPropagation();
+                return;
+            }
+
             // Intercept active wiring
             if (e.button === 0 && Sim.wiring.active) {
                 e.stopPropagation();
@@ -775,26 +837,52 @@ const InteractionHandler = {
             }
         });
 
-        window.addEventListener('mousemove', (e) => {
-            // [AUDIT: v1.26.20 | SEC_ARCH_LEAD] - Execute parametric edge-sliding and cluster-squish transformations in real-time.
-            if (Sim._activePinDrag) {
+        ws.addEventListener('mousemove', (e) => {
+            // [AUDIT: v1.26.22 | SEC_ARCH_LEAD] - Propagate deterministic pin mutation arrays during transform frame.
+            if (Sim._pinDrag) {
                 e.preventDefault();
-                const state = Sim._activePinDrag;
-                const node = Sim.nodes.find(n => n.id === state.nodeId);
-                if (!node) return;
+                const scale = View.scale || 1;
+                const dx = (e.clientX - Sim._pinDrag.startX) / scale;
+                const dy = (e.clientY - Sim._pinDrag.startY) / scale;
                 
-                const dy = (e.clientY - state.startY) / View.scale;
-                const dx = (e.clientX - state.startX) / View.scale;
-                
-                if (!node.pinOffsets) node.pinOffsets = {};
-                
-                if (state.mode === 'pin-relocate') {
-                    node.pinOffsets[state.portId] = { y: state.baseY + dy, x: state.baseX + dx };
-                } else if (state.mode === 'pin-scale') {
-                    node.pinScaleFactor = 1 + (dy * 0.01);
-                }
+                const node = Sim.nodes.find(n => n.id === Sim._pinDrag.nodeId);
+                const el = document.getElementById(node.id);
+                const nw = node.customWidth || parseInt(el.style.width) || 100;
+                const nh = node.customHeight || parseInt(el.style.height) || 100;
+
+                Sim._pinDrag.ports.forEach(pid => {
+                    const base = Sim._pinDrag.bases[pid];
+                    if (!base) return;
+                    if (!node.pinOverrides[pid]) node.pinOverrides[pid] = { ...base };
+                    
+                    if (Sim._pinDrag.mode === 'relocate') {
+                        let nx = base.x + dx;
+                        let ny = base.y + dy;
+                        const dLeft = Math.abs(nx);
+                        const dRight = Math.abs(nx - nw);
+                        const dTop = Math.abs(ny);
+                        const dBot = Math.abs(ny - nh);
+                        const minD = Math.min(dLeft, dRight, dTop, dBot);
+                        
+                        if (minD === dLeft) nx = -6;
+                        else if (minD === dRight) nx = nw - 6;
+                        else if (minD === dTop) ny = -6;
+                        else ny = nh - 6;
+
+                        node.pinOverrides[pid].x = Math.max(-10, Math.min(nw + 10, nx));
+                        node.pinOverrides[pid].y = Math.max(-10, Math.min(nh + 10, ny));
+                        
+                    } else if (Sim._pinDrag.mode === 'scale') {
+                        const distY = base.y - Sim._pinDrag.centerY;
+                        const distX = base.x - Sim._pinDrag.centerX;
+                        const factor = 1 + (dy * 0.01) + (dx * 0.01);
+                        node.pinOverrides[pid].y = Sim._pinDrag.centerY + (distY * factor);
+                        node.pinOverrides[pid].x = Sim._pinDrag.centerX + (distX * factor);
+                    }
+                });
                 
                 if (window.UIOrchestrator) UIOrchestrator.updateNodeVisual(Sim, node);
+                else Sim.updateNodeVisual(node);
                 Sim.updateWireVisuals();
                 return;
             }
@@ -833,6 +921,29 @@ const InteractionHandler = {
             marquee.style.left = left + 'px'; marquee.style.top = top + 'px';
             marquee.style.width = width + 'px'; marquee.style.height = height + 'px';
 
+            // [AUDIT: v1.26.22 | SEC_ARCH_LEAD] - Dynamic intersection computation for multi-port marquee selection context.
+            if (Sim._pinSelectState) {
+                const nodeEl = document.getElementById(Sim._pinSelectState.nodeId);
+                if (nodeEl) {
+                    nodeEl.querySelectorAll('.port').forEach(p => {
+                        const pr = p.getBoundingClientRect();
+                        const px = (pr.left + pr.width/2 - wr.left);
+                        const py = (pr.top + pr.height/2 - wr.top);
+                        const isContained = (px >= left && px <= left + width && py >= top && py <= top + height);
+                        if (isContained) {
+                            Sim._pinSelectState.selected.add(p.dataset.port);
+                            p.classList.add('selected-pin');
+                            p.style.boxShadow = '0 0 5px #00ffaa';
+                        } else if (!e.shiftKey) {
+                            Sim._pinSelectState.selected.delete(p.dataset.port);
+                            p.classList.remove('selected-pin');
+                            p.style.boxShadow = '';
+                        }
+                    });
+                }
+                return;
+            }
+
             Sim.nodes.forEach(n => {
                 const el = document.getElementById(n.id);
                 if (!el) return;
@@ -852,9 +963,9 @@ const InteractionHandler = {
         });
 
         window.addEventListener('mouseup', () => {
-            // [AUDIT: v1.26.20 | SEC_ARCH_LEAD] - Finalize parametric pin mutations and commit to heap state.
-            if (Sim._activePinDrag) {
-                Sim._activePinDrag = null;
+            // [AUDIT: v1.26.22 | SEC_ARCH_LEAD] - Commit matrix transformation array mapping.
+            if (Sim._pinDrag) {
+                Sim._pinDrag = null;
                 Sim.autoSave();
                 return;
             }
