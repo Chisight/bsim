@@ -47,26 +47,28 @@
   )
 
   (func $nand (param $a i32) (param $b i32) (result i32)
-    ;; [AUDIT: v1.26.06 | SEC_ARCH_LEAD] - High-Z (2) propagation support for native NAND primitive to enforce dual-engine parity.
+    ;; [AUDIT: v1.26.06 | SEC_ARCH_LEAD] - High-Z (2) propagation support for native NAND primitive with 0-dominance.
     local.get $a
-    i32.const 2
+    i32.const 0
     i32.eq
     local.get $b
-    i32.const 2
+    i32.const 0
     i32.eq
     i32.or
     (if (result i32)
-      (then i32.const 2)
+      (then i32.const 1)
       (else
         local.get $a
-        i32.const 1
+        i32.const 2
         i32.eq
         local.get $b
-        i32.const 1
+        i32.const 2
         i32.eq
-        i32.and
-        i32.const 1
-        i32.xor
+        i32.or
+        (if (result i32)
+          (then i32.const 2)
+          (else i32.const 0)
+        )
       )
     )
   )
