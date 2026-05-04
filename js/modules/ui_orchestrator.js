@@ -11,13 +11,16 @@ const UIOrchestrator = {
     updateNodeVisual(sim, n) {
         const el = document.getElementById(n.id); if (!el) return;
         
-        if (n.customWidth) el.style.width = n.customWidth + 'px';
-        if (n.customHeight) el.style.height = n.customHeight + 'px';
+        // [AUDIT: v1.26.20 | SEC_ARCH_LEAD] - Decoupled strict geometric pin bounds to permit independent macro chassis down-scaling regardless of terminal count.
+        if (n.customWidth) { el.style.width = n.customWidth + 'px'; el.style.minWidth = n.customWidth + 'px'; }
+        if (n.customHeight) { el.style.height = n.customHeight + 'px'; el.style.minHeight = n.customHeight + 'px'; }
 
-        if (n.portY !== undefined || n.portH !== undefined) {
+        // [AUDIT: v1.26.25 | SEC_ARCH_LEAD] - Expanded layout evaluation gate to ensure isolated pin override tracking maps cleanly to physical DOM rendering.
+        if (n.portY !== undefined || n.portH !== undefined || n.pinOffsets || n.pinScaleFactor || n.pinOverrides) {
             const py = n.portY !== undefined ? n.portY : 24;
             const ph = n.portH !== undefined ? n.portH : (n.customHeight || parseInt(el.style.height) || 64) - 30;
             
+            // [AUDIT: v1.26.22 | SEC_ARCH_LEAD] - Injected parametric layout overrides bypassing fixed topology matrices for granular pin placement.
             if (n.type === 'RAM') {
                 const aBits = n.addressPins || 4;
                 const dBits = 8;
@@ -29,6 +32,12 @@ const UIOrchestrator = {
                 const applyPin = (p) => {
                     const pid = p.dataset.port;
                     if (!pid) return;
+                    if (n.pinOverrides && n.pinOverrides[pid]) {
+                        if (n.pinOverrides[pid].y !== undefined) p.style.top = n.pinOverrides[pid].y + 'px';
+                        if (n.pinOverrides[pid].x !== undefined) p.style.left = n.pinOverrides[pid].x + 'px';
+                        return;
+                    }
+                    p.style.left = '';
                     if (pid.startsWith('out')) {
                         const idx = parseInt(pid.replace('out',''));
                         const vIdx = (dBits - 1) - idx; 
@@ -52,6 +61,13 @@ const UIOrchestrator = {
                     const total = ports.length;
                     if (total === 0) return;
                     ports.forEach((p, i) => {
+                        const pid = p.dataset.port;
+                        if (n.pinOverrides && n.pinOverrides[pid]) {
+                            if (n.pinOverrides[pid].y !== undefined) p.style.top = n.pinOverrides[pid].y + 'px';
+                            if (n.pinOverrides[pid].x !== undefined) p.style.left = n.pinOverrides[pid].x + 'px';
+                            return;
+                        }
+                        p.style.left = '';
                         const topPct = total === 1 ? 0.5 : ((i + 0.5) / total);
                         p.style.top = (py + topPct * ph) + 'px';
                     });

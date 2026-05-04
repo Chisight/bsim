@@ -7,8 +7,8 @@ const InteractionHandler = {
      */
     handleNodeDrag(e, node, div) {
         console.debug('[DEBUG] Node onmousedown triggered. Node ID:', node.id, '| Button pressed:', e.button);
-        // [AUDIT: SEC_ARCH_LEAD] - Global freeze on node topological drags during layout configurations.
-        if (document.body.classList.contains('edit-mode-active')) return;
+        // [AUDIT: v1.26.24 | SEC_ARCH_LEAD] - Global freeze on node topological drags during layout configurations.
+        if (document.body.classList.contains('edit-mode-active') || document.body.classList.contains('pin-mutate-active')) return;
 
         if (e.target.classList.contains('port')) {
             return;
@@ -51,6 +51,8 @@ const InteractionHandler = {
                     ${((node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) && !node.type.endsWith('-1')) ? `<div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'info'); document.getElementById('context-menu').style.display='none';">↳ Edit Readout Layout</div>` : ''}
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'label'); document.getElementById('context-menu').style.display='none';">↳ Edit Label Layout</div>
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'icon'); document.getElementById('context-menu').style.display='none';">↳ Edit Icon Scale</div>
+                    <div class="menu-item" style="padding-left:15px; color:#00ffaa;" onclick="Sim.enterPinSelectMode('${node.id}', 'relocate'); document.getElementById('context-menu').style.display='none';">↳ Relocate Pin(s)</div>
+                    <div class="menu-item" style="padding-left:15px; color:#00ffaa;" onclick="Sim.enterPinSelectMode('${node.id}', 'scale'); document.getElementById('context-menu').style.display='none';">↳ Scale Pin(s)</div>
                 `;
             }
 
@@ -152,8 +154,8 @@ const InteractionHandler = {
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for logical state toggle.
      */
     handleNodeClick(e, node, div, bits) {
-        // [AUDIT: SEC_ARCH_LEAD] - Global freeze on node topological clicks during layout configurations.
-        if (document.body.classList.contains('edit-mode-active')) return;
+        // [AUDIT: v1.26.24 | SEC_ARCH_LEAD] - Global freeze on node topological clicks during layout configurations.
+        if (document.body.classList.contains('edit-mode-active') || document.body.classList.contains('pin-mutate-active')) return;
         if (e.target.classList.contains('port') || e.target.classList.contains('bit-dot')) return;
         if (e.shiftKey) return; // Reserved for Port Interaction
         if (node.type.startsWith('IN-')) {
@@ -660,9 +662,13 @@ const InteractionHandler = {
         });
 
         ws.addEventListener('dblclick', (e) => {
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Escape hatch for parametric node edit mode via workspace double-click.
+            // [AUDIT: v1.26.27 | SEC_ARCH_LEAD] - Workspace escape trigger synced to unified pin selection state machine.
             if (Sim.activeNodeEdit) {
                 Sim.exitNodeEditMode();
+                return;
+            }
+            if (Sim._pinSelectState) {
+                Sim.cancelPinMutate();
                 return;
             }
         });
@@ -718,6 +724,24 @@ const InteractionHandler = {
                 return;
             }
 
+            // [AUDIT: v1.26.20 | SEC_ARCH_LEAD] - Intercept deterministic grid loop to capture custom pin boundary manipulation.
+            if (e.button === 0 && Sim.activeNodeEdit && (Sim.activeNodeEdit.mode === 'pin-relocate' || Sim.activeNodeEdit.mode === 'pin-scale')) {
+                if (e.target.classList.contains('port') || e.target.classList.contains('port-label')) {
+                    e.stopPropagation();
+                    const portEl = e.target.classList.contains('port') ? e.target : e.target.closest('.port');
+                    Sim._activePinDrag = {
+                        mode: Sim.activeNodeEdit.mode,
+                        nodeId: Sim.activeNodeEdit.nodeId,
+                        portId: portEl.dataset.port,
+                        startY: e.clientY,
+                        startX: e.clientX,
+                        baseY: parseFloat(portEl.style.top) || 0,
+                        baseX: parseFloat(portEl.style.left) || 0
+                    };
+                    return;
+                }
+            }
+
             // Intercept active wiring
             if (e.button === 0 && Sim.wiring.active) {
                 e.stopPropagation();
@@ -755,7 +779,76 @@ const InteractionHandler = {
             }
         });
 
-        window.addEventListener('mousemove', (e) => {
+        ws.addEventListener('mousemove', (e) => {
+            // [AUDIT: v1.26.22 | SEC_ARCH_LEAD] - Propagate deterministic pin mutation arrays during transform frame.
+            if (Sim._pinDrag) {
+                e.preventDefault();
+                const scale = View.scale || 1;
+                const dx = (e.clientX - Sim._pinDrag.startX) / scale;
+                const dy = (e.clientY - Sim._pinDrag.startY) / scale;
+                
+                const node = Sim.nodes.find(n => n.id === Sim._pinDrag.nodeId);
+                const el = document.getElementById(node.id);
+                const nw = node.customWidth || parseInt(el.style.width) || 100;
+                const nh = node.customHeight || parseInt(el.style.height) || 100;
+
+                // [AUDIT: v1.26.27 | SEC_ARCH_LEAD] - Enforced perimeter edge-clamping logic and deterministic grid tracking for dynamic collision avoidance.
+                const occupiedCoords = new Set();
+                if (Sim._pinDrag.mode === 'relocate') {
+                    Object.entries(node.pinOverrides || {}).forEach(([opid, pos]) => {
+                        if (!Sim._pinDrag.ports.includes(opid)) occupiedCoords.add(`${Math.round(pos.x)},${Math.round(pos.y)}`);
+                    });
+                }
+
+                Sim._pinDrag.ports.forEach(pid => {
+                    const base = Sim._pinDrag.bases[pid];
+                    if (!base) return;
+                    if (!node.pinOverrides[pid]) node.pinOverrides[pid] = { ...base };
+                    
+                    if (Sim._pinDrag.mode === 'relocate') {
+                        let tx = base.x + dx;
+                        let ty = base.y + dy;
+                        
+                        const dL = Math.abs(tx - (-6));
+                        const dR = Math.abs(tx - (nw - 6));
+                        const dT = Math.abs(ty - (-6));
+                        const dB = Math.abs(ty - (nh - 6));
+                        const minD = Math.min(dL, dR, dT, dB);
+                        
+                        if (minD === dL) tx = -6;
+                        else if (minD === dR) tx = nw - 6;
+                        else if (minD === dT) ty = -6;
+                        else ty = nh - 6;
+
+                        if (minD === dL || minD === dR) {
+                            ty = Math.round(ty / 20) * 20;
+                            ty = Math.max(0, Math.min(nh, ty));
+                            while (occupiedCoords.has(`${tx},${ty}`) && ty <= nh + 20) ty += 20;
+                        } else {
+                            tx = Math.round(tx / 20) * 20;
+                            tx = Math.max(0, Math.min(nw, tx));
+                            while (occupiedCoords.has(`${tx},${ty}`) && tx <= nw + 20) tx += 20;
+                        }
+                        
+                        occupiedCoords.add(`${tx},${ty}`);
+                        node.pinOverrides[pid].x = tx;
+                        node.pinOverrides[pid].y = ty;
+                        
+                    } else if (Sim._pinDrag.mode === 'scale') {
+                        const distY = base.y - Sim._pinDrag.centerY;
+                        const distX = base.x - Sim._pinDrag.centerX;
+                        const factor = Math.max(0.1, 1 + (dy * 0.01) + (dx * 0.01));
+                        node.pinOverrides[pid].y = Sim._pinDrag.centerY + (distY * factor);
+                        node.pinOverrides[pid].x = Sim._pinDrag.centerX + (distX * factor);
+                    }
+                });
+                
+                if (window.UIOrchestrator) UIOrchestrator.updateNodeVisual(Sim, node);
+                else Sim.updateNodeVisual(node);
+                Sim.updateWireVisuals();
+                return;
+            }
+
             if (Sim._activeWireDrag) {
                 e.preventDefault();
                 const state = Sim._activeWireDrag;
@@ -790,6 +883,29 @@ const InteractionHandler = {
             marquee.style.left = left + 'px'; marquee.style.top = top + 'px';
             marquee.style.width = width + 'px'; marquee.style.height = height + 'px';
 
+            // [AUDIT: v1.26.23 | SEC_ARCH_LEAD] - Dynamic intersection computation for multi-port marquee selection context.
+            if (Sim._pinSelectState) {
+                const nodeEl = document.getElementById(Sim._pinSelectState.nodeId);
+                if (nodeEl) {
+                    nodeEl.querySelectorAll('.port').forEach(p => {
+                        const pr = p.getBoundingClientRect();
+                        const px = (pr.left - wr.left + pr.width/2);
+                        const py = (pr.top - wr.top + pr.height/2);
+                        const isContained = (px >= left && px <= left + width && py >= top && py <= top + height);
+                        if (isContained) {
+                            Sim._pinSelectState.selected.add(p.dataset.port);
+                            p.classList.add('selected-pin');
+                            p.style.boxShadow = '0 0 5px #00ffaa';
+                        } else if (!e.shiftKey) {
+                            Sim._pinSelectState.selected.delete(p.dataset.port);
+                            p.classList.remove('selected-pin');
+                            p.style.boxShadow = '';
+                        }
+                    });
+                }
+                return;
+            }
+
             Sim.nodes.forEach(n => {
                 const el = document.getElementById(n.id);
                 if (!el) return;
@@ -809,6 +925,13 @@ const InteractionHandler = {
         });
 
         window.addEventListener('mouseup', () => {
+            // [AUDIT: v1.26.27 | SEC_ARCH_LEAD] - Terminate drag tracking loop seamlessly while preserving selection highlight clusters.
+            if (Sim._pinDrag) {
+                Sim._pinDrag = null;
+                Sim.autoSave();
+                return;
+            }
+
             if (Sim._activeWireDrag) {
                 const state = Sim._activeWireDrag;
                 Sim._activeWireDrag = null;
