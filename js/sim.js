@@ -1,6 +1,6 @@
 /**
  * Browser-Sim Core Engine
- * Version: 1.26.04
+ * Version: 1.26.05
  */
 const Sim = {
     nodes: [],
@@ -365,18 +365,21 @@ const Sim = {
                 const applyPin = (p) => {
                     const pid = p.dataset.port;
                     if (!pid) return;
-                    // [AUDIT: v1.26.04 | SEC_ARCH_LEAD] - Offset Data In pins vertically below Address block to eliminate spatial overlap.
+                    // [AUDIT: v1.26.05 | SEC_ARCH_LEAD] - Restored MSB-first pin polarity alignment to match standard IN-8 / OUT-8 layouts.
                     if (pid.startsWith('out')) {
                         const idx = parseInt(pid.replace('out', ''));
-                        p.style.top = (py + idx * 20) + 'px';
+                        const vIdx = (dBits - 1) - idx;
+                        p.style.top = (py + vIdx * 20) + 'px';
                     } else if (pid.startsWith('din')) {
                         const idx = parseInt(pid.replace('din', ''));
-                        p.style.top = (py + (aBits + 1 + idx) * 20) + 'px';
+                        const vIdx = (dBits - 1) - idx;
+                        p.style.top = (py + (aBits + 1 + vIdx) * 20) + 'px';
                     } else if (pid === 'we') {
                         p.style.top = (py + aBits * 20) + 'px';
                     } else if (pid.startsWith('in')) {
                         const idx = parseInt(pid.replace('in', ''));
-                        p.style.top = (py + idx * 20) + 'px';
+                        const vIdx = (aBits - 1) - idx;
+                        p.style.top = (py + vIdx * 20) + 'px';
                     }
                 };
 
