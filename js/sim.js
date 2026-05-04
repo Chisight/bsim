@@ -1,6 +1,6 @@
 /**
  * Browser-Sim Core Engine
- * Version: 1.26.25
+ * Version: 1.26.26
  */
 const Sim = {
     nodes: [],
@@ -581,8 +581,9 @@ const Sim = {
     /**
      */
     handlePortInteraction(e, nodeId, portId) {
-        // [AUDIT: v1.26.23 | SEC_ARCH_LEAD] - Intercept port interaction for parametric layout phase to block wiring state.
+        // [AUDIT: v1.26.26 | SEC_ARCH_LEAD] - Suppress native browser text/element drag loops that stall JS coordinate tracking.
         if (this._pinSelectState && this._pinSelectState.nodeId === nodeId) {
+            e.preventDefault();
             const pEl = document.getElementById(nodeId)?.querySelector(`[data-port="${portId}"]`);
             if (!pEl) return;
             
@@ -1207,11 +1208,12 @@ const Sim = {
         const nodeEl = document.getElementById(node.id);
         let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
         
+        // [AUDIT: v1.26.26 | SEC_ARCH_LEAD] - Extract absolute rendering coordinates rather than parsing dynamic CSS properties.
         this._pinDrag.ports.forEach(pid => {
             const pEl = nodeEl.querySelector(`[data-port="${pid}"]`);
             if (pEl) {
-                const bx = parseFloat(pEl.style.left) || (pEl.classList.contains('input') ? -6 : nodeEl.offsetWidth - 6);
-                const by = parseFloat(pEl.style.top) || 0;
+                const bx = pEl.offsetLeft;
+                const by = pEl.offsetTop;
                 this._pinDrag.bases[pid] = { x: bx, y: by };
                 if (bx < minX) minX = bx; if (bx > maxX) maxX = bx;
                 if (by < minY) minY = by; if (by > maxY) maxY = by;
