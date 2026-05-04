@@ -1,6 +1,6 @@
 /**
  * Browser-Sim Core Engine
- * Version: 1.26.03
+ * Version: 1.26.04
  */
 const Sim = {
     nodes: [],
@@ -365,12 +365,13 @@ const Sim = {
                 const applyPin = (p) => {
                     const pid = p.dataset.port;
                     if (!pid) return;
+                    // [AUDIT: v1.26.04 | SEC_ARCH_LEAD] - Offset Data In pins vertically below Address block to eliminate spatial overlap.
                     if (pid.startsWith('out')) {
                         const idx = parseInt(pid.replace('out', ''));
                         p.style.top = (py + idx * 20) + 'px';
                     } else if (pid.startsWith('din')) {
                         const idx = parseInt(pid.replace('din', ''));
-                        p.style.top = (py + idx * 20) + 'px';
+                        p.style.top = (py + (aBits + 1 + idx) * 20) + 'px';
                     } else if (pid === 'we') {
                         p.style.top = (py + aBits * 20) + 'px';
                     } else if (pid.startsWith('in')) {

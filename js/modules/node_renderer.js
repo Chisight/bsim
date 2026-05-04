@@ -120,7 +120,8 @@ const NodeRenderer = {
                 const aBits = node.addressPins || 4;
                 const dBits = 8;
                 
-                const leftPins = aBits + 1; 
+                // [AUDIT: v1.26.04 | SEC_ARCH_LEAD] - Expanded vertical chassis geometry to accommodate distinct Data In block offset.
+                const leftPins = aBits + 1 + dBits; 
                 const rightPins = dBits;
                 const maxPins = Math.max(leftPins, rightPins);
                 const heightCalc = (maxPins * 20 + 30);
@@ -129,7 +130,6 @@ const NodeRenderer = {
                 div.style.height = heightCalc + 'px';
                 div.style.width = node.customWidth ? node.customWidth + 'px' : '100px';
 
-                // [AUDIT: v1.26.03 | SEC_ARCH_LEAD] - Corrected RAM pin alignment polarity to match bus standards.
                 for (let i = 0; i < aBits; i++) {
                     const visualIdx = i;
                     const tStyle = `top:calc(24px + ${visualIdx * 20}px)`;
@@ -142,8 +142,9 @@ const NodeRenderer = {
                 for (let i = 0; i < dBits; i++) {
                     const visualIdx = i;
                     const tStyle = `top:calc(24px + ${visualIdx * 20}px)`;
+                    const dinStyle = `left:-6px; top:calc(24px + ${(aBits + 1 + visualIdx) * 20}px)`;
                     portsHtml += `<div class="port output" data-port="out${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${i}')"><span class="port-label">D${i}</span></div>`;
-                    portsHtml += `<div class="port input" data-port="din${i}" style="left:-6px; top:calc(24px + ${visualIdx * 20}px)" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'din${i}')"><span class="port-label" style="left:14px; text-align:left;">DI${i}</span></div>`;
+                    portsHtml += `<div class="port input" data-port="din${i}" style="${dinStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'din${i}')"><span class="port-label" style="left:14px; text-align:left;">DI${i}</span></div>`;
                 }
             } else if (node.isCustom) {
                 const chipDef = Sim.library[node.type];
