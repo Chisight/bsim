@@ -61,73 +61,48 @@ const Engine = {
 
     getDrivingSignal(sim, nodeId, portId, visited = new Set()) {
         const key = `${nodeId}:${portId}`;
-        if (visited.has(key)) return 'Z';
+        if (visited.has(key)) return 0;
         visited.add(key);
 
-        let signals = [];
+        let high = false;
         sim.wires.forEach(w => {
             if (w.to.nodeId === nodeId && w.to.portId === portId) {
-                signals.push(this.getSignal(sim, w.from.nodeId, w.from.portId, visited));
+                if (this.getSignal(sim, w.from.nodeId, w.from.portId, visited)) high = true;
             } else if (w.from.nodeId === nodeId && w.from.portId === portId) {
-                signals.push(this.getSignal(sim, w.to.nodeId, w.to.portId, visited));
+                if (this.getSignal(sim, w.to.nodeId, w.to.portId, visited)) high = true;
             }
         });
 
-        if (signals.length === 0) return 'Z';
-        for (let sig of signals) {
-            if (sig === 1 || sig === true) return 1;
-        }
-        if (signals.every(s => s === 'Z' || s === null)) return 'Z';
-        return 0;
+        return high ? 1 : 0;
     },
 
     calculateNextState(sim, node) {
         if (node.type === 'JUNCTION') return this.getDrivingSignal(sim, node.id, 'j');
         if (node.type === '0') return 0;
         if (node.type === 'NOT') {
-            const s = this.getDrivingSignal(sim, node.id, 'a');
-            return (s === 'Z' || s === null) ? 'Z' : (s ? 0 : 1);
+            return this.getDrivingSignal(sim, node.id, 'a') ? 0 : 1;
         }
         if (node.type === 'AND') {
-            const s1 = this.getDrivingSignal(sim, node.id, 'a');
-            const s2 = this.getDrivingSignal(sim, node.id, 'b');
-            if (s1 === 'Z' || s2 === 'Z' || s1 === null || s2 === null) return 'Z';
-            return (s1 && s2) ? 1 : 0;
+            return (this.getDrivingSignal(sim, node.id, 'a') && this.getDrivingSignal(sim, node.id, 'b')) ? 1 : 0;
         }
         if (node.type === 'OR') {
-            const s1 = this.getDrivingSignal(sim, node.id, 'a');
-            const s2 = this.getDrivingSignal(sim, node.id, 'b');
-            if (s1 === 'Z' || s2 === 'Z' || s1 === null || s2 === null) return 'Z';
-            return (s1 || s2) ? 1 : 0;
+            return (this.getDrivingSignal(sim, node.id, 'a') || this.getDrivingSignal(sim, node.id, 'b')) ? 1 : 0;
         }
         if (node.type === 'NAND') {
-            const s1 = this.getDrivingSignal(sim, node.id, 'a');
-            const s2 = this.getDrivingSignal(sim, node.id, 'b');
-            if (s1 === 'Z' || s2 === 'Z' || s1 === null || s2 === null) return 'Z';
-            return (s1 && s2) ? 0 : 1;
+            return (this.getDrivingSignal(sim, node.id, 'a') && this.getDrivingSignal(sim, node.id, 'b')) ? 0 : 1;
         }
         if (node.type === 'NOR') {
-            const s1 = this.getDrivingSignal(sim, node.id, 'a');
-            const s2 = this.getDrivingSignal(sim, node.id, 'b');
-            if (s1 === 'Z' || s2 === 'Z' || s1 === null || s2 === null) return 'Z';
-            return (s1 || s2) ? 0 : 1;
+            return (this.getDrivingSignal(sim, node.id, 'a') || this.getDrivingSignal(sim, node.id, 'b')) ? 0 : 1;
         }
         if (node.type === 'XOR') {
-            const s1 = this.getDrivingSignal(sim, node.id, 'a');
-            const s2 = this.getDrivingSignal(sim, node.id, 'b');
-            if (s1 === 'Z' || s2 === 'Z' || s1 === null || s2 === null) return 'Z';
-            return (s1 ^ s2) ? 1 : 0;
+            return (this.getDrivingSignal(sim, node.id, 'a') ^ this.getDrivingSignal(sim, node.id, 'b')) ? 1 : 0;
         }
         if (node.type === 'XNOR') {
-            const s1 = this.getDrivingSignal(sim, node.id, 'a');
-            const s2 = this.getDrivingSignal(sim, node.id, 'b');
-            if (s1 === 'Z' || s2 === 'Z' || s1 === null || s2 === null) return 'Z';
-            return (s1 ^ s2) ? 0 : 1;
+            return (this.getDrivingSignal(sim, node.id, 'a') ^ this.getDrivingSignal(sim, node.id, 'b')) ? 0 : 1;
         }
         if (node.type === 'TRISTATE') {
             const en = this.getDrivingSignal(sim, node.id, 'en');
-            if (en === 1 || en === true) return this.getDrivingSignal(sim, node.id, 'in');
-            return 'Z';
+            return en ? this.getDrivingSignal(sim, node.id, 'in') : 0;
         }
         if (node.type === 'DFF') {
             const d = this.getDrivingSignal(sim, node.id, 'd');
@@ -135,15 +110,15 @@ const Engine = {
             let q = (node.val && node.val.q !== undefined) ? node.val.q : 0;
             if (clk === 1 && node._lastClk === 0) q = d;
             node._lastClk = clk;
-            return { q: q, nq: q === 'Z' ? 'Z' : (q ? 0 : 1) };
+            return { q: q, nq: q ? 0 : 1 };
         }
         if (node.type === 'TFF') {
             const t = this.getDrivingSignal(sim, node.id, 't');
             const clk = this.getDrivingSignal(sim, node.id, 'clk');
             let q = (node.val && node.val.q !== undefined) ? node.val.q : 0;
-            if (clk === 1 && node._lastClk === 0 && t === 1) q = q === 'Z' ? 'Z' : (q ? 0 : 1);
+            if (clk === 1 && node._lastClk === 0 && t === 1) q = q ? 0 : 1;
             node._lastClk = clk;
-            return { q: q, nq: q === 'Z' ? 'Z' : (q ? 0 : 1) };
+            return { q: q, nq: q ? 0 : 1 };
         }
         if (node.type === 'CLOCK') {
             // [AUDIT: v1.27.17 | SEC_ARCH_LEAD] - Synchronized temporal frame references across engines to prevent oscillator faults.
@@ -161,20 +136,14 @@ const Engine = {
             const aBits = node.addressPins || 4;
             const addr = [];
             for (let i = 0; i < aBits; i++) addr.push(this.getDrivingSignal(sim, node.id, `in${i}`));
-            if (addr.some(b => b === 'Z' || b === null)) return node.val || {};
-
             const addrVal = parseInt(addr.reverse().join(''), 2);
             const we = this.getDrivingSignal(sim, node.id, 'we');
-
             if (we === 1) {
                 if (!node.memoryData) node.memoryData = new Array(Math.pow(2, aBits)).fill(0);
                 const din = [];
                 for (let i = 0; i < 8; i++) din.push(this.getDrivingSignal(sim, node.id, `din${i}`));
-                if (!din.some(b => b === 'Z' || b === null)) {
-                    node.memoryData[addrVal] = parseInt(din.reverse().join(''), 2);
-                }
+                node.memoryData[addrVal] = parseInt(din.reverse().join(''), 2);
             }
-
             const outVal = (node.memoryData && node.memoryData[addrVal] !== undefined) ? node.memoryData[addrVal] : 0;
             const res = {};
             const binStr = outVal.toString(2).padStart(8, '0');
@@ -183,13 +152,10 @@ const Engine = {
         }
         if (node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
             const bits = parseInt(node.type.split('-')[1]) || 1;
-            if (bits === 1) {
-                return this.getDrivingSignal(sim, node.id, 'in0');
-            }
+            if (bits === 1) return this.getDrivingSignal(sim, node.id, 'in0');
             const nextState = [];
             for (let i = 0; i < bits; i++) {
-                const sig = this.getDrivingSignal(sim, node.id, `in${i}`);
-                nextState.push((sig === 'Z' || sig === null) ? 'Z' : (sig ? 1 : 0));
+                nextState.push(this.getDrivingSignal(sim, node.id, `in${i}`) ? 1 : 0);
             }
             return nextState;
         }
