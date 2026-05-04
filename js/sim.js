@@ -1,6 +1,6 @@
 /**
  * Browser-Sim Core Engine
- * Version: 1.26.08
+ * Version: 1.26.09
  */
 const Sim = {
     nodes: [],
@@ -358,28 +358,29 @@ const Sim = {
 
             // [AUDIT: v1.25.49 | SEC_ARCH_LEAD] - Rewritten RAM port matrix traversal to decouple read/write bus strides and eliminate collision clipping.
             if (n.type === 'RAM') {
-                // [AUDIT: v1.26.03 | SEC_ARCH_LEAD] - Rigid 20px spatial constraint applied to resolve hit-box unreachability and dynamic scaling overlap. Reversing pin iteration for polarity sync.
+                // [AUDIT: v1.26.09 | SEC_ARCH_LEAD] - Converted RAM pin spatial anchors to relative percentages to support interactive bounding box scaling.
                 const aBits = n.addressPins || 4;
                 const dBits = 8;
+                const leftPins = aBits + 1 + dBits;
+                const rightPins = dBits;
 
                 const applyPin = (p) => {
                     const pid = p.dataset.port;
                     if (!pid) return;
-                    // [AUDIT: v1.26.08 | SEC_ARCH_LEAD] - Optimized logic block vertical density by clustering Data Out pins independently of Data In offset.
                     if (pid.startsWith('out')) {
                         const idx = parseInt(pid.replace('out', ''));
                         const vIdx = (dBits - 1) - idx;
-                        p.style.top = (py + vIdx * 20) + 'px';
+                        p.style.top = `calc(24px + ${(vIdx / Math.max(1, rightPins - 1))} * (100% - 48px))`;
                     } else if (pid.startsWith('din')) {
                         const idx = parseInt(pid.replace('din', ''));
                         const vIdx = (aBits + 1) + ((dBits - 1) - idx);
-                        p.style.top = (py + vIdx * 20) + 'px';
+                        p.style.top = `calc(24px + ${(vIdx / Math.max(1, leftPins - 1))} * (100% - 48px))`;
                     } else if (pid === 'we') {
-                        p.style.top = (py + aBits * 20) + 'px';
+                        p.style.top = `calc(24px + ${(aBits / Math.max(1, leftPins - 1))} * (100% - 48px))`;
                     } else if (pid.startsWith('in')) {
                         const idx = parseInt(pid.replace('in', ''));
                         const vIdx = (aBits - 1) - idx;
-                        p.style.top = (py + vIdx * 20) + 'px';
+                        p.style.top = `calc(24px + ${(vIdx / Math.max(1, leftPins - 1))} * (100% - 48px))`;
                     }
                 };
 

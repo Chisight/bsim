@@ -115,35 +115,48 @@ const NodeRenderer = {
                     <div class="port output" data-port="q" style="top:42%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'q')"><span class="port-label">Q</span></div>
                     <div class="port output" data-port="nq" style="top:78%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'nq')"><span class="port-label">NQ</span></div>`;
             } else if (node.type === 'RAM') {
-                // [AUDIT: v1.26.08 | SEC_ARCH_LEAD] - Compacted RAM primitive geometry by isolating Data Out bus vertical index.
+                // [AUDIT: v1.26.09 | SEC_ARCH_LEAD] - Implemented percentage-based relative positioning for RAM pins to support dynamic user scaling and label bounding. Removed misaligned offsets.
                 const aBits = node.addressPins || 4;
                 const dBits = 8;
                 
                 const leftPins = aBits + 1 + dBits; 
                 const rightPins = dBits;
                 const maxPins = Math.max(leftPins, rightPins);
-                const heightCalc = (maxPins * 20 + 30);
                 
-                div.style.minHeight = heightCalc + 'px';
-                div.style.height = heightCalc + 'px';
-                div.style.width = node.customWidth ? node.customWidth + 'px' : '100px';
+                if (node.customHeight) {
+                    div.style.height = node.customHeight + 'px';
+                    div.style.minHeight = node.customHeight + 'px';
+                } else {
+                    const heightCalc = (maxPins * 20 + 30);
+                    div.style.minHeight = heightCalc + 'px';
+                    div.style.height = heightCalc + 'px';
+                }
+                
+                if (node.customWidth) {
+                    div.style.width = node.customWidth + 'px';
+                    div.style.minWidth = node.customWidth + 'px';
+                } else {
+                    div.style.width = '100px';
+                }
+
+                const getPct = (vIdx, total) => `calc(24px + ${(vIdx / Math.max(1, total - 1))} * (100% - 48px))`;
 
                 for (let i = 0; i < aBits; i++) {
                     const visualIdx = (aBits - 1) - i;
-                    const tStyle = `top:calc(24px + ${visualIdx * 20}px)`;
+                    const tStyle = `top:${getPct(visualIdx, leftPins)}`;
                     portsHtml += `<div class="port input" data-port="in${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'in${i}')"><span class="port-label">A${i}</span></div>`;
                 }
                 
-                const ctrlY = aBits * 20 + 24;
-                portsHtml += `<div class="port input" data-port="we" style="top:${ctrlY}px" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'we')"><span class="port-label">WE</span></div>`;
+                const weIdx = aBits;
+                portsHtml += `<div class="port input" data-port="we" style="top:${getPct(weIdx, leftPins)}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'we')"><span class="port-label">WE</span></div>`;
 
                 for (let i = 0; i < dBits; i++) {
                     const vIdxOut = (dBits - 1) - i;
                     const vIdxIn = (aBits + 1) + ((dBits - 1) - i);
-                    const tStyle = `top:calc(24px + ${vIdxOut * 20}px)`;
-                    const dinStyle = `left:-6px; top:calc(24px + ${vIdxIn * 20}px)`;
+                    const tStyle = `top:${getPct(vIdxOut, rightPins)}`;
+                    const dinStyle = `top:${getPct(vIdxIn, leftPins)}`;
                     portsHtml += `<div class="port output" data-port="out${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${i}')"><span class="port-label">D${i}</span></div>`;
-                    portsHtml += `<div class="port input" data-port="din${i}" style="${dinStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'din${i}')"><span class="port-label" style="left:14px; text-align:left;">DI${i}</span></div>`;
+                    portsHtml += `<div class="port input" data-port="din${i}" style="${dinStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'din${i}')"><span class="port-label">DI${i}</span></div>`;
                 }
             } else if (node.isCustom) {
                 const chipDef = Sim.library[node.type];
