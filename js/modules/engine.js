@@ -126,7 +126,7 @@ const Engine = {
         }
         if (node.type === 'TRISTATE') {
             const en = this.getDrivingSignal(sim, node.id, 'en');
-            if (en === 1 || en === true) return this.getDrivingSignal(sim, node.id, 'in0');
+            if (en === 1 || en === true) return this.getDrivingSignal(sim, node.id, 'in');
             return 'Z';
         }
         if (node.type === 'DFF') {
