@@ -89,38 +89,38 @@ const Engine = {
             return (s === 'Z' || s === null) ? 'Z' : (s ? 0 : 1);
         }
         if (node.type === 'AND') {
-            const s1 = this.getDrivingSignal(sim, node.id, 'in0');
-            const s2 = this.getDrivingSignal(sim, node.id, 'in1');
+            const s1 = this.getDrivingSignal(sim, node.id, 'a');
+            const s2 = this.getDrivingSignal(sim, node.id, 'b');
             if (s1 === 'Z' || s2 === 'Z' || s1 === null || s2 === null) return 'Z';
             return (s1 && s2) ? 1 : 0;
         }
         if (node.type === 'OR') {
-            const s1 = this.getDrivingSignal(sim, node.id, 'in0');
-            const s2 = this.getDrivingSignal(sim, node.id, 'in1');
+            const s1 = this.getDrivingSignal(sim, node.id, 'a');
+            const s2 = this.getDrivingSignal(sim, node.id, 'b');
             if (s1 === 'Z' || s2 === 'Z' || s1 === null || s2 === null) return 'Z';
             return (s1 || s2) ? 1 : 0;
         }
         if (node.type === 'NAND') {
-            const s1 = this.getDrivingSignal(sim, node.id, 'in0');
-            const s2 = this.getDrivingSignal(sim, node.id, 'in1');
+            const s1 = this.getDrivingSignal(sim, node.id, 'a');
+            const s2 = this.getDrivingSignal(sim, node.id, 'b');
             if (s1 === 'Z' || s2 === 'Z' || s1 === null || s2 === null) return 'Z';
             return (s1 && s2) ? 0 : 1;
         }
         if (node.type === 'NOR') {
-            const s1 = this.getDrivingSignal(sim, node.id, 'in0');
-            const s2 = this.getDrivingSignal(sim, node.id, 'in1');
+            const s1 = this.getDrivingSignal(sim, node.id, 'a');
+            const s2 = this.getDrivingSignal(sim, node.id, 'b');
             if (s1 === 'Z' || s2 === 'Z' || s1 === null || s2 === null) return 'Z';
             return (s1 || s2) ? 0 : 1;
         }
         if (node.type === 'XOR') {
-            const s1 = this.getDrivingSignal(sim, node.id, 'in0');
-            const s2 = this.getDrivingSignal(sim, node.id, 'in1');
+            const s1 = this.getDrivingSignal(sim, node.id, 'a');
+            const s2 = this.getDrivingSignal(sim, node.id, 'b');
             if (s1 === 'Z' || s2 === 'Z' || s1 === null || s2 === null) return 'Z';
             return (s1 ^ s2) ? 1 : 0;
         }
         if (node.type === 'XNOR') {
-            const s1 = this.getDrivingSignal(sim, node.id, 'in0');
-            const s2 = this.getDrivingSignal(sim, node.id, 'in1');
+            const s1 = this.getDrivingSignal(sim, node.id, 'a');
+            const s2 = this.getDrivingSignal(sim, node.id, 'b');
             if (s1 === 'Z' || s2 === 'Z' || s1 === null || s2 === null) return 'Z';
             return (s1 ^ s2) ? 0 : 1;
         }
@@ -296,13 +296,7 @@ const Engine = {
             if (isPureNative) {
                 let changed = false;
                 if (sim._netlistDirty) {
-                    const mapPort = p => {
-                        if (p === 'a') return 'in0';
-                        if (p === 'b') return 'in1';
-                        if (p === 'q') return 'out0';
-                        if (p === 'nq') return 'out1';
-                        return p;
-                    };
+                    const mapPort = p => p;
                     const mappedWires = sim.wires.map(w => ({
                         ...w,
                         from: { ...w.from, portId: mapPort(w.from.portId) },
@@ -529,13 +523,7 @@ const Engine = {
         const isPureNative = this.isPureNative(sim.nodes, sim.library);
         if (!isPureNative) return sim.toast('Parity check requires native logic components only.', 'warning');
         console.group(`[Diagnostics] Wasm vs V8 State Parity Sweep (${iterations} Cycles)`);
-        const mapPort = p => {
-            if (p === 'a') return 'in0';
-            if (p === 'b') return 'in1';
-            if (p === 'q') return 'out0';
-            if (p === 'nq') return 'out1';
-            return p;
-        };
+        const mapPort = p => p;
         const mappedWires = sim.wires.map(w => ({
             ...w,
             from: { ...w.from, portId: mapPort(w.from.portId) },
