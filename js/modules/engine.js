@@ -1,6 +1,6 @@
 /**
- * Simulation Engine Module v1.26.01
- * [AUDIT: v1.26.01 | SEC_ARCH_LEAD] - Extracted core logical evaluation kernel from sim.js to isolate simulation math from UI orchestration.
+ * Simulation Engine Module v1.26.06
+ * [AUDIT: v1.26.06 | SEC_ARCH_LEAD] - Injected universal High-Z decoding for native primitives to align with NAND propagation parity.
  */
 const Engine = {
     // KERNEL set for purity validation
@@ -338,7 +338,8 @@ const Engine = {
                     const NATIVE_GATES = new Set(['NAND', 'CLOCK', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'TRISTATE']);
                     if (NATIVE_GATES.has(n.type) && !n.isCustom) {
                         let newVal = WasmEngine.readState(n.id);
-                        if (newVal === 2 && n.type === 'TRISTATE') newVal = 'Z';
+                        // [AUDIT: v1.26.06 | SEC_ARCH_LEAD] - Corrected High-Z decoding for all native primitives.
+                        if (newVal === 2) newVal = 'Z';
                         if (n.val !== newVal || n._forcePropagate) {
                             n._forcePropagate = false;
                             n.val = newVal;
