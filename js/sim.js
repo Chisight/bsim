@@ -1,6 +1,6 @@
 /**
  * Browser-Sim Core Engine
- * Version: 1.26.22
+ * Version: 1.26.23
  */
 const Sim = {
     nodes: [],
@@ -581,6 +581,32 @@ const Sim = {
     /**
      */
     handlePortInteraction(e, nodeId, portId) {
+        // [AUDIT: v1.26.23 | SEC_ARCH_LEAD] - Intercept port interaction for parametric layout phase to block wiring state.
+        if (this._pinSelectState && this._pinSelectState.nodeId === nodeId) {
+            const pEl = document.getElementById(nodeId)?.querySelector(`[data-port="${portId}"]`);
+            if (!pEl) return;
+            
+            if (this._pinSelectState.selected.has(portId)) {
+                if (e.shiftKey) {
+                    this._pinSelectState.selected.delete(portId);
+                    pEl.classList.remove('selected-pin');
+                    pEl.style.boxShadow = '';
+                    return;
+                }
+                if (this._pinSelectState.mode === 'scale' && this._pinSelectState.selected.size < 2) {
+                    this.toast('Select at least 2 pins to scale.', 'warning');
+                    return;
+                }
+                if (e.button === 0) this.commitPinSelection(e.clientX, e.clientY);
+                return;
+            }
+            
+            this._pinSelectState.selected.add(portId);
+            pEl.classList.add('selected-pin');
+            pEl.style.boxShadow = '0 0 5px #00ffaa';
+            return;
+        }
+
         // [AUDIT: SEC_ARCH_LEAD] - Global freeze on wiring interactions during layout configurations.
         if (document.body.classList.contains('edit-mode-active')) return;
         const pEl = document.getElementById(nodeId)?.querySelector(`[data-port="${portId}"]`);
@@ -1148,38 +1174,63 @@ const Sim = {
      * [AUDIT: SEC_ARCH_LEAD] - Entry trace for parametric node edit mode.
      */
     // [AUDIT: v1.24.43 | SEC_ARCH_LEAD] - Injected nomenclature translation layer to intercept legacy pin-dots dispatches.
-    // [AUDIT: v1.26.22 | SEC_ARCH_LEAD] - Injected finite state machine for multi-pin selection phase prior to parametric mutation.
+    // [AUDIT: v1.26.23 | SEC_ARCH_LEAD] - Implemented fluid pin selection clustering and instant drag vectors.
     enterPinSelectMode(nodeId, mode) {
         const node = this.nodes.find(n => n.id === nodeId);
         if (!node) return;
         this._pinSelectState = { nodeId, mode, selected: new Set() };
         document.body.classList.add('edit-mode-active');
-        this.toast(`Select pins to ${mode}. Click background to confirm. Drag to multi-select.`, 'info', 0);
+        this.toast(`[${mode.toUpperCase()}] Click pins or drag box to select. Click a selected pin to begin dragging. Double-click background to save.`, 'info', 0);
     },
-    commitPinSelection() {
+    commitPinSelection(clientX, clientY) {
         const state = this._pinSelectState;
         if (!state) return;
-        if (state.mode === 'scale' && state.selected.size < 2) {
-            this.toast('Select at least 2 pins to scale.', 'warning');
-            return;
-        }
-        if (state.selected.size === 0) {
-            this.cancelPinMutate();
-            return;
-        }
+        if (state.mode === 'scale' && state.selected.size < 2) return;
+        if (state.selected.size === 0) return;
+
         this._pinMutateState = { ...state };
         this._pinSelectState = null;
-        this.toast(`Click and drag anywhere to ${state.mode}. Double-click background to finish.`, 'info', 0);
+        this.toast(`Dragging ${state.selected.size} pins...`, 'info', 0);
+
+        this._pinDrag = {
+            startX: clientX,
+            startY: clientY,
+            nodeId: this._pinMutateState.nodeId,
+            mode: this._pinMutateState.mode,
+            ports: Array.from(this._pinMutateState.selected),
+            bases: {}
+        };
+
+        const node = this.nodes.find(n => n.id === this._pinDrag.nodeId);
+        if (!node.pinOverrides) node.pinOverrides = {};
+        
+        const nodeEl = document.getElementById(node.id);
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        
+        this._pinDrag.ports.forEach(pid => {
+            const pEl = nodeEl.querySelector(`[data-port="${pid}"]`);
+            if (pEl) {
+                const bx = parseFloat(pEl.style.left) || (pEl.classList.contains('input') ? -6 : nodeEl.offsetWidth - 6);
+                const by = parseFloat(pEl.style.top) || 0;
+                this._pinDrag.bases[pid] = { x: bx, y: by };
+                if (bx < minX) minX = bx; if (bx > maxX) maxX = bx;
+                if (by < minY) minY = by; if (by > maxY) maxY = by;
+            }
+        });
+        
+        this._pinDrag.centerY = (minY + maxY) / 2;
+        this._pinDrag.centerX = (minX + maxX) / 2;
     },
     cancelPinMutate() {
         this._pinSelectState = null;
         this._pinMutateState = null;
+        this._pinDrag = null;
         document.body.classList.remove('edit-mode-active');
         document.querySelectorAll('.port').forEach(el => {
             el.classList.remove('selected-pin');
             el.style.boxShadow = '';
         });
-        this.toast('Pin edit finished.', 'success');
+        this.toast('Pin layout modifications saved.', 'success');
         this.autoSave();
     },
 

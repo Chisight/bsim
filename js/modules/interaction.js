@@ -667,7 +667,7 @@ const InteractionHandler = {
                 Sim.exitNodeEditMode();
                 return;
             }
-            if (Sim._pinMutateState) {
+            if (Sim._pinSelectState || Sim._pinMutateState) {
                 Sim.cancelPinMutate();
                 return;
             }
@@ -742,59 +742,19 @@ const InteractionHandler = {
                 }
             }
 
-            // [AUDIT: v1.26.22 | SEC_ARCH_LEAD] - State machine interception for topological pin grouping phase.
-            if (Sim._pinSelectState) {
-                if (e.target.classList.contains('port')) {
-                    const pid = e.target.dataset.port;
-                    if (Sim._pinSelectState.selected.has(pid)) {
-                        Sim._pinSelectState.selected.delete(pid);
-                        e.target.style.boxShadow = '';
-                    } else {
-                        Sim._pinSelectState.selected.add(pid);
-                        e.target.style.boxShadow = '0 0 5px #00ffaa';
+            // [AUDIT: v1.26.23 | SEC_ARCH_LEAD] - Cleared redundant state machine interception. Mousedown marquee initiates natively.
+            if (Sim._pinSelectState && e.button === 0) {
+                if (e.target === ws || e.target.id === 'grid-layer') {
+                    if (!e.shiftKey) {
+                        Sim._pinSelectState.selected.clear();
+                        document.querySelectorAll('.selected-pin').forEach(p => {
+                            p.classList.remove('selected-pin');
+                            p.style.boxShadow = '';
+                        });
                     }
-                    e.stopPropagation();
-                    return;
-                } else if (e.button === 0) {
-                    Sim.commitPinSelection();
-                    e.stopPropagation();
+                } else {
                     return;
                 }
-            }
-
-            if (Sim._pinMutateState && e.button === 0) {
-                // Initialize parametric vector transformation tracking
-                Sim._pinDrag = {
-                    startX: e.clientX,
-                    startY: e.clientY,
-                    nodeId: Sim._pinMutateState.nodeId,
-                    mode: Sim._pinMutateState.mode,
-                    ports: Array.from(Sim._pinMutateState.selected),
-                    bases: {}
-                };
-                const node = Sim.nodes.find(n => n.id === Sim._pinDrag.nodeId);
-                if (!node.pinOverrides) node.pinOverrides = {};
-                
-                const nodeEl = document.getElementById(node.id);
-                let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
-                
-                Sim._pinDrag.ports.forEach(pid => {
-                    const pEl = nodeEl.querySelector(`[data-port="${pid}"]`);
-                    if (pEl) {
-                        const bx = parseFloat(pEl.style.left) || (pEl.classList.contains('input') ? -6 : nodeEl.offsetWidth - 6);
-                        const by = parseFloat(pEl.style.top) || 0;
-                        Sim._pinDrag.bases[pid] = { x: bx, y: by };
-                        
-                        if (bx < minX) minX = bx; if (bx > maxX) maxX = bx;
-                        if (by < minY) minY = by; if (by > maxY) maxY = by;
-                    }
-                });
-                
-                Sim._pinDrag.centerY = (minY + maxY) / 2;
-                Sim._pinDrag.centerX = (minX + maxX) / 2;
-
-                e.stopPropagation();
-                return;
             }
 
             // Intercept active wiring
@@ -918,14 +878,14 @@ const InteractionHandler = {
             marquee.style.left = left + 'px'; marquee.style.top = top + 'px';
             marquee.style.width = width + 'px'; marquee.style.height = height + 'px';
 
-            // [AUDIT: v1.26.22 | SEC_ARCH_LEAD] - Dynamic intersection computation for multi-port marquee selection context.
+            // [AUDIT: v1.26.23 | SEC_ARCH_LEAD] - Dynamic intersection computation for multi-port marquee selection context.
             if (Sim._pinSelectState) {
                 const nodeEl = document.getElementById(Sim._pinSelectState.nodeId);
                 if (nodeEl) {
                     nodeEl.querySelectorAll('.port').forEach(p => {
                         const pr = p.getBoundingClientRect();
-                        const px = (pr.left + pr.width/2 - wr.left);
-                        const py = (pr.top + pr.height/2 - wr.top);
+                        const px = (pr.left - wr.left + pr.width/2);
+                        const py = (pr.top - wr.top + pr.height/2);
                         const isContained = (px >= left && px <= left + width && py >= top && py <= top + height);
                         if (isContained) {
                             Sim._pinSelectState.selected.add(p.dataset.port);
@@ -960,10 +920,13 @@ const InteractionHandler = {
         });
 
         window.addEventListener('mouseup', () => {
-            // [AUDIT: v1.26.22 | SEC_ARCH_LEAD] - Commit matrix transformation array mapping.
+            // [AUDIT: v1.26.23 | SEC_ARCH_LEAD] - Commit matrix transformation array mapping and return to selection phase for subsequent mutations.
             if (Sim._pinDrag) {
                 Sim._pinDrag = null;
                 Sim.autoSave();
+                Sim._pinSelectState = { ...Sim._pinMutateState };
+                Sim._pinMutateState = null;
+                Sim.toast(`[${Sim._pinSelectState.mode.toUpperCase()}] Pin modifications applied. Click selected pins to modify further.`, 'success', 0);
                 return;
             }
 
