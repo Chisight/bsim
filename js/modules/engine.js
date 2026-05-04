@@ -146,7 +146,8 @@ const Engine = {
             return { q: q, nq: q === 'Z' ? 'Z' : (q ? 0 : 1) };
         }
         if (node.type === 'CLOCK') {
-            const now = Date.now();
+            // [AUDIT: v1.27.17 | SEC_ARCH_LEAD] - Synchronized temporal frame references across engines to prevent oscillator faults.
+            const now = performance.now();
             const freq = node.freq || 1;
             const interval = 1000 / (freq * 2);
             if (!node.lastTick) node.lastTick = now;

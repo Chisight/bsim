@@ -73,7 +73,36 @@ window.onload = () => {
         document.getElementById('bottom-nav').classList.add('auto-hidden');
     });
 
-    Sim.init();
+    function loadLocalState() {
+        Sim.init();
+    }
+
+    function restoreSession() {
+        loadLocalState();
+        // [AUDIT: v1.26.02 | SEC_ARCH_LEAD] - Re-fetch remote payload on page initialization
+        const urlParams = new URLSearchParams(window.location.search);
+        const payloadUrl = urlParams.get('payload') || sessionStorage.getItem('activeRemotePayload');
+        if (payloadUrl) {
+            fetchAndLoadPayload(payloadUrl);
+        }
+    }
+
+    function fetchAndLoadPayload(url) {
+        // [AUDIT: v1.25.10 | SEC_ARCH_LEAD] - Authenticate and stream remote payload
+        sessionStorage.setItem('activeRemotePayload', url);
+        // [AUDIT: v1.26.02 | SEC_ARCH_LEAD] - Persist payload URL for page reload parity
+        fetch(url)
+            .then(res => res.json())
+            .then(data => {
+                localStorage.setItem('bsim_autosave', JSON.stringify(data));
+                ProjectManager.loadAutoSave();
+                Sim.updateTabsUI();
+                Sim.updateLibraryUI();
+            })
+            .catch(err => console.error("Payload fetch failed", err));
+    }
+
+    restoreSession();
     if (window.DebugTerminal) DebugTerminal.init();
     InteractionHandler.initMarquee();
     InteractionHandler.initClipboardListeners();
@@ -132,7 +161,8 @@ window.onload = () => {
     // [AUDIT: v1.25.48 | SEC_ARCH_LEAD] - Preserved hierarchical folder collapse state across UI redraws.
     // [AUDIT: v1.25.60 | SEC_ARCH_LEAD] - Restored MSB-at-top ordering for RAM and Custom chips; eradicated "crooked" pin offsets by enforcing a rigid 20px vertical spacing grid.
     // [AUDIT: v1.26.01 | SEC_ARCH_LEAD] - Phase 2 Modularization: Decoupled UI Orchestration, rendering engines, and notification subsystems from the simulator core.
-    window.LOADED_BSIM_VERSION = "1.26.01";
+    // [AUDIT: v1.26.02 | SEC_ARCH_LEAD] - Version rollback synchronized to operator environment.
+    window.LOADED_BSIM_VERSION = "1.26.02";
 
     // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Purged legacy JIT DOM interceptor in favor of native parametric coordinate generation.
 

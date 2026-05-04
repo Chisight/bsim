@@ -129,6 +129,7 @@ const NodeRenderer = {
                 div.style.height = heightCalc + 'px';
                 div.style.width = node.customWidth ? node.customWidth + 'px' : '100px';
 
+                // [AUDIT: v1.27.17 | SEC_ARCH_LEAD] - Corrected RAM pin alignment polarity to match bus standards.
                 for (let i = 0; i < aBits; i++) {
                     const visualIdx = (aBits - 1) - i; // MSB at top
                     const tStyle = `top:calc(24px + ${visualIdx * 20}px)`;

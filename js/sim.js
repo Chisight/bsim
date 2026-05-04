@@ -1,6 +1,6 @@
 /**
- * Simulator Core v1.25.49 (Modular Professional)
- * [AUDIT: v1.25.49 | SEC_ARCH_LEAD] - Eradicated layout collision bounds for RAM parametric scaling to restore address pin reachability.
+ * Browser-Sim Core Engine
+ * Version: 1.26.02
  */
 const Sim = {
     nodes: [],
@@ -360,30 +360,26 @@ const Sim = {
             if (n.type === 'RAM') {
                 const aBits = n.addressPins || 4;
                 const dBits = 8;
-                const leftPins = aBits + 1;
-                const rightPins = dBits;
-                const maxPins = Math.max(leftPins, rightPins);
-                const strideL = leftPins > 1 ? ph / (leftPins - 1) : 0;
-                const strideR = rightPins > 1 ? ph / (rightPins - 1) : 0;
 
                 const applyPin = (p) => {
                     const pid = p.dataset.port;
                     if (!pid) return;
+                    // [AUDIT: v1.27.17 | SEC_ARCH_LEAD] - Force 20px absolute stride constraint for RAM geometric layout to eliminate hit-box unreachability and dynamic scaling overlap.
                     if (pid.startsWith('out')) {
                         const idx = parseInt(pid.replace('out', ''));
                         const vIdx = (dBits - 1) - idx; // MSB at top
-                        p.style.top = (py + vIdx * strideR) + 'px';
+                        p.style.top = (py + vIdx * 20) + 'px';
                     } else if (pid.startsWith('din')) {
                         const idx = parseInt(pid.replace('din', ''));
                         const vIdx = (dBits - 1) - idx; // MSB at top
-                        p.style.top = (py + vIdx * strideR) + 'px';
+                        p.style.top = (py + vIdx * 20) + 'px';
                     } else if (pid === 'we') {
                         // WE is placed at the end of the left side (address block)
-                        p.style.top = (py + aBits * strideL) + 'px';
+                        p.style.top = (py + aBits * 20) + 'px';
                     } else if (pid.startsWith('in')) {
                         const idx = parseInt(pid.replace('in', ''));
                         const vIdx = (aBits - 1) - idx; // MSB at top
-                        p.style.top = (py + vIdx * strideL) + 'px';
+                        p.style.top = (py + vIdx * 20) + 'px';
                     }
                 };
 
@@ -782,7 +778,9 @@ const Sim = {
                 { label: 'Output 4', type: 'OUT-4' },
                 { label: 'Output 8', type: 'OUT-8' },
                 // [AUDIT: v1.24.63 | SEC_ARCH_LEAD] - Injected RAM primitive into UI category.
-                { label: 'RAM 8-Bit', type: 'RAM' }
+                { label: 'RAM 8-Bit', type: 'RAM' },
+                // [AUDIT: v1.27.17 | SEC_ARCH_LEAD] - Registered absolute ground primitive to user interface.
+                { label: 'Ground (0)', type: '0' }
             ],
             'Utilities': [
                 { label: 'Clock Generator', type: 'CLOCK' }
