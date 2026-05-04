@@ -115,9 +115,10 @@ const NodeRenderer = {
                     <div class="port output" data-port="q" style="top:42%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'q')"><span class="port-label">Q</span></div>
                     <div class="port output" data-port="nq" style="top:78%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'nq')"><span class="port-label">NQ</span></div>`;
             } else if (node.type === 'RAM') {
-                // [AUDIT: v1.25.60 | SEC_ARCH_LEAD] - Restored MSB-at-top pin ordering for RAM; A[n] and D[n] are now visually prioritized at the top of the chassis.
-                // [AUDIT: v1.25.60 | SEC_ARCH_LEAD] - Standardized fixed 20px vertical spacing to eliminate fractional pixel offsets and "crooked" pin rendering.
-                // [AUDIT: v1.26.05 | SEC_ARCH_LEAD] - Restored MSB-first pin polarity and retained Data In vertical offset logic.
+                // [AUDIT: v1.26.06 | SEC_ARCH_LEAD] - Restored MSB-at-top polarity and established structural offset for Data In bus to prevent pin collision.
+                const aBits = node.addressPins || 4;
+                const dBits = 8;
+                
                 const leftPins = aBits + 1 + dBits; 
                 const rightPins = dBits;
                 const maxPins = Math.max(leftPins, rightPins);
@@ -137,9 +138,10 @@ const NodeRenderer = {
                 portsHtml += `<div class="port input" data-port="we" style="top:${ctrlY}px" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'we')"><span class="port-label">WE</span></div>`;
 
                 for (let i = 0; i < dBits; i++) {
-                    const visualIdx = (dBits - 1) - i;
-                    const tStyle = `top:calc(24px + ${visualIdx * 20}px)`;
-                    const dinStyle = `left:-6px; top:calc(24px + ${(aBits + 1 + visualIdx) * 20}px)`;
+                    const vIdxOut = (dBits - 1) - i;
+                    const vIdxIn = (aBits + 1) + ((dBits - 1) - i);
+                    const tStyle = `top:calc(24px + ${vIdxOut * 20}px)`;
+                    const dinStyle = `left:-6px; top:calc(24px + ${vIdxIn * 20}px)`;
                     portsHtml += `<div class="port output" data-port="out${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${i}')"><span class="port-label">D${i}</span></div>`;
                     portsHtml += `<div class="port input" data-port="din${i}" style="${dinStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'din${i}')"><span class="port-label" style="left:14px; text-align:left;">DI${i}</span></div>`;
                 }
