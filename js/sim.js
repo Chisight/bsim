@@ -1,6 +1,6 @@
 /**
  * Browser-Sim Core Engine
- * Version: 1.26.06
+ * Version: 1.26.08
  */
 const Sim = {
     nodes: [],
@@ -365,7 +365,7 @@ const Sim = {
                 const applyPin = (p) => {
                     const pid = p.dataset.port;
                     if (!pid) return;
-                    // [AUDIT: v1.26.06 | SEC_ARCH_LEAD] - Synchronized geometric wiring anchors with updated MSB-first polarity and vertical bus offset.
+                    // [AUDIT: v1.26.08 | SEC_ARCH_LEAD] - Optimized logic block vertical density by clustering Data Out pins independently of Data In offset.
                     if (pid.startsWith('out')) {
                         const idx = parseInt(pid.replace('out', ''));
                         const vIdx = (dBits - 1) - idx;

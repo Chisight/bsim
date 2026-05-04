@@ -115,7 +115,7 @@ const NodeRenderer = {
                     <div class="port output" data-port="q" style="top:42%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'q')"><span class="port-label">Q</span></div>
                     <div class="port output" data-port="nq" style="top:78%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'nq')"><span class="port-label">NQ</span></div>`;
             } else if (node.type === 'RAM') {
-                // [AUDIT: v1.26.06 | SEC_ARCH_LEAD] - Restored MSB-at-top polarity and established structural offset for Data In bus to prevent pin collision.
+                // [AUDIT: v1.26.08 | SEC_ARCH_LEAD] - Compacted RAM primitive geometry by isolating Data Out bus vertical index.
                 const aBits = node.addressPins || 4;
                 const dBits = 8;
                 
