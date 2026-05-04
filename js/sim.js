@@ -1,6 +1,6 @@
 /**
  * Browser-Sim Core Engine
- * Version: 1.26.06
+ * Version: 1.26.10
  */
 const Sim = {
     nodes: [],
@@ -358,30 +358,34 @@ const Sim = {
 
             // [AUDIT: v1.25.49 | SEC_ARCH_LEAD] - Rewritten RAM port matrix traversal to decouple read/write bus strides and eliminate collision clipping.
             if (n.type === 'RAM') {
-                // [AUDIT: v1.26.03 | SEC_ARCH_LEAD] - Rigid 20px spatial constraint applied to resolve hit-box unreachability and dynamic scaling overlap. Reversing pin iteration for polarity sync.
-                const aBits = n.addressPins || 4;
-                const dBits = 8;
+                    // [AUDIT: v1.26.10 | SEC_ARCH_LEAD] - Re-enabled dynamic mathematical evaluation against absolute layout constraints (ph, py) to prevent wiring coordinate corruption on resize.
+                    const aBits = n.addressPins || 4;
+                    const dBits = 8;
+                    const leftPins = aBits + 1 + dBits;
+                    const rightPins = dBits;
 
-                const applyPin = (p) => {
-                    const pid = p.dataset.port;
-                    if (!pid) return;
-                    // [AUDIT: v1.26.06 | SEC_ARCH_LEAD] - Synchronized geometric wiring anchors with updated MSB-first polarity and vertical bus offset.
-                    if (pid.startsWith('out')) {
-                        const idx = parseInt(pid.replace('out', ''));
-                        const vIdx = (dBits - 1) - idx;
-                        p.style.top = (py + vIdx * 20) + 'px';
-                    } else if (pid.startsWith('din')) {
-                        const idx = parseInt(pid.replace('din', ''));
-                        const vIdx = (aBits + 1) + ((dBits - 1) - idx);
-                        p.style.top = (py + vIdx * 20) + 'px';
-                    } else if (pid === 'we') {
-                        p.style.top = (py + aBits * 20) + 'px';
-                    } else if (pid.startsWith('in')) {
-                        const idx = parseInt(pid.replace('in', ''));
-                        const vIdx = (aBits - 1) - idx;
-                        p.style.top = (py + vIdx * 20) + 'px';
-                    }
-                };
+                    const applyPin = (p) => {
+                        const pid = p.dataset.port;
+                        if (!pid) return;
+                        
+                        const getTop = (vIdx, total) => py + (total > 1 ? (vIdx / (total - 1)) * ph : ph / 2);
+
+                        if (pid.startsWith('out')) {
+                            const idx = parseInt(pid.replace('out', ''));
+                            const vIdx = (dBits - 1) - idx;
+                            p.style.top = getTop(vIdx, rightPins) + 'px';
+                        } else if (pid.startsWith('din')) {
+                            const idx = parseInt(pid.replace('din', ''));
+                            const vIdx = (aBits + 1) + ((dBits - 1) - idx);
+                            p.style.top = getTop(vIdx, leftPins) + 'px';
+                        } else if (pid === 'we') {
+                            p.style.top = getTop(aBits, leftPins) + 'px';
+                        } else if (pid.startsWith('in')) {
+                            const idx = parseInt(pid.replace('in', ''));
+                            const vIdx = (aBits - 1) - idx;
+                            p.style.top = getTop(vIdx, leftPins) + 'px';
+                        }
+                    };
 
                 el.querySelectorAll('.port').forEach(applyPin);
             } else {
