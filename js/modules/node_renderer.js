@@ -129,9 +129,9 @@ const NodeRenderer = {
                 div.style.height = heightCalc + 'px';
                 div.style.width = node.customWidth ? node.customWidth + 'px' : '100px';
 
-                // [AUDIT: v1.27.17 | SEC_ARCH_LEAD] - Corrected RAM pin alignment polarity to match bus standards.
+                // [AUDIT: v1.26.03 | SEC_ARCH_LEAD] - Corrected RAM pin alignment polarity to match bus standards.
                 for (let i = 0; i < aBits; i++) {
-                    const visualIdx = (aBits - 1) - i; // MSB at top
+                    const visualIdx = i;
                     const tStyle = `top:calc(24px + ${visualIdx * 20}px)`;
                     portsHtml += `<div class="port input" data-port="in${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'in${i}')"><span class="port-label">A${i}</span></div>`;
                 }
@@ -140,7 +140,7 @@ const NodeRenderer = {
                 portsHtml += `<div class="port input" data-port="we" style="top:${ctrlY}px" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'we')"><span class="port-label">WE</span></div>`;
 
                 for (let i = 0; i < dBits; i++) {
-                    const visualIdx = (dBits - 1) - i; // MSB at top
+                    const visualIdx = i;
                     const tStyle = `top:calc(24px + ${visualIdx * 20}px)`;
                     portsHtml += `<div class="port output" data-port="out${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${i}')"><span class="port-label">D${i}</span></div>`;
                     portsHtml += `<div class="port input" data-port="din${i}" style="left:-6px; top:calc(24px + ${visualIdx * 20}px)" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'din${i}')"><span class="port-label" style="left:14px; text-align:left;">DI${i}</span></div>`;

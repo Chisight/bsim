@@ -1,6 +1,6 @@
 /**
  * Browser-Sim Core Engine
- * Version: 1.26.02
+ * Version: 1.26.03
  */
 const Sim = {
     nodes: [],
@@ -358,28 +358,24 @@ const Sim = {
 
             // [AUDIT: v1.25.49 | SEC_ARCH_LEAD] - Rewritten RAM port matrix traversal to decouple read/write bus strides and eliminate collision clipping.
             if (n.type === 'RAM') {
+                // [AUDIT: v1.26.03 | SEC_ARCH_LEAD] - Rigid 20px spatial constraint applied to resolve hit-box unreachability and dynamic scaling overlap. Reversing pin iteration for polarity sync.
                 const aBits = n.addressPins || 4;
                 const dBits = 8;
 
                 const applyPin = (p) => {
                     const pid = p.dataset.port;
                     if (!pid) return;
-                    // [AUDIT: v1.27.17 | SEC_ARCH_LEAD] - Force 20px absolute stride constraint for RAM geometric layout to eliminate hit-box unreachability and dynamic scaling overlap.
                     if (pid.startsWith('out')) {
                         const idx = parseInt(pid.replace('out', ''));
-                        const vIdx = (dBits - 1) - idx; // MSB at top
-                        p.style.top = (py + vIdx * 20) + 'px';
+                        p.style.top = (py + idx * 20) + 'px';
                     } else if (pid.startsWith('din')) {
                         const idx = parseInt(pid.replace('din', ''));
-                        const vIdx = (dBits - 1) - idx; // MSB at top
-                        p.style.top = (py + vIdx * 20) + 'px';
+                        p.style.top = (py + idx * 20) + 'px';
                     } else if (pid === 'we') {
-                        // WE is placed at the end of the left side (address block)
                         p.style.top = (py + aBits * 20) + 'px';
                     } else if (pid.startsWith('in')) {
                         const idx = parseInt(pid.replace('in', ''));
-                        const vIdx = (aBits - 1) - idx; // MSB at top
-                        p.style.top = (py + vIdx * 20) + 'px';
+                        p.style.top = (py + idx * 20) + 'px';
                     }
                 };
 
