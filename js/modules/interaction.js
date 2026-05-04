@@ -46,6 +46,8 @@ const InteractionHandler = {
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-leds'); document.getElementById('context-menu').style.display='none';">↳ Edit Pin LEDs</div>
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-labels'); document.getElementById('context-menu').style.display='none';">↳ Edit Pin Labels</div>
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-both'); document.getElementById('context-menu').style.display='none';">↳ Edit Both (Sync)</div>
+                    <div class="menu-item" style="padding-left:15px; color:#00ffaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-relocate'); document.getElementById('context-menu').style.display='none';">↳ Relocate Pin(s)</div>
+                    <div class="menu-item" style="padding-left:15px; color:#00ffaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-scale'); document.getElementById('context-menu').style.display='none';">↳ Scale Pin(s)</div>
                     ` : ''}
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.toggleNodePolarity('${node.id}'); document.getElementById('context-menu').style.display='none';">↳ Flip Pin Polarity</div>
                     ${((node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) && !node.type.endsWith('-1')) ? `<div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'info'); document.getElementById('context-menu').style.display='none';">↳ Edit Readout Layout</div>` : ''}
@@ -718,6 +720,24 @@ const InteractionHandler = {
                 return;
             }
 
+            // [AUDIT: v1.26.20 | SEC_ARCH_LEAD] - Intercept deterministic grid loop to capture custom pin boundary manipulation.
+            if (e.button === 0 && Sim.activeNodeEdit && (Sim.activeNodeEdit.mode === 'pin-relocate' || Sim.activeNodeEdit.mode === 'pin-scale')) {
+                if (e.target.classList.contains('port') || e.target.classList.contains('port-label')) {
+                    e.stopPropagation();
+                    const portEl = e.target.classList.contains('port') ? e.target : e.target.closest('.port');
+                    Sim._activePinDrag = {
+                        mode: Sim.activeNodeEdit.mode,
+                        nodeId: Sim.activeNodeEdit.nodeId,
+                        portId: portEl.dataset.port,
+                        startY: e.clientY,
+                        startX: e.clientX,
+                        baseY: parseFloat(portEl.style.top) || 0,
+                        baseX: parseFloat(portEl.style.left) || 0
+                    };
+                    return;
+                }
+            }
+
             // Intercept active wiring
             if (e.button === 0 && Sim.wiring.active) {
                 e.stopPropagation();
@@ -756,6 +776,29 @@ const InteractionHandler = {
         });
 
         window.addEventListener('mousemove', (e) => {
+            // [AUDIT: v1.26.20 | SEC_ARCH_LEAD] - Execute parametric edge-sliding and cluster-squish transformations in real-time.
+            if (Sim._activePinDrag) {
+                e.preventDefault();
+                const state = Sim._activePinDrag;
+                const node = Sim.nodes.find(n => n.id === state.nodeId);
+                if (!node) return;
+                
+                const dy = (e.clientY - state.startY) / View.scale;
+                const dx = (e.clientX - state.startX) / View.scale;
+                
+                if (!node.pinOffsets) node.pinOffsets = {};
+                
+                if (state.mode === 'pin-relocate') {
+                    node.pinOffsets[state.portId] = { y: state.baseY + dy, x: state.baseX + dx };
+                } else if (state.mode === 'pin-scale') {
+                    node.pinScaleFactor = 1 + (dy * 0.01);
+                }
+                
+                if (window.UIOrchestrator) UIOrchestrator.updateNodeVisual(Sim, node);
+                Sim.updateWireVisuals();
+                return;
+            }
+
             if (Sim._activeWireDrag) {
                 e.preventDefault();
                 const state = Sim._activeWireDrag;
@@ -809,6 +852,13 @@ const InteractionHandler = {
         });
 
         window.addEventListener('mouseup', () => {
+            // [AUDIT: v1.26.20 | SEC_ARCH_LEAD] - Finalize parametric pin mutations and commit to heap state.
+            if (Sim._activePinDrag) {
+                Sim._activePinDrag = null;
+                Sim.autoSave();
+                return;
+            }
+
             if (Sim._activeWireDrag) {
                 const state = Sim._activeWireDrag;
                 Sim._activeWireDrag = null;

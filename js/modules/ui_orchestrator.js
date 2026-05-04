@@ -11,10 +11,11 @@ const UIOrchestrator = {
     updateNodeVisual(sim, n) {
         const el = document.getElementById(n.id); if (!el) return;
         
-        if (n.customWidth) el.style.width = n.customWidth + 'px';
-        if (n.customHeight) el.style.height = n.customHeight + 'px';
+        // [AUDIT: v1.26.20 | SEC_ARCH_LEAD] - Decoupled strict geometric pin bounds to permit independent macro chassis down-scaling regardless of terminal count.
+        if (n.customWidth) { el.style.width = n.customWidth + 'px'; el.style.minWidth = n.customWidth + 'px'; }
+        if (n.customHeight) { el.style.height = n.customHeight + 'px'; el.style.minHeight = n.customHeight + 'px'; }
 
-        if (n.portY !== undefined || n.portH !== undefined) {
+        if (n.portY !== undefined || n.portH !== undefined || n.pinOffsets || n.pinScaleFactor) {
             const py = n.portY !== undefined ? n.portY : 24;
             const ph = n.portH !== undefined ? n.portH : (n.customHeight || parseInt(el.style.height) || 64) - 30;
             
@@ -29,20 +30,30 @@ const UIOrchestrator = {
                 const applyPin = (p) => {
                     const pid = p.dataset.port;
                     if (!pid) return;
+                    // [AUDIT: v1.26.20 | SEC_ARCH_LEAD] - Apply dynamic parametric scaling and unhinged offsets to absolute terminal logic.
+                    const scale = n.pinScaleFactor || 1;
+                    const cStrideR = strideR * scale;
+                    const cStrideL = strideL * scale;
+                    const pOff = (n.pinOffsets && n.pinOffsets[pid]) || { x: 0, y: 0 };
+                    
                     if (pid.startsWith('out')) {
                         const idx = parseInt(pid.replace('out',''));
                         const vIdx = (dBits - 1) - idx; 
-                        p.style.top = (py + vIdx * strideR) + 'px';
+                        p.style.top = (py + vIdx * cStrideR + pOff.y) + 'px';
+                        if (pOff.x) p.style.left = pOff.x + 'px';
                     } else if (pid.startsWith('din')) {
                         const idx = parseInt(pid.replace('din',''));
                         const vIdx = (dBits - 1) - idx;
-                        p.style.top = (py + vIdx * strideR) + 'px';
+                        p.style.top = (py + vIdx * cStrideR + pOff.y) + 'px';
+                        if (pOff.x) p.style.left = pOff.x + 'px';
                     } else if (pid === 'we') {
-                        p.style.top = (py + aBits * strideL) + 'px';
+                        p.style.top = (py + aBits * cStrideL + pOff.y) + 'px';
+                        if (pOff.x) p.style.left = pOff.x + 'px';
                     } else if (pid.startsWith('in')) {
                         const idx = parseInt(pid.replace('in',''));
                         const vIdx = (aBits - 1) - idx;
-                        p.style.top = (py + vIdx * strideL) + 'px';
+                        p.style.top = (py + vIdx * cStrideL + pOff.y) + 'px';
+                        if (pOff.x) p.style.left = pOff.x + 'px';
                     }
                 };
                 el.querySelectorAll('.port').forEach(applyPin);
