@@ -1,6 +1,6 @@
 /**
  * Browser-Sim Core Engine
- * Version: 1.26.23
+ * Version: 1.26.24
  */
 const Sim = {
     nodes: [],
@@ -607,8 +607,8 @@ const Sim = {
             return;
         }
 
-        // [AUDIT: SEC_ARCH_LEAD] - Global freeze on wiring interactions during layout configurations.
-        if (document.body.classList.contains('edit-mode-active')) return;
+        // [AUDIT: v1.26.24 | SEC_ARCH_LEAD] - Global freeze on wiring interactions during layout configurations. Extended to pin-mutate state.
+        if (document.body.classList.contains('edit-mode-active') || document.body.classList.contains('pin-mutate-active')) return;
         const pEl = document.getElementById(nodeId)?.querySelector(`[data-port="${portId}"]`);
         if (e.shiftKey && !this.wiring.active) {
             const wire = this.wires.findLast(w => (w.to.nodeId === nodeId && w.to.portId === portId) || (w.from.nodeId === nodeId && w.from.portId === portId));
@@ -711,8 +711,8 @@ const Sim = {
     },
 
     toggleBit(e, nodeId, bitIndex) {
-        // [AUDIT: SEC_ARCH_LEAD] - Prevent input toggling while in layout mutation mode.
-        if (document.body.classList.contains('edit-mode-active')) return;
+        // [AUDIT: v1.26.24 | SEC_ARCH_LEAD] - Prevent input toggling while in layout mutation mode.
+        if (document.body.classList.contains('edit-mode-active') || document.body.classList.contains('pin-mutate-active')) return;
 
         // [AUDIT: v1.25.41 | SEC_ARCH_LEAD] - Refactored dependency resolution to utilize modern Event interface layer.
         if (typeof e === 'string') {
@@ -1174,12 +1174,12 @@ const Sim = {
      * [AUDIT: SEC_ARCH_LEAD] - Entry trace for parametric node edit mode.
      */
     // [AUDIT: v1.24.43 | SEC_ARCH_LEAD] - Injected nomenclature translation layer to intercept legacy pin-dots dispatches.
-    // [AUDIT: v1.26.23 | SEC_ARCH_LEAD] - Implemented fluid pin selection clustering and instant drag vectors.
+    // [AUDIT: v1.26.24 | SEC_ARCH_LEAD] - Bypassed legacy 'edit-mode-active' pointer-events lock to enable direct terminal interaction during pin mutation phase.
     enterPinSelectMode(nodeId, mode) {
         const node = this.nodes.find(n => n.id === nodeId);
         if (!node) return;
         this._pinSelectState = { nodeId, mode, selected: new Set() };
-        document.body.classList.add('edit-mode-active');
+        document.body.classList.add('pin-mutate-active');
         this.toast(`[${mode.toUpperCase()}] Click pins or drag box to select. Click a selected pin to begin dragging. Double-click background to save.`, 'info', 0);
     },
     commitPinSelection(clientX, clientY) {
@@ -1225,7 +1225,7 @@ const Sim = {
         this._pinSelectState = null;
         this._pinMutateState = null;
         this._pinDrag = null;
-        document.body.classList.remove('edit-mode-active');
+        document.body.classList.remove('pin-mutate-active');
         document.querySelectorAll('.port').forEach(el => {
             el.classList.remove('selected-pin');
             el.style.boxShadow = '';
@@ -1554,8 +1554,8 @@ const Sim = {
     /**
      */
     uiInlineEditValue(e, id, format) {
-        // [AUDIT: SEC_ARCH_LEAD] - Inline structural editor for multi-bit readouts.
-        if (document.body.classList.contains('edit-mode-active')) return;
+        // [AUDIT: v1.26.24 | SEC_ARCH_LEAD] - Inline structural editor for multi-bit readouts.
+        if (document.body.classList.contains('edit-mode-active') || document.body.classList.contains('pin-mutate-active')) return;
         const target = e.currentTarget;
         if (target.querySelector('input')) return; // Already editing
 

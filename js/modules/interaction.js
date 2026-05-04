@@ -7,8 +7,8 @@ const InteractionHandler = {
      */
     handleNodeDrag(e, node, div) {
         console.debug('[DEBUG] Node onmousedown triggered. Node ID:', node.id, '| Button pressed:', e.button);
-        // [AUDIT: SEC_ARCH_LEAD] - Global freeze on node topological drags during layout configurations.
-        if (document.body.classList.contains('edit-mode-active')) return;
+        // [AUDIT: v1.26.24 | SEC_ARCH_LEAD] - Global freeze on node topological drags during layout configurations.
+        if (document.body.classList.contains('edit-mode-active') || document.body.classList.contains('pin-mutate-active')) return;
 
         if (e.target.classList.contains('port')) {
             return;
@@ -154,8 +154,8 @@ const InteractionHandler = {
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for logical state toggle.
      */
     handleNodeClick(e, node, div, bits) {
-        // [AUDIT: SEC_ARCH_LEAD] - Global freeze on node topological clicks during layout configurations.
-        if (document.body.classList.contains('edit-mode-active')) return;
+        // [AUDIT: v1.26.24 | SEC_ARCH_LEAD] - Global freeze on node topological clicks during layout configurations.
+        if (document.body.classList.contains('edit-mode-active') || document.body.classList.contains('pin-mutate-active')) return;
         if (e.target.classList.contains('port') || e.target.classList.contains('bit-dot')) return;
         if (e.shiftKey) return; // Reserved for Port Interaction
         if (node.type.startsWith('IN-')) {
