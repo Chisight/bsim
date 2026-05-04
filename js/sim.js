@@ -1,6 +1,6 @@
 /**
  * Browser-Sim Core Engine
- * Version: 1.26.06
+ * Version: 1.26.28
  */
 const Sim = {
     nodes: [],
@@ -358,30 +358,34 @@ const Sim = {
 
             // [AUDIT: v1.25.49 | SEC_ARCH_LEAD] - Rewritten RAM port matrix traversal to decouple read/write bus strides and eliminate collision clipping.
             if (n.type === 'RAM') {
-                // [AUDIT: v1.26.03 | SEC_ARCH_LEAD] - Rigid 20px spatial constraint applied to resolve hit-box unreachability and dynamic scaling overlap. Reversing pin iteration for polarity sync.
-                const aBits = n.addressPins || 4;
-                const dBits = 8;
+                    // [AUDIT: v1.26.10 | SEC_ARCH_LEAD] - Re-enabled dynamic mathematical evaluation against absolute layout constraints (ph, py) to prevent wiring coordinate corruption on resize.
+                    const aBits = n.addressPins || 4;
+                    const dBits = 8;
+                    const leftPins = aBits + 1 + dBits;
+                    const rightPins = dBits;
 
-                const applyPin = (p) => {
-                    const pid = p.dataset.port;
-                    if (!pid) return;
-                    // [AUDIT: v1.26.06 | SEC_ARCH_LEAD] - Synchronized geometric wiring anchors with updated MSB-first polarity and vertical bus offset.
-                    if (pid.startsWith('out')) {
-                        const idx = parseInt(pid.replace('out', ''));
-                        const vIdx = (dBits - 1) - idx;
-                        p.style.top = (py + vIdx * 20) + 'px';
-                    } else if (pid.startsWith('din')) {
-                        const idx = parseInt(pid.replace('din', ''));
-                        const vIdx = (aBits + 1) + ((dBits - 1) - idx);
-                        p.style.top = (py + vIdx * 20) + 'px';
-                    } else if (pid === 'we') {
-                        p.style.top = (py + aBits * 20) + 'px';
-                    } else if (pid.startsWith('in')) {
-                        const idx = parseInt(pid.replace('in', ''));
-                        const vIdx = (aBits - 1) - idx;
-                        p.style.top = (py + vIdx * 20) + 'px';
-                    }
-                };
+                    const applyPin = (p) => {
+                        const pid = p.dataset.port;
+                        if (!pid) return;
+                        
+                        const getTop = (vIdx, total) => py + (total > 1 ? (vIdx / (total - 1)) * ph : ph / 2);
+
+                        if (pid.startsWith('out')) {
+                            const idx = parseInt(pid.replace('out', ''));
+                            const vIdx = (dBits - 1) - idx;
+                            p.style.top = getTop(vIdx, rightPins) + 'px';
+                        } else if (pid.startsWith('din')) {
+                            const idx = parseInt(pid.replace('din', ''));
+                            const vIdx = (aBits + 1) + ((dBits - 1) - idx);
+                            p.style.top = getTop(vIdx, leftPins) + 'px';
+                        } else if (pid === 'we') {
+                            p.style.top = getTop(aBits, leftPins) + 'px';
+                        } else if (pid.startsWith('in')) {
+                            const idx = parseInt(pid.replace('in', ''));
+                            const vIdx = (aBits - 1) - idx;
+                            p.style.top = getTop(vIdx, leftPins) + 'px';
+                        }
+                    };
 
                 el.querySelectorAll('.port').forEach(applyPin);
             } else {
@@ -571,15 +575,41 @@ const Sim = {
             x: (r.left - sr.left + r.width / 2) / View.scale,
             y: (r.top - sr.top + r.height / 2) / View.scale
         };
-        // [AUDIT: v1.25.10 | SEC_ARCH_LEAD] - Resolved unreachable code path blocking extraction trace.
         return coords;
     },
 
     /**
      */
     handlePortInteraction(e, nodeId, portId) {
-        // [AUDIT: SEC_ARCH_LEAD] - Global freeze on wiring interactions during layout configurations.
-        if (document.body.classList.contains('edit-mode-active')) return;
+        // [AUDIT: v1.26.27 | SEC_ARCH_LEAD] - Inline routing for dynamic node drag instantiation from highlighted pin clusters.
+        if (this._pinSelectState && this._pinSelectState.nodeId === nodeId) {
+            e.preventDefault();
+            const pEl = document.getElementById(nodeId)?.querySelector(`[data-port="${portId}"]`);
+            if (!pEl) return;
+            
+            if (this._pinSelectState.selected.has(portId) && !e.shiftKey) {
+                if (this._pinSelectState.mode === 'scale' && this._pinSelectState.selected.size < 2) {
+                    this.toast('Select at least 2 pins to scale.', 'warning');
+                    return;
+                }
+                if (e.button === 0) this.initPinDrag(e.clientX, e.clientY);
+                return;
+            }
+            
+            if (this._pinSelectState.selected.has(portId)) {
+                this._pinSelectState.selected.delete(portId);
+                pEl.classList.remove('selected-pin');
+                pEl.style.boxShadow = '';
+            } else {
+                this._pinSelectState.selected.add(portId);
+                pEl.classList.add('selected-pin');
+                pEl.style.boxShadow = '0 0 5px #00ffaa';
+            }
+            return;
+        }
+
+        // [AUDIT: v1.26.24 | SEC_ARCH_LEAD] - Global freeze on wiring interactions during layout configurations. Extended to pin-mutate state.
+        if (document.body.classList.contains('edit-mode-active') || document.body.classList.contains('pin-mutate-active')) return;
         const pEl = document.getElementById(nodeId)?.querySelector(`[data-port="${portId}"]`);
         if (e.shiftKey && !this.wiring.active) {
             const wire = this.wires.findLast(w => (w.to.nodeId === nodeId && w.to.portId === portId) || (w.from.nodeId === nodeId && w.from.portId === portId));
@@ -682,8 +712,8 @@ const Sim = {
     },
 
     toggleBit(e, nodeId, bitIndex) {
-        // [AUDIT: SEC_ARCH_LEAD] - Prevent input toggling while in layout mutation mode.
-        if (document.body.classList.contains('edit-mode-active')) return;
+        // [AUDIT: v1.26.24 | SEC_ARCH_LEAD] - Prevent input toggling while in layout mutation mode.
+        if (document.body.classList.contains('edit-mode-active') || document.body.classList.contains('pin-mutate-active')) return;
 
         // [AUDIT: v1.25.41 | SEC_ARCH_LEAD] - Refactored dependency resolution to utilize modern Event interface layer.
         if (typeof e === 'string') {
@@ -1145,6 +1175,59 @@ const Sim = {
      * [AUDIT: SEC_ARCH_LEAD] - Entry trace for parametric node edit mode.
      */
     // [AUDIT: v1.24.43 | SEC_ARCH_LEAD] - Injected nomenclature translation layer to intercept legacy pin-dots dispatches.
+    // [AUDIT: v1.26.27 | SEC_ARCH_LEAD] - Consolidated selection and tracking state initialization to bypass premature mouseup consumption.
+    enterPinSelectMode(nodeId, mode) {
+        const node = this.nodes.find(n => n.id === nodeId);
+        if (!node) return;
+        this._pinSelectState = { nodeId, mode, selected: new Set() };
+        document.body.classList.add('pin-mutate-active');
+        this.toast(`[${mode.toUpperCase()}] Select pins, then drag any highlighted pin. Double-click background to save.`, 'info', 0);
+    },
+    initPinDrag(clientX, clientY) {
+        const state = this._pinSelectState;
+        if (!state || state.selected.size === 0) return;
+
+        this._pinDrag = {
+            startX: clientX,
+            startY: clientY,
+            nodeId: state.nodeId,
+            mode: state.mode,
+            ports: Array.from(state.selected),
+            bases: {}
+        };
+
+        const node = this.nodes.find(n => n.id === this._pinDrag.nodeId);
+        if (!node.pinOverrides) node.pinOverrides = {};
+        
+        const nodeEl = document.getElementById(node.id);
+        let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+        
+        this._pinDrag.ports.forEach(pid => {
+            const pEl = nodeEl.querySelector(`[data-port="${pid}"]`);
+            if (pEl) {
+                const bx = pEl.offsetLeft;
+                const by = pEl.offsetTop;
+                this._pinDrag.bases[pid] = { x: bx, y: by };
+                if (bx < minX) minX = bx; if (bx > maxX) maxX = bx;
+                if (by < minY) minY = by; if (by > maxY) maxY = by;
+            }
+        });
+        
+        this._pinDrag.centerY = (minY + maxY) / 2;
+        this._pinDrag.centerX = (minX + maxX) / 2;
+    },
+    cancelPinMutate() {
+        this._pinSelectState = null;
+        this._pinDrag = null;
+        document.body.classList.remove('pin-mutate-active');
+        document.querySelectorAll('.port').forEach(el => {
+            el.classList.remove('selected-pin');
+            el.style.boxShadow = '';
+        });
+        this.toast('Pin modifications finalized and saved.', 'success');
+        this.autoSave();
+    },
+
     enterNodeEditMode(nodeId, mode) {
         if (mode === 'pin-dots') mode = 'pin-leds';
         const node = this.nodes.find(n => n.id === nodeId);
@@ -1465,8 +1548,8 @@ const Sim = {
     /**
      */
     uiInlineEditValue(e, id, format) {
-        // [AUDIT: SEC_ARCH_LEAD] - Inline structural editor for multi-bit readouts.
-        if (document.body.classList.contains('edit-mode-active')) return;
+        // [AUDIT: v1.26.24 | SEC_ARCH_LEAD] - Inline structural editor for multi-bit readouts.
+        if (document.body.classList.contains('edit-mode-active') || document.body.classList.contains('pin-mutate-active')) return;
         const target = e.currentTarget;
         if (target.querySelector('input')) return; // Already editing
 
