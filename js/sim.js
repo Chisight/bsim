@@ -1,6 +1,6 @@
 /**
  * Browser-Sim Core Engine
- * Version: 1.26.27
+ * Version: 1.26.28
  */
 const Sim = {
     nodes: [],
