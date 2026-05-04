@@ -82,10 +82,10 @@ const Engine = {
     },
 
     calculateNextState(sim, node) {
-        if (node.type === 'JUNCTION') return this.getDrivingSignal(sim, node.id, 'in0');
+        if (node.type === 'JUNCTION') return this.getDrivingSignal(sim, node.id, 'j');
         if (node.type === '0') return 0;
         if (node.type === 'NOT') {
-            const s = this.getDrivingSignal(sim, node.id, 'in0');
+            const s = this.getDrivingSignal(sim, node.id, 'a');
             return (s === 'Z' || s === null) ? 'Z' : (s ? 0 : 1);
         }
         if (node.type === 'AND') {
