@@ -115,7 +115,7 @@ const NodeRenderer = {
                     <div class="port output" data-port="q" style="top:42%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'q')"><span class="port-label">Q</span></div>
                     <div class="port output" data-port="nq" style="top:78%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'nq')"><span class="port-label">NQ</span></div>`;
             } else if (node.type === 'RAM') {
-                // [AUDIT: v1.26.09 | SEC_ARCH_LEAD] - Implemented percentage-based relative positioning for RAM pins to support dynamic user scaling and label bounding. Removed misaligned offsets.
+                // [AUDIT: v1.26.10 | SEC_ARCH_LEAD] - Refactored RAM layout to strictly align CSS boundary offsets, anchoring dynamic spacing and locking labels to respective edge borders.
                 const aBits = node.addressPins || 4;
                 const dBits = 8;
                 
@@ -139,24 +139,24 @@ const NodeRenderer = {
                     div.style.width = '100px';
                 }
 
-                const getPct = (vIdx, total) => `calc(24px + ${(vIdx / Math.max(1, total - 1))} * (100% - 48px))`;
+                const getPct = (vIdx, total) => `calc(24px + ${(vIdx / Math.max(1, total - 1))} * (100% - 36px))`;
 
                 for (let i = 0; i < aBits; i++) {
                     const visualIdx = (aBits - 1) - i;
                     const tStyle = `top:${getPct(visualIdx, leftPins)}`;
-                    portsHtml += `<div class="port input" data-port="in${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'in${i}')"><span class="port-label">A${i}</span></div>`;
+                    portsHtml += `<div class="port input" data-port="in${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'in${i}')"><span class="port-label" style="left:14px; text-align:left;">A${i}</span></div>`;
                 }
                 
                 const weIdx = aBits;
-                portsHtml += `<div class="port input" data-port="we" style="top:${getPct(weIdx, leftPins)}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'we')"><span class="port-label">WE</span></div>`;
+                portsHtml += `<div class="port input" data-port="we" style="top:${getPct(weIdx, leftPins)}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'we')"><span class="port-label" style="left:14px; text-align:left;">WE</span></div>`;
 
                 for (let i = 0; i < dBits; i++) {
                     const vIdxOut = (dBits - 1) - i;
                     const vIdxIn = (aBits + 1) + ((dBits - 1) - i);
                     const tStyle = `top:${getPct(vIdxOut, rightPins)}`;
                     const dinStyle = `top:${getPct(vIdxIn, leftPins)}`;
-                    portsHtml += `<div class="port output" data-port="out${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${i}')"><span class="port-label">D${i}</span></div>`;
-                    portsHtml += `<div class="port input" data-port="din${i}" style="${dinStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'din${i}')"><span class="port-label">DI${i}</span></div>`;
+                    portsHtml += `<div class="port output" data-port="out${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${i}')"><span class="port-label" style="right:14px; text-align:right;">D${i}</span></div>`;
+                    portsHtml += `<div class="port input" data-port="din${i}" style="${dinStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'din${i}')"><span class="port-label" style="left:14px; text-align:left;">DI${i}</span></div>`;
                 }
             } else if (node.isCustom) {
                 const chipDef = Sim.library[node.type];
