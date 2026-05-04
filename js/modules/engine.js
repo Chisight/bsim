@@ -181,6 +181,18 @@ const Engine = {
             for (let i = 0; i < 8; i++) res[`out${i}`] = parseInt(binStr[7 - i]);
             return res;
         }
+        if (node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
+            const bits = parseInt(node.type.split('-')[1]) || 1;
+            if (bits === 1) {
+                return this.getDrivingSignal(sim, node.id, 'in0');
+            }
+            const nextState = [];
+            for (let i = 0; i < bits; i++) {
+                const sig = this.getDrivingSignal(sim, node.id, `in${i}`);
+                nextState.push((sig === 'Z' || sig === null) ? 'Z' : (sig ? 1 : 0));
+            }
+            return nextState;
+        }
         if (node.isCustom) {
             const chipDef = sim.library[node.type];
             if (!chipDef) return node.val || 0;
