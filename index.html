@@ -6,7 +6,7 @@
     <title>bSim</title>
     <link rel="icon" type="image/svg+xml" href="assets/bSim-logo-nand.svg">
     <link rel="stylesheet" href="css/style.css">
-    <script>window.EXPECTED_BSIM_VERSION = "1.25.60";</script>
+    <script>window.EXPECTED_BSIM_VERSION = "1.26.04";</script>
 </head>
 
 <body oncontextmenu="return false;">
@@ -18,7 +18,7 @@
                 onclick="document.getElementById('sidebar').classList.toggle('mobile-open')">☰</button>
             <img src="assets/bSim-logo-nand.svg" alt="bSim Logo"
                 style="height: 31.25px; margin-right: 8px; transition: transform 0.2s ease;">
-            <span style="font-size:10px; color:var(--wire-on); padding-top: 4px;">v1.25.60</span>
+            <span style="font-size:10px; color:var(--wire-on); padding-top: 4px;">v1.26.04</span>
         </div>
 
         <style>
@@ -165,7 +165,7 @@
     <script src="js/view.js"></script>
 
     <!-- Analysis & Project Modules -->
-    <script src="js/modules/persistence.js"></script>
+    <script src="js/modules/project_io.js"></script>
     <script src="js/modules/analyzer.js"></script>
     <script src="js/modules/node_renderer.js"></script>
     <script src="js/modules/wire_renderer.js"></script>
@@ -181,7 +181,9 @@
     <script src="js/modules/synth_ui.js"></script>
     <script src="js/modules/debug_terminal.js"></script>
 
-    <!-- Core Engine -->
+    <!-- Core Modules -->
+    <script src="js/modules/engine.js"></script>
+    <script src="js/modules/ui_orchestrator.js"></script>
     <script src="js/synthesizer.js"></script>
     <script src="js/sim.js?v=1.25.29"></script>
     <script src="js/app.js?v=1.25.29"></script>
