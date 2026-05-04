@@ -46,14 +46,11 @@ const InteractionHandler = {
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-leds'); document.getElementById('context-menu').style.display='none';">↳ Edit Pin LEDs</div>
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-labels'); document.getElementById('context-menu').style.display='none';">↳ Edit Pin Labels</div>
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-both'); document.getElementById('context-menu').style.display='none';">↳ Edit Both (Sync)</div>
-                    <div class="menu-item" style="padding-left:15px; color:#00ffaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-relocate'); document.getElementById('context-menu').style.display='none';">↳ Relocate Pin(s)</div>
-                    <div class="menu-item" style="padding-left:15px; color:#00ffaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-scale'); document.getElementById('context-menu').style.display='none';">↳ Scale Pin(s)</div>
                     ` : ''}
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.toggleNodePolarity('${node.id}'); document.getElementById('context-menu').style.display='none';">↳ Flip Pin Polarity</div>
                     ${((node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) && !node.type.endsWith('-1')) ? `<div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'info'); document.getElementById('context-menu').style.display='none';">↳ Edit Readout Layout</div>` : ''}
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'label'); document.getElementById('context-menu').style.display='none';">↳ Edit Label Layout</div>
                     <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'icon'); document.getElementById('context-menu').style.display='none';">↳ Edit Icon Scale</div>
-                    // [AUDIT: v1.26.22 | SEC_ARCH_LEAD] - Injected parametric spatial override states into UI interface context layer.
                     <div class="menu-item" style="padding-left:15px; color:#00ffaa;" onclick="Sim.enterPinSelectMode('${node.id}', 'relocate'); document.getElementById('context-menu').style.display='none';">↳ Relocate Pin(s)</div>
                     <div class="menu-item" style="padding-left:15px; color:#00ffaa;" onclick="Sim.enterPinSelectMode('${node.id}', 'scale'); document.getElementById('context-menu').style.display='none';">↳ Scale Pin(s)</div>
                 `;
