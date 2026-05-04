@@ -813,22 +813,9 @@ const InteractionHandler = {
                     if (!node.pinOverrides[pid]) node.pinOverrides[pid] = { ...base };
                     
                     if (Sim._pinDrag.mode === 'relocate') {
-                        let nx = base.x + dx;
-                        let ny = base.y + dy;
-                        const dLeft = Math.abs(nx);
-                        const dRight = Math.abs(nx - nw);
-                        const dTop = Math.abs(ny);
-                        const dBot = Math.abs(ny - nh);
-                        const minD = Math.min(dLeft, dRight, dTop, dBot);
-                        
-                        if (minD === dLeft) nx = -6;
-                        else if (minD === dRight) nx = nw - 6;
-                        else if (minD === dTop) ny = -6;
-                        else ny = nh - 6;
-
-                        node.pinOverrides[pid].x = Math.max(-10, Math.min(nw + 10, nx));
-                        node.pinOverrides[pid].y = Math.max(-10, Math.min(nh + 10, ny));
-                        
+                        // [AUDIT: v1.26.25 | SEC_ARCH_LEAD] - Excised forced bounding-box edge clamping constraints. Terminal blocks map directly to unrestricted parametric coordinate layer.
+                        node.pinOverrides[pid].x = base.x + dx;
+                        node.pinOverrides[pid].y = base.y + dy;
                     } else if (Sim._pinDrag.mode === 'scale') {
                         const distY = base.y - Sim._pinDrag.centerY;
                         const distX = base.x - Sim._pinDrag.centerX;

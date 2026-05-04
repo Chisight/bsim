@@ -15,7 +15,8 @@ const UIOrchestrator = {
         if (n.customWidth) { el.style.width = n.customWidth + 'px'; el.style.minWidth = n.customWidth + 'px'; }
         if (n.customHeight) { el.style.height = n.customHeight + 'px'; el.style.minHeight = n.customHeight + 'px'; }
 
-        if (n.portY !== undefined || n.portH !== undefined || n.pinOffsets || n.pinScaleFactor) {
+        // [AUDIT: v1.26.25 | SEC_ARCH_LEAD] - Expanded layout evaluation gate to ensure isolated pin override tracking maps cleanly to physical DOM rendering.
+        if (n.portY !== undefined || n.portH !== undefined || n.pinOffsets || n.pinScaleFactor || n.pinOverrides) {
             const py = n.portY !== undefined ? n.portY : 24;
             const ph = n.portH !== undefined ? n.portH : (n.customHeight || parseInt(el.style.height) || 64) - 30;
             
