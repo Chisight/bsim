@@ -662,12 +662,12 @@ const InteractionHandler = {
         });
 
         ws.addEventListener('dblclick', (e) => {
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Escape hatch for parametric node edit mode via workspace double-click.
+            // [AUDIT: v1.26.27 | SEC_ARCH_LEAD] - Workspace escape trigger synced to unified pin selection state machine.
             if (Sim.activeNodeEdit) {
                 Sim.exitNodeEditMode();
                 return;
             }
-            if (Sim._pinSelectState || Sim._pinMutateState) {
+            if (Sim._pinSelectState) {
                 Sim.cancelPinMutate();
                 return;
             }
@@ -742,21 +742,6 @@ const InteractionHandler = {
                 }
             }
 
-            // [AUDIT: v1.26.23 | SEC_ARCH_LEAD] - Cleared redundant state machine interception. Mousedown marquee initiates natively.
-            if (Sim._pinSelectState && e.button === 0) {
-                if (e.target === ws || e.target.id === 'grid-layer') {
-                    if (!e.shiftKey) {
-                        Sim._pinSelectState.selected.clear();
-                        document.querySelectorAll('.selected-pin').forEach(p => {
-                            p.classList.remove('selected-pin');
-                            p.style.boxShadow = '';
-                        });
-                    }
-                } else {
-                    return;
-                }
-            }
-
             // Intercept active wiring
             if (e.button === 0 && Sim.wiring.active) {
                 e.stopPropagation();
@@ -807,19 +792,52 @@ const InteractionHandler = {
                 const nw = node.customWidth || parseInt(el.style.width) || 100;
                 const nh = node.customHeight || parseInt(el.style.height) || 100;
 
+                // [AUDIT: v1.26.27 | SEC_ARCH_LEAD] - Enforced perimeter edge-clamping logic and deterministic grid tracking for dynamic collision avoidance.
+                const occupiedCoords = new Set();
+                if (Sim._pinDrag.mode === 'relocate') {
+                    Object.entries(node.pinOverrides || {}).forEach(([opid, pos]) => {
+                        if (!Sim._pinDrag.ports.includes(opid)) occupiedCoords.add(`${Math.round(pos.x)},${Math.round(pos.y)}`);
+                    });
+                }
+
                 Sim._pinDrag.ports.forEach(pid => {
                     const base = Sim._pinDrag.bases[pid];
                     if (!base) return;
                     if (!node.pinOverrides[pid]) node.pinOverrides[pid] = { ...base };
                     
                     if (Sim._pinDrag.mode === 'relocate') {
-                        // [AUDIT: v1.26.25 | SEC_ARCH_LEAD] - Excised forced bounding-box edge clamping constraints. Terminal blocks map directly to unrestricted parametric coordinate layer.
-                        node.pinOverrides[pid].x = base.x + dx;
-                        node.pinOverrides[pid].y = base.y + dy;
+                        let tx = base.x + dx;
+                        let ty = base.y + dy;
+                        
+                        const dL = Math.abs(tx - (-6));
+                        const dR = Math.abs(tx - (nw - 6));
+                        const dT = Math.abs(ty - (-6));
+                        const dB = Math.abs(ty - (nh - 6));
+                        const minD = Math.min(dL, dR, dT, dB);
+                        
+                        if (minD === dL) tx = -6;
+                        else if (minD === dR) tx = nw - 6;
+                        else if (minD === dT) ty = -6;
+                        else ty = nh - 6;
+
+                        if (minD === dL || minD === dR) {
+                            ty = Math.round(ty / 20) * 20;
+                            ty = Math.max(0, Math.min(nh, ty));
+                            while (occupiedCoords.has(`${tx},${ty}`) && ty <= nh + 20) ty += 20;
+                        } else {
+                            tx = Math.round(tx / 20) * 20;
+                            tx = Math.max(0, Math.min(nw, tx));
+                            while (occupiedCoords.has(`${tx},${ty}`) && tx <= nw + 20) tx += 20;
+                        }
+                        
+                        occupiedCoords.add(`${tx},${ty}`);
+                        node.pinOverrides[pid].x = tx;
+                        node.pinOverrides[pid].y = ty;
+                        
                     } else if (Sim._pinDrag.mode === 'scale') {
                         const distY = base.y - Sim._pinDrag.centerY;
                         const distX = base.x - Sim._pinDrag.centerX;
-                        const factor = 1 + (dy * 0.01) + (dx * 0.01);
+                        const factor = Math.max(0.1, 1 + (dy * 0.01) + (dx * 0.01));
                         node.pinOverrides[pid].y = Sim._pinDrag.centerY + (distY * factor);
                         node.pinOverrides[pid].x = Sim._pinDrag.centerX + (distX * factor);
                     }
@@ -907,13 +925,10 @@ const InteractionHandler = {
         });
 
         window.addEventListener('mouseup', () => {
-            // [AUDIT: v1.26.23 | SEC_ARCH_LEAD] - Commit matrix transformation array mapping and return to selection phase for subsequent mutations.
+            // [AUDIT: v1.26.27 | SEC_ARCH_LEAD] - Terminate drag tracking loop seamlessly while preserving selection highlight clusters.
             if (Sim._pinDrag) {
                 Sim._pinDrag = null;
                 Sim.autoSave();
-                Sim._pinSelectState = { ...Sim._pinMutateState };
-                Sim._pinMutateState = null;
-                Sim.toast(`[${Sim._pinSelectState.mode.toUpperCase()}] Pin modifications applied. Click selected pins to modify further.`, 'success', 0);
                 return;
             }
 
