@@ -299,6 +299,8 @@ const InteractionHandler = {
                         NodeRenderer.renderNode(node);
                     }
                     Sim.updateWireVisuals();
+                    Sim.seedQueue();
+                    Sim.processQueue();
                     Sim.autoSave();
                 }
                 overlay.style.display = 'none';
