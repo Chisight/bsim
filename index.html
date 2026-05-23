@@ -11,7 +11,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 </head>
 
-<body oncontextmenu="return false;">
+<body>
     <div id="top-reveal" class="edge-reveal top">▼</div>
     <nav id="top-nav">
         <div class="nav-brand" style="display: flex; align-items: center;">
@@ -67,22 +67,7 @@
                             Save .bsim</div>
                     </div>
                 </div>
-                <div class="menu-item" onclick="toggleSubMenu(this, event)">Export PNG
-                    <div class="sub-menu" style="padding: 8px; width: 150px; cursor: default;"
-                        onclick="event.stopPropagation()">
-                        <div
-                            style="font-size: 10px; color: #888; margin-bottom: 4px; text-transform: uppercase; font-weight: bold;">
-                            Filename:</div>
-                        <input type="text" id="export-png-name" value="bSim_Diagram"
-                            style="width: 100%; box-sizing: border-box; background: #111; color: #0f5; border: 1px solid #334; padding: 6px; font-size: 11px; margin-bottom: 6px; outline: none; border-radius: 4px; font-family: 'JetBrains Mono', monospace;"
-                            onkeydown="if(event.key === 'Enter') { ProjectManager.exportImage(this.value); this.blur(); this.parentElement.style.display='none'; }">
-                        <div class="menu-item"
-                            style="text-align: center; background: #252530; border-radius: 4px; padding: 6px; color: #fff; font-weight: bold;"
-                            onclick="ProjectManager.exportImage(document.getElementById('export-png-name').value); this.parentElement.style.display='none';">
-                            Save PNG</div>
-                    </div>
-                </div>
-                <div class="menu-item" onclick="ProjectManager.exportHighFidelity()">High-Fidelity Export</div>
+
             </div>
         </div>
 

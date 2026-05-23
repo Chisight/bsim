@@ -1022,6 +1022,9 @@ const InteractionHandler = {
      */
     initClipboardListeners() {
         window.addEventListener('keydown', (e) => {
+            // Prevent interfering with modal inputs or text fields
+            if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+
             const key = e.key.toLowerCase();
             if (e.ctrlKey && key === 'c') {
                 e.preventDefault();
