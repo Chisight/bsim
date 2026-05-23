@@ -32,6 +32,51 @@ const ProjectManager = {
 
             this.standardize(data);
 
+            // [Migration 1.27.00] - Reverse LSB/MSB pin physical ordering.
+            // Old version had MSB at top. New version has LSB at top.
+            // To preserve physical wiring, we must invert the bit index of all wires connected to native bus pins.
+            if (fileVer < this.parseVer("1.27.00")) {
+                const fixBusWiring = (wires, nodes) => {
+                    if (!wires || !nodes) return;
+                    wires.forEach(w => {
+                        [{ ep: w.from, isIn: false }, { ep: w.to, isIn: true }].forEach(({ ep, isIn }) => {
+                            const cNode = nodes.find(n => n.id === ep.nodeId);
+                            if (!cNode) return;
+                            
+                            if (cNode.type.startsWith('IN-') || cNode.type.startsWith('OUT-') || cNode.type.startsWith('PROBE-')) {
+                                const bits = parseInt(cNode.type.split('-')[1]) || 1;
+                                if (bits > 1) {
+                                    const match = ep.portId.match(/^(in|out)(\d+)$/);
+                                    if (match) {
+                                        const idx = parseInt(match[2]);
+                                        ep.portId = `${match[1]}${bits - 1 - idx}`;
+                                    }
+                                }
+                            } else if (cNode.type === 'RAM') {
+                                const aBits = cNode.addressPins || 4;
+                                const dBits = 8;
+                                const match = ep.portId.match(/^(in|out|din)(\d+)$/);
+                                if (match) {
+                                    const prefix = match[1];
+                                    const idx = parseInt(match[2]);
+                                    if (prefix === 'in') {
+                                        ep.portId = `in${aBits - 1 - idx}`;
+                                    } else {
+                                        ep.portId = `${prefix}${dBits - 1 - idx}`;
+                                    }
+                                }
+                            }
+                        });
+                    });
+                };
+                
+                fixBusWiring(data.wires, data.nodes);
+                if (data.tabs) data.tabs.forEach(t => fixBusWiring(t.wires, t.nodes));
+                if (data.library) {
+                    Object.values(data.library).forEach(lib => fixBusWiring(lib.wires, lib.nodes));
+                }
+            }
+
             // --- GLOBAL DEEP PORT MIGRATION (Fixes nested Custom Chips) ---
             const NATIVE = new Set(['NAND', 'CLOCK', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'JUNCTION', 'TRISTATE', 'DFF', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR']);
             const fixNetlist = (wires, nodes) => {

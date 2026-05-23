@@ -81,8 +81,8 @@ const WasmEngine = {
                 const bits = parseInt(io.type.split('-')[1]) || 1;
                 if (targetIdx < currentIdx + bits) {
                     const bitOffset = targetIdx - currentIdx;
-                    // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Re-enabled index inversion to fix MSB/LSB parity alignment for custom chips.
-                    const bIdx = bits > 1 ? (bits - 1 - bitOffset) : 0;
+                    // LSB is at the top, so bitOffset cleanly maps directly to bIdx
+                    const bIdx = bitOffset;
                     return { nodeId: `${gid}:${io.id}`, portId: isInput ? `in${bIdx}` : `out${bIdx}` };
                 }
                 currentIdx += bits;

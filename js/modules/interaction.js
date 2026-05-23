@@ -404,7 +404,7 @@ const InteractionHandler = {
                     const file = ev.target.files[0];
                     // [AUDIT: v1.25.17 | SEC_ARCH_LEAD] - Auto-scale address bus width to accommodate uploaded payload size without truncation.
                     // [AUDIT: v1.25.34 | SEC_ARCH_LEAD] - Corrected precision truncation fault in address bus scaling computation.
-                    let requiredPins = Math.max(4, Math.ceil(Math.log2(Math.max(1, file.size))));
+                    let requiredPins = Math.max(node.addressPins || 4, Math.ceil(Math.log2(Math.max(1, file.size))));
                     if (Math.pow(2, requiredPins) < file.size) requiredPins++; // Guarantee encapsulation boundary
                     if (requiredPins > 24) requiredPins = 24; // Clamp to 16MB physical limit
                     node.addressPins = requiredPins;
@@ -424,6 +424,8 @@ const InteractionHandler = {
                         if (el) el.remove();
                         NodeRenderer.renderNode(node);
                         Sim.updateWireVisuals();
+                        Sim.seedQueue();
+                        Sim.processQueue();
                     }
                     
                     // [AUDIT: v1.25.06 | SEC_ARCH_LEAD] - Injected hardware-level diagnostic telemetry for direct context-menu payload ingestion.

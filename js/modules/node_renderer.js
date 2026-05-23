@@ -43,7 +43,7 @@ const NodeRenderer = {
         if (node.type.startsWith('IN-')) {
             let dotsHtml = '';
             for (let i = 0; i < bits; i++) {
-                const bIdx = bits - 1 - i; // TOP is MSB, BOTTOM is LSB
+                const bIdx = i; // TOP is LSB, BOTTOM is MSB
                 // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Evaluated flipPolarity vector directly against geometric calculation loops.
                 const vIdx = node.flipPolarity ? (bits - 1 - i) : i;
                 const topStyle = bits === 1 ? "top:50%" : `top:calc(24px + ${((vIdx + 0.5) / bits)} * (100% - 30px))`;
@@ -59,7 +59,7 @@ const NodeRenderer = {
         } else if (node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
             let dotsHtml = '';
             for (let i = 0; i < bits; i++) {
-                const bIdx = bits - 1 - i; // TOP is MSB, BOTTOM is LSB
+                const bIdx = i; // TOP is LSB, BOTTOM is MSB
                 const vIdx = node.flipPolarity ? (bits - 1 - i) : i;
                 const topStyle = bits === 1 ? "top:50%" : `top:calc(24px + ${((vIdx + 0.5) / bits)} * (100% - 30px))`;
                 // [AUDIT: v1.24.28 | SEC_ARCH_LEAD] - Adjusted pin layout percentage calculation to prevent header collision.
@@ -142,7 +142,7 @@ const NodeRenderer = {
                 const getPct = (vIdx, total) => `calc(24px + ${(vIdx / Math.max(1, total - 1))} * (100% - 36px))`;
 
                 for (let i = 0; i < aBits; i++) {
-                    const visualIdx = (aBits - 1) - i;
+                    const visualIdx = i;
                     const tStyle = `top:${getPct(visualIdx, leftPins)}`;
                     portsHtml += `<div class="port input" data-port="in${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'in${i}')"><span class="port-label" style="left:14px; text-align:left;">A${i}</span></div>`;
                 }
@@ -151,8 +151,8 @@ const NodeRenderer = {
                 portsHtml += `<div class="port input" data-port="we" style="top:${getPct(weIdx, leftPins)}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'we')"><span class="port-label" style="left:14px; text-align:left;">WE</span></div>`;
 
                 for (let i = 0; i < dBits; i++) {
-                    const vIdxOut = (dBits - 1) - i;
-                    const vIdxIn = (aBits + 1) + ((dBits - 1) - i);
+                    const vIdxOut = i;
+                    const vIdxIn = (aBits + 1) + i;
                     const tStyle = `top:${getPct(vIdxOut, rightPins)}`;
                     const dinStyle = `top:${getPct(vIdxIn, leftPins)}`;
                     portsHtml += `<div class="port output" data-port="out${i}" style="${tStyle}" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out${i}')"><span class="port-label" style="right:14px; text-align:right;">D${i}</span></div>`;
@@ -184,7 +184,7 @@ const NodeRenderer = {
                         const bits = parseInt(p.type.split('-')[1]) || 1;
                         const labelBase = (p.label && p.label !== p.type) ? p.label : '';
                         for (let i = 0; i < bits; i++) {
-                            const bIdx = bits > 1 ? (bits - 1 - i) : 0;
+                            const bIdx = i;
                             const portId = `in${cIn}`;
                             // [AUDIT: v1.24.28 | SEC_ARCH_LEAD] - UI Scaling: Cascade bus labels to macro pins and prevent header collision.
                             const lbl = bits > 1 ? (labelBase + bIdx) : p.label;
@@ -200,7 +200,7 @@ const NodeRenderer = {
                         const bits = parseInt(p.type.split('-')[1]) || 1;
                         const labelBase = (p.label && p.label !== p.type) ? p.label : '';
                         for (let i = 0; i < bits; i++) {
-                            const bIdx = bits > 1 ? (bits - 1 - i) : 0;
+                            const bIdx = i;
                             const portId = `out${cOut}`;
                             // [AUDIT: v1.24.28 | SEC_ARCH_LEAD] - UI Scaling: Cascade bus labels to macro pins and prevent header collision.
                             const lbl = bits > 1 ? (labelBase + bIdx) : p.label;
