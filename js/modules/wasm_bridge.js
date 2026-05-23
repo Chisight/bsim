@@ -576,9 +576,11 @@ const WasmEngine = {
                     dataPacking = dinBase; // Bypass bit-shifting, Wasm will offset by +8 natively
                 }
 
+                // Initialize RAM data
                 const allocSize = 1 << pins;
+                n._romOffset = currentRomOffset;
                 if (n.memoryData) {
-                    const view = new Uint8Array(this.memory.buffer, 16777216 + currentRomOffset, allocSize);
+                    const view = new Uint8Array(this.memArray.buffer, this.REGION_C_OFFSET * 4 + currentRomOffset, allocSize);
                     view.set(n.memoryData.slice(0, allocSize)); // Safe truncation/expansion
                 }
                 
@@ -832,20 +834,16 @@ const WasmEngine = {
             return current;
         };
 
-        let currentRomOffset = 0;
         this.flatNodes.forEach(fn => {
-            if (fn.type === 'RAM' || fn.type === 'ROM') {
+            if (fn.type === 'RAM') {
                 const pins = fn.addressPins || 4;
                 const allocSize = 1 << pins;
-                if (fn.type === 'RAM') {
-                    const hostNode = resolveInstanceNode(fn.id);
-                    if (hostNode) {
-                        const view = new Uint8Array(this.memory.buffer, 16777216 + currentRomOffset, allocSize);
-                        if (!hostNode.memoryData || hostNode.memoryData.length !== allocSize) hostNode.memoryData = new Array(allocSize).fill(0);
-                        for(let i = 0; i < allocSize; i++) hostNode.memoryData[i] = view[i];
-                    }
+                const hostNode = resolveInstanceNode(fn.id);
+                if (hostNode && fn._romOffset !== undefined) {
+                    const view = new Uint8Array(this.memory.buffer, 16777216 + fn._romOffset, allocSize);
+                    if (!hostNode.memoryData || hostNode.memoryData.length !== allocSize) hostNode.memoryData = new Array(allocSize).fill(0);
+                    for(let i = 0; i < allocSize; i++) hostNode.memoryData[i] = view[i];
                 }
-                currentRomOffset += allocSize;
             }
         });
     },
