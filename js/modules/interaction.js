@@ -276,8 +276,8 @@ const InteractionHandler = {
                         } else if (url) {
                             node.dataUrl = url;
                             Sim.toast('Fetching memory data via network...', 'info');
-                            const res = await fetch(url, { headers: { 'Range': `bytes=0-${MAX_BYTES - 1}` } });
-                            if (!res.ok && res.status !== 206) throw new Error('HTTP ' + res.status);
+                            const res = await fetch(url);
+                            if (!res.ok) throw new Error('HTTP ' + res.status);
                             const buffer = await res.arrayBuffer();
                             const safeView = new Uint8Array(MAX_BYTES);
                             safeView.set(new Uint8Array(buffer).subarray(0, MAX_BYTES));
