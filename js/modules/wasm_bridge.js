@@ -199,7 +199,7 @@ const WasmEngine = {
             } else if (n.type === 'DFF' || n.type === 'TFF') {
                 // [AUDIT: v1.24.92 | SEC_ARCH_LEAD] - Expand to 4 slots to support Shadow State NextQ for Three-Phase Commit.
                 this.idMap.set(n.id, [slot++, slot++, slot++, slot++]);
-            } else if (n.type === 'RAM') {
+            } else if (n.type === 'RAM' || n.type === 'ROM') {
                 let indices = [];
                 for (let i = 0; i < 8; i++) indices.push(slot++);
                 this.idMap.set(n.id, indices);
@@ -834,7 +834,7 @@ const WasmEngine = {
 
         let currentRomOffset = 0;
         this.flatNodes.forEach(fn => {
-            if (fn.type === 'RAM') {
+            if (fn.type === 'RAM' || fn.type === 'ROM') {
                 const pins = fn.addressPins || 4;
                 const allocSize = 1 << pins;
                 if (fn.type === 'RAM') {
