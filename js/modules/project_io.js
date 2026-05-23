@@ -337,7 +337,7 @@ const ProjectManager = {
                     });
                 }
 
-                const activeTab = Sim.tabs.find(t => t.id === Sim.activeTabId);
+                const activeTab = Sim.tabs?.find(t => t.id === Sim.activeTabId);
                 if (activeTab && Sim.workspaceStack.length === 0) {
                     activeTab.nodes = cNodes;
                     activeTab.wires = cWires;
@@ -347,7 +347,7 @@ const ProjectManager = {
                     }
                 }
 
-                const safeTabs = Sim.tabs.map(t => ({
+                const safeTabs = (Sim.tabs || []).map(t => ({
                     id: t.id, name: t.name,
                     nodes: (t.id === Sim.activeTabId && Sim.workspaceStack.length === 0) ? cNodes : (t.nodes || []).map(n => this._cleanNode(n)).filter(n => n !== null),
                     wires: (t.id === Sim.activeTabId && Sim.workspaceStack.length === 0) ? cWires : (t.wires || []).map(w => this._cleanWire(w)).filter(w => w !== null),
@@ -360,12 +360,12 @@ const ProjectManager = {
                 if (storedProject && storedProject.tabs) {
                     safeTabs.forEach(st => {
                         if (st.id !== Sim.activeTabId) {
-                            const otherTab = storedProject.tabs.find(x => x.id === st.id);
+                            const otherTab = storedProject.tabs.find(x => x && x.id === st.id);
                             if (otherTab) {
-                                st.nodes = otherTab.nodes;
-                                st.wires = otherTab.wires;
-                                st.historyStack = otherTab.historyStack;
-                                st.historyIndex = otherTab.historyIndex;
+                                st.nodes = otherTab.nodes || [];
+                                st.wires = otherTab.wires || [];
+                                st.historyStack = otherTab.historyStack || [];
+                                st.historyIndex = otherTab.historyIndex !== undefined ? otherTab.historyIndex : -1;
                                 st.activeSplitChip = otherTab.activeSplitChip;
                                 st.splitDirection = otherTab.splitDirection;
                             }
@@ -374,7 +374,7 @@ const ProjectManager = {
                     
                     // Append any new tabs created in another window
                     storedProject.tabs.forEach(ot => {
-                        if (!safeTabs.find(st => st.id === ot.id)) {
+                        if (ot && !safeTabs.find(st => st.id === ot.id)) {
                             safeTabs.push(ot);
                         }
                     });

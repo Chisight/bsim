@@ -136,18 +136,17 @@ const Engine = {
             const aBits = node.addressPins || 4;
             const addr = [];
             for (let i = 0; i < aBits; i++) addr.push(this.getDrivingSignal(sim, node.id, `in${i}`));
-            const addrVal = parseInt(addr.reverse().join(''), 2);
+            const addrVal = addr.reduce((acc, b, i) => acc | (b << i), 0);
             const we = this.getDrivingSignal(sim, node.id, 'we');
             if (we === 1) {
                 if (!node.memoryData) node.memoryData = new Array(Math.pow(2, aBits)).fill(0);
                 const din = [];
                 for (let i = 0; i < 8; i++) din.push(this.getDrivingSignal(sim, node.id, `din${i}`));
-                node.memoryData[addrVal] = parseInt(din.reverse().join(''), 2);
+                node.memoryData[addrVal] = din.reduce((acc, b, i) => acc | (b << i), 0);
             }
             const outVal = (node.memoryData && node.memoryData[addrVal] !== undefined) ? node.memoryData[addrVal] : 0;
             const res = {};
-            const binStr = outVal.toString(2).padStart(8, '0');
-            for (let i = 0; i < 8; i++) res[`out${i}`] = parseInt(binStr[7 - i]);
+            for (let i = 0; i < 8; i++) res[`out${i}`] = (outVal & (1 << i)) ? 1 : 0;
             return res;
         }
         if (node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
