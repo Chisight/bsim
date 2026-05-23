@@ -669,14 +669,23 @@ const ProjectManager = {
      */
     async importFromUrl(url) {
         try {
-            const res = await fetch(url);
-            if (!res.ok) throw new Error("HTTP " + res.status);
+            let res;
+            try {
+                res = await fetch(url);
+                if (!res.ok) throw new Error("HTTP " + res.status);
+            } catch (err) {
+                console.warn('[CORS] Native fetch failed. Falling back to CORS proxy.', err);
+                const proxyUrl = 'https://api.allorigins.win/raw?url=' + encodeURIComponent(url);
+                res = await fetch(proxyUrl);
+                if (!res.ok) throw new Error("HTTP " + res.status);
+            }
+            
             const data = await res.json();
             localStorage.setItem('bsim_autosave', JSON.stringify(data));
             location.reload();
         } catch (e) {
             console.error('[FATAL] Remote import failed:', e);
-            if (window.Sim && typeof Sim.toast === 'function') Sim.toast('Failed to load project from URL.', 'error');
+            if (window.Sim && typeof Sim.toast === 'function') Sim.toast('Failed to load project from URL. (CORS or Invalid JSON)', 'danger');
         }
     },
 
