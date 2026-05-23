@@ -265,6 +265,13 @@ const ProjectManager = {
                     Sim.library[Sim.activeEditingChip] = { folder: Sim.library[Sim.activeEditingChip]?.folder || '', nodes: cNodes, wires: cWires };
                 }
                 
+                // [State Merging] Fetch latest localStorage before committing to prevent cross-window overwrites
+                let storedProject = null;
+                try {
+                    const raw = localStorage.getItem('bsim_autosave');
+                    if (raw) storedProject = JSON.parse(raw);
+                } catch (e) { console.warn('Failed to parse existing autosave for merging', e); }
+
                 const safeLib = {};
                 Object.keys(Sim.library).forEach(k => {
                     if (Sim.library[k]) {
@@ -275,6 +282,15 @@ const ProjectManager = {
                         };
                     }
                 });
+
+                // Merge library chips from storedProject if they aren't currently being edited
+                if (storedProject && storedProject.library) {
+                    Object.keys(storedProject.library).forEach(k => {
+                        if (k !== Sim.activeEditingChip && !safeLib[k]) {
+                            safeLib[k] = storedProject.library[k];
+                        }
+                    });
+                }
 
                 const activeTab = Sim.tabs.find(t => t.id === Sim.activeTabId);
                 if (activeTab && Sim.workspaceStack.length === 0) {
@@ -294,6 +310,30 @@ const ProjectManager = {
                     activeSplitChip: t.id === Sim.activeTabId ? Sim.activeSplitChip : t.activeSplitChip,
                     splitDirection: t.id === Sim.activeTabId ? (document.getElementById('main')?.classList.contains('split-left') ? 'left' : (document.getElementById('main')?.classList.contains('split-right') ? 'right' : (Sim.activeSplitChip ? 'popup' : null))) : t.splitDirection
                 }));
+
+                // Merge background tabs from storedProject to isolate cross-window editing
+                if (storedProject && storedProject.tabs) {
+                    safeTabs.forEach(st => {
+                        if (st.id !== Sim.activeTabId) {
+                            const otherTab = storedProject.tabs.find(x => x.id === st.id);
+                            if (otherTab) {
+                                st.nodes = otherTab.nodes;
+                                st.wires = otherTab.wires;
+                                st.historyStack = otherTab.historyStack;
+                                st.historyIndex = otherTab.historyIndex;
+                                st.activeSplitChip = otherTab.activeSplitChip;
+                                st.splitDirection = otherTab.splitDirection;
+                            }
+                        }
+                    });
+                    
+                    // Append any new tabs created in another window
+                    storedProject.tabs.forEach(ot => {
+                        if (!safeTabs.find(st => st.id === ot.id)) {
+                            safeTabs.push(ot);
+                        }
+                    });
+                }
 
                 const project = { 
                     nodes: wsStack.length > 0 ? wsStack[0].nodes : cNodes, 
