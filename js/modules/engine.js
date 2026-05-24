@@ -299,11 +299,13 @@ const Engine = {
                     WasmEngine.writeState(n.id, n.state);
                 });
 
-                for (let i = 0; i < execDepth; i++) {
-                    WasmEngine.executeTick(0);
+                if (!WasmEngine.useWorker) {
+                    for (let i = 0; i < execDepth; i++) {
+                        WasmEngine.executeTick(0);
+                    }
+                    WasmEngine.executeTick(1);
+                    WasmEngine.executeTick(2);
                 }
-                WasmEngine.executeTick(1);
-                WasmEngine.executeTick(2);
 
                 sim.nodes.forEach(n => {
                     const NATIVE_GATES = new Set(['NAND', 'CLOCK', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'TRISTATE']);

@@ -1,5 +1,7 @@
 const WasmEngine = {
     ready: false,
+    useWorker: false,
+    worker: null,
     instance: null,
     memArray: null,
     REGION_A_OFFSET: 0,
@@ -25,14 +27,29 @@ const WasmEngine = {
             if (!response.ok) throw new Error(`HTTP ${response.status}: Failed to fetch WebAssembly binary.`);
             const bytes = await response.arrayBuffer();
 
-            // [AUDIT: v1.24.96 | SEC_ARCH_LEAD] - Reverted to non-shared memory to bypass Cross-Origin Isolation requirements for local deployment.
-            this.memory = new WebAssembly.Memory({ 
-                initial: 512, // 32MB baseline
-                maximum: 2048, // 128MB ceiling
-                shared: false 
-            });
+            let useShared = false;
+            if (typeof SharedArrayBuffer !== 'undefined') {
+                try {
+                    this.memory = new WebAssembly.Memory({
+                        initial: 512, // 32MB baseline
+                        maximum: 2048, // 128MB ceiling
+                        shared: true
+                    });
+                    useShared = true;
+                } catch (e) {
+                    console.warn('[WasmEngine] Shared memory allocation failed (missing headers or unsupported browser). Falling back to legacy mode.', e);
+                }
+            }
 
-            // [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Dynamic Guard Band Memory Allocation via environment injection.
+            if (!useShared) {
+                this.memory = new WebAssembly.Memory({
+                    initial: 512,
+                    maximum: 2048,
+                    shared: false
+                });
+            }
+            this.useWorker = useShared;
+
             const { instance } = await WebAssembly.instantiate(bytes, {
                 env: {
                     memory: this.memory,
@@ -43,13 +60,35 @@ const WasmEngine = {
             });
             this.instance = instance;
             this.memArray = new Int32Array(this.memory.buffer);
-            this.ready = true;
-            console.log('[WasmEngine] Core initialized successfully (Single-Threaded Mode).');
-            
-            if (window.Sim) {
-                Sim.seedQueue();
-                Sim.processQueue();
-                Sim.updateHUD();
+
+            if (this.useWorker) {
+                this.worker = new Worker('js/modules/sim_worker.js');
+                this.worker.onmessage = (e) => {
+                    if (e.data.action === 'ready') {
+                        this.ready = true;
+                        console.log('[WasmEngine] Core initialized successfully (WebWorker Mode).');
+                        if (window.Sim) {
+                            Sim.seedQueue();
+                            Sim.processQueue();
+                            Sim.updateHUD();
+                        }
+                    } else if (e.data.action === 'error') {
+                        console.error('[WasmEngine] Worker error:', e.data.error);
+                    }
+                };
+                this.worker.postMessage({
+                    action: 'init',
+                    wasmBytes: bytes,
+                    memory: this.memory
+                });
+            } else {
+                this.ready = true;
+                console.log('[WasmEngine] Core initialized successfully (Single-Threaded Mode).');
+                if (window.Sim) {
+                    Sim.seedQueue();
+                    Sim.processQueue();
+                    Sim.updateHUD();
+                }
             }
         } catch (e) {
             console.error('[WasmEngine] Initialization failed:', e);
@@ -605,6 +644,13 @@ const WasmEngine = {
         });
 
         console.log(`[WasmEngine] Optimized execution graph built with ${this.instructionCount} instructions.`);
+        
+        if (this.useWorker && this.worker) {
+            this.worker.postMessage({
+                action: 'graph_built',
+                instructionCount: this.instructionCount
+            });
+        }
     },
 
     /**
