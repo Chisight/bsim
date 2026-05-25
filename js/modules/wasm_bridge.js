@@ -23,11 +23,9 @@ const WasmEngine = {
      */
     async init() {
         try {
-            const response = await fetch('js/wasm-bin/engine.wasm');
-            if (!response.ok) throw new Error(`HTTP ${response.status}: Failed to fetch WebAssembly binary.`);
-            const bytes = await response.arrayBuffer();
-
             let useShared = false;
+            let wasmUrl = 'js/wasm-bin/engine.wasm';
+
             if (typeof SharedArrayBuffer !== 'undefined') {
                 try {
                     this.memory = new WebAssembly.Memory({
@@ -36,6 +34,7 @@ const WasmEngine = {
                         shared: true
                     });
                     useShared = true;
+                    wasmUrl = 'js/wasm-bin/engine_shared.wasm';
                 } catch (e) {
                     console.warn('[WasmEngine] Shared memory allocation failed (missing headers or unsupported browser). Falling back to legacy mode.', e);
                 }
@@ -49,6 +48,10 @@ const WasmEngine = {
                 });
             }
             this.useWorker = useShared;
+
+            const response = await fetch(wasmUrl);
+            if (!response.ok) throw new Error(`HTTP ${response.status}: Failed to fetch WebAssembly binary.`);
+            const bytes = await response.arrayBuffer();
 
             const { instance } = await WebAssembly.instantiate(bytes, {
                 env: {
