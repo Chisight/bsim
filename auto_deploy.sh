@@ -1,7 +1,7 @@
 #!/bin/bash
 
-# Define the repository directory, branch, and target web directory
-PROJECT_DIR="/home/the/Documents/browser-sim"
+# Dynamically determine the repository directory based on the script's location
+PROJECT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 BRANCH="main"
 DEPLOY_DIR="/var/www/html/sim.dystopi.cc"
 
