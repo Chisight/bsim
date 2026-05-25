@@ -22,35 +22,34 @@ const WasmEngine = {
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for Wasm kernel initialization.
      */
     async init() {
-        try {
-            let useShared = false;
-            let wasmUrl = 'js/wasm-bin/engine.wasm';
+        let useShared = false;
+        let wasmUrl = 'js/wasm-bin/engine.wasm';
 
-            if (typeof SharedArrayBuffer !== 'undefined') {
-                try {
-                    this.memory = new WebAssembly.Memory({
-                        initial: 512, // 32MB baseline
-                        maximum: 2048, // 128MB ceiling
-                        shared: true
-                    });
-                    useShared = true;
-                    wasmUrl = 'js/wasm-bin/engine_shared.wasm';
-                } catch (e) {
-                    console.warn('[WasmEngine] Shared memory allocation failed (missing headers or unsupported browser). Falling back to legacy mode.', e);
-                }
-            }
-
-            if (!useShared) {
+        if (typeof SharedArrayBuffer !== 'undefined') {
+            try {
                 this.memory = new WebAssembly.Memory({
-                    initial: 512,
-                    maximum: 2048,
-                    shared: false
+                    initial: 512, // 32MB baseline
+                    maximum: 2048, // 128MB ceiling
+                    shared: true
                 });
+                useShared = true;
+                wasmUrl = 'js/wasm-bin/engine_shared.wasm';
+            } catch (e) {
+                console.warn('[WasmEngine] Shared memory allocation failed (missing headers or unsupported browser). Falling back to legacy mode.', e);
             }
-            this.useWorker = useShared;
+        }
 
-            const response = await fetch(wasmUrl);
-            if (!response.ok) throw new Error(`HTTP ${response.status}: Failed to fetch WebAssembly binary.`);
+        if (!useShared) {
+            this.memory = new WebAssembly.Memory({
+                initial: 512,
+                maximum: 2048,
+                shared: false
+            });
+        }
+
+        const tryInstantiate = async (url) => {
+            const response = await fetch(url);
+            if (!response.ok) throw new Error(`HTTP ${response.status}: Failed to fetch WebAssembly binary from ${url}`);
             const bytes = await response.arrayBuffer();
 
             const { instance } = await WebAssembly.instantiate(bytes, {
@@ -61,8 +60,38 @@ const WasmEngine = {
                     NQ_BASE: 65536
                 }
             });
+            return { instance, bytes };
+        };
+
+        try {
+            let instance, bytes;
+            if (useShared) {
+                try {
+                    const res = await tryInstantiate(wasmUrl);
+                    instance = res.instance;
+                    bytes = res.bytes;
+                } catch (err) {
+                    console.warn('[WasmEngine] Shared WebAssembly instantiation failed. Falling back to non-shared mode...', err);
+                    useShared = false;
+                    wasmUrl = 'js/wasm-bin/engine.wasm';
+                    this.memory = new WebAssembly.Memory({
+                        initial: 512,
+                        maximum: 2048,
+                        shared: false
+                    });
+                    const res = await tryInstantiate(wasmUrl);
+                    instance = res.instance;
+                    bytes = res.bytes;
+                }
+            } else {
+                const res = await tryInstantiate(wasmUrl);
+                instance = res.instance;
+                bytes = res.bytes;
+            }
+
             this.instance = instance;
             this.memArray = new Int32Array(this.memory.buffer);
+            this.useWorker = useShared;
 
             if (this.useWorker) {
                 this.worker = new Worker('js/modules/sim_worker.js');
@@ -94,7 +123,7 @@ const WasmEngine = {
                 }
             }
         } catch (e) {
-            console.error('[WasmEngine] Initialization failed:', e);
+            console.error('[WasmEngine] Initialization failed completely:', e);
         }
     },
 

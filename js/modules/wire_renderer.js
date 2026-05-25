@@ -37,7 +37,7 @@ const WireRenderer = {
             const p2 = Sim.getPortCoords(w.to.nodeId, w.to.portId);
             if (p1 && p2) {
                 let sig = null;
-                const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE']);
+                const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'RAM', '0']);
                 const checkPure = (nodes, visited = new Set()) => {
                     if (visited.has(nodes)) return true; // Cycle detected, assume pure to break loop
                     visited.add(nodes);
