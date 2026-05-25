@@ -49,6 +49,18 @@ deploy_files() {
     $USE_SUDO find "$DEPLOY_DIR" -type d -exec chmod 755 {} +
     $USE_SUDO find "$DEPLOY_DIR" -type f -exec chmod 644 {} +
 
+    # Set web server owner/group ownership (with graceful fallbacks)
+    echo "[$(date)] Setting owner to web server user (www-data)..."
+    if $USE_SUDO chown -R www-data:www-data "$DEPLOY_DIR" 2>/dev/null; then
+        echo "[$(date)] Ownership successfully set to www-data:www-data."
+    elif $USE_SUDO chown -R nginx:nginx "$DEPLOY_DIR" 2>/dev/null; then
+        echo "[$(date)] Ownership successfully set to nginx:nginx."
+    elif $USE_SUDO chown -R apache:apache "$DEPLOY_DIR" 2>/dev/null; then
+        echo "[$(date)] Ownership successfully set to apache:apache."
+    else
+        echo "[$(date)] Warning: Web server users (www-data/nginx/apache) not found or chown failed. Keeping default owner."
+    fi
+
     echo "[$(date)] Deployment successfully completed."
 }
 
