@@ -21,22 +21,26 @@ deploy_files() {
     # Create target directory
     $USE_SUDO mkdir -p "$DEPLOY_DIR"
 
-    # Rsync only the relevant assets/code files
-    # --delete will clean up any removed assets/js/css files and remove
-    # git repositories, test scripts, makefiles, and dev directories.
-    echo "[$(date)] Syncing production files to $DEPLOY_DIR..."
-    $USE_SUDO rsync -av --delete \
-      --include="/index.html" \
-      --include="/assets/" \
-      --include="/assets/**" \
-      --include="/bsimscripts/" \
-      --include="/bsimscripts/**" \
-      --include="/css/" \
-      --include="/css/**" \
-      --include="/js/" \
-      --include="/js/**" \
-      --exclude="*" \
-      "$PROJECT_DIR/" "$DEPLOY_DIR/"
+    # Explicitly remove development, git, and scripting files from the web root for security
+    echo "[$(date)] Cleaning up any non-production/dangerous files from $DEPLOY_DIR..."
+    $USE_SUDO rm -rf "$DEPLOY_DIR/.git" \
+                     "$DEPLOY_DIR/.gitignore" \
+                     "$DEPLOY_DIR/wasm-core" \
+                     "$DEPLOY_DIR/auto_deploy.sh" \
+                     "$DEPLOY_DIR/poll_updates.sh" \
+                     "$DEPLOY_DIR/README.md" \
+                     "$DEPLOY_DIR/SCRIPTING.md" \
+                     "$DEPLOY_DIR"/test*
+
+    # Sync production directories cleanly
+    echo "[$(date)] Syncing production directories to $DEPLOY_DIR..."
+    $USE_SUDO rsync -av --delete "$PROJECT_DIR/assets/" "$DEPLOY_DIR/assets/"
+    $USE_SUDO rsync -av --delete "$PROJECT_DIR/bsimscripts/" "$DEPLOY_DIR/bsimscripts/"
+    $USE_SUDO rsync -av --delete "$PROJECT_DIR/css/" "$DEPLOY_DIR/css/"
+    $USE_SUDO rsync -av --delete "$PROJECT_DIR/js/" "$DEPLOY_DIR/js/"
+    
+    # Copy entrypoint index.html
+    $USE_SUDO cp "$PROJECT_DIR/index.html" "$DEPLOY_DIR/index.html"
 
     # Set proper permissions:
     # - Directories: 755 (drwxr-xr-x)
