@@ -7,6 +7,25 @@ DEPLOY_DIR="/var/www/html/sim.dystopi.cc"
 
 cd "$PROJECT_DIR" || exit
 
+# Auto-increment the version by 0.00.01 in index.html to force browser cache reload
+if [ -f "index.html" ]; then
+    CURRENT_VERSION=$(grep -oP '(?<=v)1\.\d+\.\d+' index.html | head -n 1)
+    if [ ! -z "$CURRENT_VERSION" ]; then
+        IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
+        NEW_PATCH=$(printf "%02d" $((10#$patch + 1)))
+        NEW_VERSION="$major.$minor.$NEW_PATCH"
+        echo "[$(date)] Auto-incrementing version in index.html: $CURRENT_VERSION -> $NEW_VERSION"
+        sed -i "s/$CURRENT_VERSION/$NEW_VERSION/g" index.html
+        
+        # Commit the version bump if inside a git repository and there are unstaged changes
+        if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            git add index.html
+            git commit -m "Auto-increment version to v$NEW_VERSION for cache-busting"
+            git push origin "$BRANCH" 2>/dev/null
+        fi
+    fi
+fi
+
 # Function to perform the deployment
 deploy_files() {
     echo "[$(date)] Starting deployment process..."
