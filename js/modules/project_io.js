@@ -22,6 +22,26 @@ const ProjectManager = {
             if (!data) {
                 return data;
             }
+            
+            // Port legacy ROM primitives to standard RAM
+            const portRomToRam = (nodes) => {
+                if (!Array.isArray(nodes)) return;
+                nodes.forEach(n => {
+                    if (n.type === 'ROM') {
+                        n.type = 'RAM';
+                        if (n.addressPins === undefined) n.addressPins = 4;
+                        if (n.dataUrl === undefined) n.dataUrl = '';
+                        if (n.memoryData === undefined) {
+                            n.memoryData = Array.from(new Uint8Array(1 << n.addressPins));
+                        }
+                    }
+                });
+            };
+            if (data.nodes) portRomToRam(data.nodes);
+            if (data.workspaceStack) data.workspaceStack.forEach(ws => portRomToRam(ws.nodes));
+            if (data.tabs) data.tabs.forEach(t => portRomToRam(t.nodes));
+            if (data.library) Object.values(data.library).forEach(lib => portRomToRam(lib.nodes));
+
             const fileVer = this.parseVer(data.meta?.version || "1.0.0");
 
 
