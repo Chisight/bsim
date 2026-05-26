@@ -43,7 +43,7 @@ const WireRenderer = {
                     visited.add(nodes);
                     return nodes.every(n => {
                         if (validWasmTypes.has(n.type)) return true;
-                        if (n.isCustom && Sim.library && Sim.library[n.type]) return checkPure(Sim.library[n.type].nodes, visited);
+                        if (Sim.library && Sim.library[n.type]) return checkPure(Sim.library[n.type].nodes, visited);
                         return false;
                     });
                 };

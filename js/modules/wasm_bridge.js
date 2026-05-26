@@ -463,7 +463,7 @@ const WasmEngine = {
             let queryPort = w.from.portId;
 
             const fromNode = nodes.find(n => n.id === w.from.nodeId);
-            if (fromNode?.isCustom && Sim.library[fromNode.type]) {
+            if (fromNode && (fromNode.isCustom || Sim.library[fromNode.type])) {
                 const lib = Sim.library[fromNode.type];
                 const ioNodes = lib.nodes.filter(x => x.type.startsWith('OUT-'));
 
@@ -854,7 +854,7 @@ const WasmEngine = {
         // Boundary resolution for custom chips: map outer port to internal IO node
         const chipNode = window.Sim ? Sim.nodes.find(n => n.id === nodeId) : null;
         // [AUDIT: v1.25.43 | SEC_ARCH_LEAD] - Consolidated redundant array traversal for custom chip boundary resolution.
-        if (chipNode && chipNode.isCustom) {
+        if (chipNode && (chipNode.isCustom || (Sim.library && Sim.library[chipNode.type]))) {
             const lib = Sim.library[chipNode.type];
             if (lib) {
                 const isInput = portId.startsWith('in');

@@ -9,7 +9,7 @@ const Engine = {
     isPureNative(nodes, library) {
         const checkPure = (nodes) => nodes.every(n => {
             if (this.KERNEL.has(n.type)) return true;
-            if (n.isCustom && library && library[n.type]) return checkPure(library[n.type].nodes);
+            if (library && library[n.type]) return checkPure(library[n.type].nodes);
             return false;
         });
         return checkPure(nodes);

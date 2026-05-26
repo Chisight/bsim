@@ -687,7 +687,23 @@ const DebugTerminal = {
                     const isPureNative = Sim.isPureNative();
                     this.print(`  - Netlist Purity Validation: ${isPureNative ? '<span style="color:#0f5">PASSED (Native)</span>' : '<span style="color:#f90">FAILED (Contains Impure Gates)</span>'}`, 'sys');
                     if (!isPureNative) {
-                        const impure = Sim.nodes.filter(n => !Engine.KERNEL.has(n.type));
+                        const isNodePure = (n) => {
+                            if (Engine.KERNEL.has(n.type)) return true;
+                            if (Sim.library && Sim.library[n.type]) {
+                                const check = (nodes, visited = new Set()) => {
+                                    if (visited.has(nodes)) return true;
+                                    visited.add(nodes);
+                                    return nodes.every(x => {
+                                        if (Engine.KERNEL.has(x.type)) return true;
+                                        if (Sim.library && Sim.library[x.type]) return check(Sim.library[x.type].nodes, visited);
+                                        return false;
+                                    });
+                                };
+                                return check(Sim.library[n.type].nodes);
+                            }
+                            return false;
+                        };
+                        const impure = Sim.nodes.filter(n => !isNodePure(n));
                         const impureTypes = [...new Set(impure.map(n => n.type))];
                         this.print(`    * Impure Primitive/Custom Types found: ${impureTypes.join(', ')}`, 'warn');
                     }
