@@ -128,6 +128,39 @@ const WasmEngine = {
                 this.log("Launching background simulation thread via WebWorker (sim_worker.js)...");
                 this.worker = new Worker('js/modules/sim_worker.js');
                 
+                const triggerFallback = async (reason) => {
+                    this.log(`Background WebWorker failed: ${reason}. Initiating recovery and falling back to single-threaded main thread mode...`, "warn");
+                    if (this.worker) {
+                        this.worker.terminate();
+                        this.worker = null;
+                    }
+                    this.useWorker = false;
+                    
+                    try {
+                        const fallbackUrl = 'js/wasm-bin/engine.wasm';
+                        this.log("Allocating non-shared WebAssembly.Memory for main-thread recovery...");
+                        this.memory = new WebAssembly.Memory({
+                            initial: 512,
+                            maximum: 2048,
+                            shared: false
+                        });
+                        
+                        const res = await tryInstantiate(fallbackUrl);
+                        this.instance = res.instance;
+                        this.memArray = new Int32Array(this.memory.buffer);
+                        
+                        this.ready = true;
+                        this.log("Core successfully recovered and initialized (Single-Threaded Mode). ready = true.");
+                        if (window.Sim) {
+                            Sim.seedQueue();
+                            Sim.processQueue();
+                            Sim.updateHUD();
+                        }
+                    } catch (fallbackErr) {
+                        this.log(`WebWorker fallback recovery failed completely: ${fallbackErr.message}`, "error");
+                    }
+                };
+
                 this.worker.onmessage = async (e) => {
                     if (e.data.action === 'ready') {
                         this.ready = true;
@@ -138,37 +171,13 @@ const WasmEngine = {
                             Sim.updateHUD();
                         }
                     } else if (e.data.action === 'error') {
-                        this.log(`Background WebWorker error reported: ${e.data.error}. Initiating recovery and falling back to single-threaded main thread mode...`, "warn");
-                        
-                        // Terminate the failed worker and switch modes
-                        this.worker.terminate();
-                        this.worker = null;
-                        this.useWorker = false;
-                        
-                        try {
-                            const fallbackUrl = 'js/wasm-bin/engine.wasm';
-                            this.log("Allocating non-shared WebAssembly.Memory for main-thread recovery...");
-                            this.memory = new WebAssembly.Memory({
-                                initial: 512,
-                                maximum: 2048,
-                                shared: false
-                            });
-                            
-                            const res = await tryInstantiate(fallbackUrl);
-                            this.instance = res.instance;
-                            this.memArray = new Int32Array(this.memory.buffer);
-                            
-                            this.ready = true;
-                            this.log("Core successfully recovered and initialized (Single-Threaded Mode). ready = true.");
-                            if (window.Sim) {
-                                Sim.seedQueue();
-                                Sim.processQueue();
-                                Sim.updateHUD();
-                            }
-                        } catch (fallbackErr) {
-                            this.log(`WebWorker fallback recovery failed completely: ${fallbackErr.message}`, "error");
-                        }
+                        await triggerFallback(e.data.error);
                     }
+                };
+
+                this.worker.onerror = async (err) => {
+                    err.preventDefault(); // Prevent duplicate console error dumps
+                    await triggerFallback(err.message || "Failed to load/execute worker script (check CORS, CSP or 404)");
                 };
                 
                 this.log("Sending initialization payload (wasm bytes + shared memory buffer) to worker thread...");
