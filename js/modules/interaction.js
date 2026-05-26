@@ -11,11 +11,37 @@ const InteractionHandler = {
     deleteActiveNode() {
         const node = this.activeContextNode;
         if (node) {
+            console.log('[DEBUG] deleteActiveNode triggered for node:', node.id, node.type);
             const targetNode = Sim.nodes.find(n => n.id === node.id);
             if (targetNode) {
-                History.execute(new DeleteNodeCommand(targetNode));
+                try {
+                    History.execute(new DeleteNodeCommand(targetNode));
+                } catch (err) {
+                    console.error('[InteractionHandler] DeleteNodeCommand threw an error. Initiating recovery/fallback deletion...', err);
+                    // Fallback direct deletion
+                    Sim.nodes = Sim.nodes.filter(n => n.id !== targetNode.id);
+                    const el = document.getElementById(targetNode.id);
+                    if (el) el.remove();
+                    
+                    Sim.wires = Sim.wires.filter(w => w.from.nodeId !== targetNode.id && w.to.nodeId !== targetNode.id);
+                    if (typeof Sim.updateWireVisuals === 'function') Sim.updateWireVisuals();
+                    if (typeof Sim.updateHUD === 'function') Sim.updateHUD();
+                    if (typeof Sim.seedQueue === 'function') Sim.seedQueue();
+                    if (typeof Sim.processQueue === 'function') Sim.processQueue();
+                    if (typeof Sim.autoSave === 'function') Sim.autoSave();
+                }
             } else {
-                console.error('[InteractionHandler] Node not found for deletion:', node.id);
+                console.error('[InteractionHandler] Node not found in Sim.nodes. Attempting direct DOM fallback deletion for ID:', node.id);
+                // Fallback direct DOM deletion in case of reference mismatches
+                const el = document.getElementById(node.id);
+                if (el) el.remove();
+                Sim.nodes = Sim.nodes.filter(n => n.id !== node.id);
+                Sim.wires = Sim.wires.filter(w => w.from.nodeId !== node.id && w.to.nodeId !== node.id);
+                if (typeof Sim.updateWireVisuals === 'function') Sim.updateWireVisuals();
+                if (typeof Sim.updateHUD === 'function') Sim.updateHUD();
+                if (typeof Sim.seedQueue === 'function') Sim.seedQueue();
+                if (typeof Sim.processQueue === 'function') Sim.processQueue();
+                if (typeof Sim.autoSave === 'function') Sim.autoSave();
             }
         }
         const menu = document.getElementById('context-menu');
@@ -89,7 +115,23 @@ const InteractionHandler = {
         if (wire) {
             const wTarget = Sim.wires.find(w => w.from.nodeId === wire.from.nodeId && w.to.nodeId === wire.to.nodeId && w.from.portId === wire.from.portId && w.to.portId === wire.to.portId);
             if (wTarget) {
-                History.execute(new DeleteWireCommand(wTarget));
+                try {
+                    History.execute(new DeleteWireCommand(wTarget));
+                } catch (err) {
+                    console.error('[InteractionHandler] DeleteWireCommand threw an error. Initiating fallback deletion...', err);
+                    Sim.wires = Sim.wires.filter(w => w !== wTarget);
+                    if (typeof Sim.updateWireVisuals === 'function') Sim.updateWireVisuals();
+                    if (typeof Sim.seedQueue === 'function') Sim.seedQueue();
+                    if (typeof Sim.processQueue === 'function') Sim.processQueue();
+                    if (typeof Sim.autoSave === 'function') Sim.autoSave();
+                }
+            } else {
+                console.error('[InteractionHandler] Wire target not found. Initiating fallback deletion by properties...');
+                Sim.wires = Sim.wires.filter(w => !(w.from.nodeId === wire.from.nodeId && w.to.nodeId === wire.to.nodeId && w.from.portId === wire.from.portId && w.to.portId === wire.to.portId));
+                if (typeof Sim.updateWireVisuals === 'function') Sim.updateWireVisuals();
+                if (typeof Sim.seedQueue === 'function') Sim.seedQueue();
+                if (typeof Sim.processQueue === 'function') Sim.processQueue();
+                if (typeof Sim.autoSave === 'function') Sim.autoSave();
             }
         }
         const menu = document.getElementById('context-menu');
