@@ -2,6 +2,140 @@
  * Interaction Handler Module
  */
 const InteractionHandler = {
+    activeContextNode: null,
+    activeContextWire: null,
+    activeContextX: null,
+    activeContextY: null,
+    customChipsList: [],
+
+    deleteActiveNode() {
+        const node = this.activeContextNode;
+        if (node) {
+            const targetNode = Sim.nodes.find(n => n.id === node.id);
+            if (targetNode) {
+                History.execute(new DeleteNodeCommand(targetNode));
+            } else {
+                console.error('[InteractionHandler] Node not found for deletion:', node.id);
+            }
+        }
+        const menu = document.getElementById('context-menu');
+        if (menu) menu.style.display = 'none';
+    },
+
+    renameActiveNode() {
+        const node = this.activeContextNode;
+        if (node) {
+            const targetNode = Sim.nodes.find(n => n.id === node.id);
+            if (targetNode) {
+                InteractionHandler.handleNodeDblClick(new Event('dblclick'), targetNode, document.getElementById(node.id));
+            }
+        }
+        const menu = document.getElementById('context-menu');
+        if (menu) menu.style.display = 'none';
+    },
+
+    editActiveNodeInternals() {
+        const node = this.activeContextNode;
+        if (node && node.isCustom) {
+            Sim.uiEditChip(node.type);
+        }
+        const menu = document.getElementById('context-menu');
+        if (menu) menu.style.display = 'none';
+    },
+
+    scaleActiveNodeGeometry() {
+        const node = this.activeContextNode;
+        if (node && node.isCustom) {
+            Sim.uiScaleChip(node.type);
+        }
+        const menu = document.getElementById('context-menu');
+        if (menu) menu.style.display = 'none';
+    },
+
+    configureClockFrequency() {
+        const node = this.activeContextNode;
+        if (node) {
+            const targetNode = Sim.nodes.find(n => n.id === node.id);
+            if (targetNode) {
+                InteractionHandler.handleNodeDblClick(new Event('dblclick'), targetNode, document.getElementById(node.id));
+            }
+        }
+        const menu = document.getElementById('context-menu');
+        if (menu) menu.style.display = 'none';
+    },
+
+    executeNodePref(prefType) {
+        const node = this.activeContextNode;
+        if (!node) return;
+
+        if (prefType === 'pin-leds' || prefType === 'pin-labels' || prefType === 'pin-both' || prefType === 'info' || prefType === 'label' || prefType === 'icon') {
+            Sim.enterNodeEditMode(node.id, prefType);
+        } else if (prefType === 'flip-polarity') {
+            Sim.toggleNodePolarity(node.id);
+        } else if (prefType === 'relocate') {
+            Sim.enterPinSelectMode(node.id, 'relocate');
+        } else if (prefType === 'scale') {
+            Sim.enterPinSelectMode(node.id, 'scale');
+        } else if (prefType === 'mem-upload') {
+            InteractionHandler.triggerMemoryUpload(node.id);
+        }
+
+        const menu = document.getElementById('context-menu');
+        if (menu) menu.style.display = 'none';
+    },
+
+    deleteActiveWire() {
+        const wire = this.activeContextWire;
+        if (wire) {
+            const wTarget = Sim.wires.find(w => w.from.nodeId === wire.from.nodeId && w.to.nodeId === wire.to.nodeId && w.from.portId === wire.from.portId && w.to.portId === wire.to.portId);
+            if (wTarget) {
+                History.execute(new DeleteWireCommand(wTarget));
+            }
+        }
+        const menu = document.getElementById('context-menu');
+        if (menu) menu.style.display = 'none';
+    },
+
+    splitActiveWire(clickX, clickY) {
+        const wire = this.activeContextWire;
+        if (wire) {
+            InteractionHandler._splitWire(wire.from.nodeId, wire.from.portId, wire.to.nodeId, wire.to.portId, clickX, clickY);
+        }
+        const menu = document.getElementById('context-menu');
+        if (menu) menu.style.display = 'none';
+    },
+
+    spawnCustomChipByIndex(index) {
+        if (this.customChipsList && this.customChipsList[index]) {
+            const cName = this.customChipsList[index];
+            const x = this.activeContextX;
+            const y = this.activeContextY;
+            Sim.addNode(cName, x, y);
+        }
+        const menu = document.getElementById('context-menu');
+        if (menu) menu.style.display = 'none';
+    },
+
+    spawnGate(type) {
+        const x = this.activeContextX;
+        const y = this.activeContextY;
+        Sim.addNode(type, x, y);
+        const menu = document.getElementById('context-menu');
+        if (menu) menu.style.display = 'none';
+    },
+
+    splitEditor(direction) {
+        Sim.uiSplitEditor(direction);
+        const menu = document.getElementById('context-menu');
+        if (menu) menu.style.display = 'none';
+    },
+
+    openTerminal() {
+        if (window.DebugTerminal) DebugTerminal.toggle(true);
+        const menu = document.getElementById('context-menu');
+        if (menu) menu.style.display = 'none';
+    },
+
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for node translation.
      */
@@ -16,6 +150,7 @@ const InteractionHandler = {
         
         if (e.button === 2) { 
             e.preventDefault(); e.stopPropagation();
+            InteractionHandler.activeContextNode = node;
             const menu = document.getElementById('context-menu');
             if (!menu) {
                 return;
@@ -29,47 +164,44 @@ const InteractionHandler = {
             // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Node Prefs extension: spatial edit mode for I/O bounds and internal pin layout arrays.
             // [AUDIT: v1.24.15 | SEC_ARCH_LEAD] - Fixed string interpolation collision and enforced DOM recalculation for I/O labels.
             const isNative = !node.isCustom;
-            const renameAction = `onclick="InteractionHandler.handleNodeDblClick(new Event('dblclick'), Sim.nodes.find(n=>n.id==='${node.id}'), document.getElementById('${node.id}')); document.getElementById('context-menu').style.display='none';"`;
-            const editAction = isNative ? '' : `onclick="Sim.uiEditChip('${node.type}'); document.getElementById('context-menu').style.display='none';"`;
-            const geomAction = isNative ? '' : `onclick="Sim.uiScaleChip('${node.type}'); document.getElementById('context-menu').style.display='none';"`;
             
             let configOption = '';
             let nodePrefs = '';
             if (node.type === 'CLOCK') {
-                configOption = `<div class="menu-item" onclick="Sim.handleNodeDblClick(new Event('dblclick'), Sim.nodes.find(n=>n.id==='${node.id}'), document.getElementById('${node.id}')); document.getElementById('context-menu').style.display='none';">Configure Frequency</div>`;
+                configOption = `<div class="menu-item" onclick="InteractionHandler.configureClockFrequency();">Configure Frequency</div>`;
             // [AUDIT: SEC_ARCH_LEAD] - Added info readout layout mutation to preferences.
             } else if (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.isCustom || node.type === 'RAM') {
                 // [AUDIT: v1.24.34 | SEC_ARCH_LEAD] - Replaced monolithic pin layout with granular dot/label mutators.
                 nodePrefs = `
                     <div class="menu-item" style="color:var(--accent); font-weight:bold; cursor:default;">Node Prefs:</div>
                     ${(node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.isCustom || node.type === 'RAM') ? `
-                    <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-leds'); document.getElementById('context-menu').style.display='none';">↳ Edit Pin LEDs</div>
-                    <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-labels'); document.getElementById('context-menu').style.display='none';">↳ Edit Pin Labels</div>
-                    <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'pin-both'); document.getElementById('context-menu').style.display='none';">↳ Edit Both (Sync)</div>
+                    <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="InteractionHandler.executeNodePref('pin-leds');">↳ Edit Pin LEDs</div>
+                    <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="InteractionHandler.executeNodePref('pin-labels');">↳ Edit Pin Labels</div>
+                    <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="InteractionHandler.executeNodePref('pin-both');">↳ Edit Both (Sync)</div>
                     ` : ''}
-                    <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.toggleNodePolarity('${node.id}'); document.getElementById('context-menu').style.display='none';">↳ Flip Pin Polarity</div>
-                    ${((node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) && !node.type.endsWith('-1')) ? `<div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'info'); document.getElementById('context-menu').style.display='none';">↳ Edit Readout Layout</div>` : ''}
-                    <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'label'); document.getElementById('context-menu').style.display='none';">↳ Edit Label Layout</div>
-                    <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="Sim.enterNodeEditMode('${node.id}', 'icon'); document.getElementById('context-menu').style.display='none';">↳ Edit Icon Scale</div>
-                    <div class="menu-item" style="padding-left:15px; color:#00ffaa;" onclick="Sim.enterPinSelectMode('${node.id}', 'relocate'); document.getElementById('context-menu').style.display='none';">↳ Relocate Pin(s)</div>
-                    <div class="menu-item" style="padding-left:15px; color:#00ffaa;" onclick="Sim.enterPinSelectMode('${node.id}', 'scale'); document.getElementById('context-menu').style.display='none';">↳ Scale Pin(s)</div>
+                    <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="InteractionHandler.executeNodePref('flip-polarity');">↳ Flip Pin Polarity</div>
+                    ${((node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) && !node.type.endsWith('-1')) ? `<div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="InteractionHandler.executeNodePref('info');">↳ Edit Readout Layout</div>` : ''}
+                    <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="InteractionHandler.executeNodePref('label');">↳ Edit Label Layout</div>
+                    <div class="menu-item" style="padding-left:15px; color:#aaa;" onclick="InteractionHandler.executeNodePref('icon');">↳ Edit Icon Scale</div>
+                    <div class="menu-item" style="padding-left:15px; color:#00ffaa;" onclick="InteractionHandler.executeNodePref('relocate');">↳ Relocate Pin(s)</div>
+                    <div class="menu-item" style="padding-left:15px; color:#00ffaa;" onclick="InteractionHandler.executeNodePref('scale');">↳ Scale Pin(s)</div>
                 `;
             }
 
             // [AUDIT: v1.25.04 | SEC_ARCH_LEAD] - Integrated binary payload uploader specifically for memory components.
             let memUpload = '';
             if (node.type === 'RAM') {
-                memUpload = `<div class="menu-item" style="color:#00ffaa; font-weight:bold;" onclick="InteractionHandler.triggerMemoryUpload('${node.id}'); document.getElementById('context-menu').style.display='none';">Upload .bin Payload</div>`;
+                memUpload = `<div class="menu-item" style="color:#00ffaa; font-weight:bold;" onclick="InteractionHandler.executeNodePref('mem-upload');">Upload .bin Payload</div>`;
             }
 
             menu.innerHTML = `
                 ${configOption}
                 ${memUpload}
                 ${nodePrefs}
-                <div class="menu-item" ${renameAction}>Rename</div>
-                ${!isNative ? `<div class="menu-item" ${geomAction}>Set Geometry</div>` : ''}
-                <div class="menu-item ${isNative ? 'disabled' : ''}" ${editAction}>Edit Internals</div>
-                <div class="menu-item danger" onclick="History.execute(new DeleteNodeCommand(Sim.nodes.find(n=>n.id==='${node.id}'))); document.getElementById('context-menu').style.display='none';">Delete</div>
+                <div class="menu-item" onclick="InteractionHandler.renameActiveNode();">Rename</div>
+                ${!isNative ? `<div class="menu-item" onclick="InteractionHandler.scaleActiveNodeGeometry();">Set Geometry</div>` : ''}
+                <div class="menu-item ${isNative ? 'disabled' : ''}" onclick="InteractionHandler.editActiveNodeInternals();">Edit Internals</div>
+                <div class="menu-item danger" onclick="InteractionHandler.deleteActiveNode();">Delete</div>
             `;
             
             // [AUDIT: v1.24.67 | SEC_ARCH_LEAD] - Removed redundant legacy context menu extensions for ROM/Custom chips in favor of unified Node Prefs system.
@@ -468,6 +600,7 @@ const InteractionHandler = {
         console.debug('[DEBUG] handleWireInteraction invoked. Button:', e.button);
         if (e.button === 2) {
             e.preventDefault(); e.stopPropagation();
+            InteractionHandler.activeContextWire = wire;
             const menu = document.getElementById('context-menu');
             if (!menu) return;
 
@@ -482,8 +615,8 @@ const InteractionHandler = {
             // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Stricter wire resolution referencing ports to prevent incorrect deletion of parallel multi-bit connections.
             // [AUDIT: v1.24.77 | SEC_ARCH_LEAD] - Hardened missing-wire exception handling for direct-action menus.
             menu.innerHTML = `
-                <div class="menu-item" onclick="InteractionHandler._splitWire(${wire.from.nodeId ? `'${wire.from.nodeId}'` : null}, '${wire.from.portId}', ${wire.to.nodeId ? `'${wire.to.nodeId}'` : null}, '${wire.to.portId}', ${clickX}, ${clickY}); document.getElementById('context-menu').style.display='none';">Add Node Here</div>
-                <div class="menu-item danger" onclick="const wTarget = Sim.wires.find(w => w.from.nodeId === '${wire.from.nodeId}' && w.to.nodeId === '${wire.to.nodeId}' && w.from.portId === '${wire.from.portId}' && w.to.portId === '${wire.to.portId}'); if(wTarget) History.execute(new DeleteWireCommand(wTarget)); document.getElementById('context-menu').style.display='none';">Delete Wire</div>
+                <div class="menu-item" onclick="InteractionHandler.splitActiveWire(${clickX}, ${clickY});">Add Node Here</div>
+                <div class="menu-item danger" onclick="InteractionHandler.deleteActiveWire();">Delete Wire</div>
             `;
             
             // [AUDIT: v1.24.12 | SEC_ARCH_LEAD] - Smart boundary collision detection for wire context menus.
@@ -568,6 +701,9 @@ const InteractionHandler = {
             // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Context menu upgraded to support dynamic hierarchical folders for custom macros.
             let customChipsHtml = '';
             const customChips = Object.keys(Sim.library);
+            InteractionHandler.activeContextX = x;
+            InteractionHandler.activeContextY = y;
+            InteractionHandler.customChipsList = customChips;
             if (customChips.length > 0) {
                 const groups = { '': [] };
                 customChips.forEach(name => {
@@ -583,7 +719,8 @@ const InteractionHandler = {
                         chipsList += `<div class="menu-item" style="color:#aaa; display:flex; justify-content:space-between; align-items:center;" onclick="event.stopPropagation(); const n=this.nextElementSibling; const d=(n.style.display==='none'); n.style.display=d?'block':'none'; this.lastElementChild.innerText=d?'▾':'▸';"><span>📁 ${folder}</span><span style="font-size:10px; opacity:0.5; pointer-events:none;">▸</span></div><div style="display:none; margin-left:8px; border-left:1px solid #334; padding-left:4px; background:rgba(0,0,0,0.15);">`;
                     }
                     groups[folder].forEach(c => {
-                        chipsList += `<div class="menu-item" onclick="Sim.addNode('${c}', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">${c}</div>`;
+                        const globalIdx = customChips.indexOf(c);
+                        chipsList += `<div class="menu-item" onclick="InteractionHandler.spawnCustomChipByIndex(${globalIdx});">${c}</div>`;
                     });
                     if (folder !== '') {
                         chipsList += `</div>`;
@@ -601,33 +738,33 @@ const InteractionHandler = {
             }
 
             menu.innerHTML = `
-                <div class="menu-item" style="color:#8888aa; font-weight:bold; border-bottom:1px solid #334; margin-bottom:5px; padding-bottom:5px;" onclick="if(window.DebugTerminal) DebugTerminal.toggle(true); document.getElementById('context-menu').style.display='none';">> Open Terminal</div>
+                <div class="menu-item" style="color:#8888aa; font-weight:bold; border-bottom:1px solid #334; margin-bottom:5px; padding-bottom:5px;" onclick="InteractionHandler.openTerminal();">> Open Terminal</div>
                 <div class="menu-item has-sub" style="color:var(--wire-on); font-weight:bold">
                     Spawn Input
                     <div class="sub-menu">
-                        <div class="menu-item" onclick="Sim.addNode('IN-1', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">1-Bit</div>
-                        <div class="menu-item" onclick="Sim.addNode('IN-4', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">4-Bit</div>
-                        <div class="menu-item" onclick="Sim.addNode('IN-8', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">8-Bit</div>
+                        <div class="menu-item" onclick="InteractionHandler.spawnGate('IN-1');">1-Bit</div>
+                        <div class="menu-item" onclick="InteractionHandler.spawnGate('IN-4');">4-Bit</div>
+                        <div class="menu-item" onclick="InteractionHandler.spawnGate('IN-8');">8-Bit</div>
                     </div>
                 </div>
                 <div class="menu-item has-sub" style="color:var(--accent); font-weight:bold">
                     Spawn Output
                     <div class="sub-menu">
-                        <div class="menu-item" onclick="Sim.addNode('OUT-1', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">1-Bit</div>
-                        <div class="menu-item" onclick="Sim.addNode('OUT-4', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">4-Bit</div>
-                        <div class="menu-item" onclick="Sim.addNode('OUT-8', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">8-Bit</div>
+                        <div class="menu-item" onclick="InteractionHandler.spawnGate('OUT-1');">1-Bit</div>
+                        <div class="menu-item" onclick="InteractionHandler.spawnGate('OUT-4');">4-Bit</div>
+                        <div class="menu-item" onclick="InteractionHandler.spawnGate('OUT-8');">8-Bit</div>
                     </div>
                 </div>
-                <div class="menu-item" onclick="Sim.addNode('CLOCK', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">Spawn Clock</div>
-                <div class="menu-item" style="color:#fff; font-weight:bold" onclick="Sim.addNode('NAND', ${x}, ${y}); document.getElementById('context-menu').style.display='none';">Spawn NAND</div>
+                <div class="menu-item" onclick="InteractionHandler.spawnGate('CLOCK');">Spawn Clock</div>
+                <div class="menu-item" style="color:#fff; font-weight:bold" onclick="InteractionHandler.spawnGate('NAND');">Spawn NAND</div>
                 ${customChipsHtml}
                 ${Sim.activeEditingChip ? `
                     <div class="menu-item has-sub" style="color:#ffca28; font-weight:bold; border-top:1px solid #334; margin-top:5px; padding-top:5px;">
                         Split Editor
                         <div class="sub-menu">
-                            <div class="menu-item" onclick="Sim.uiSplitEditor('left'); document.getElementById('context-menu').style.display='none';">Left</div>
-                            <div class="menu-item" onclick="Sim.uiSplitEditor('right'); document.getElementById('context-menu').style.display='none';">Right</div>
-                            <div class="menu-item" onclick="Sim.uiSplitEditor('popup'); document.getElementById('context-menu').style.display='none';">Popup</div>
+                            <div class="menu-item" onclick="InteractionHandler.splitEditor('left');">Left</div>
+                            <div class="menu-item" onclick="InteractionHandler.splitEditor('right');">Right</div>
+                            <div class="menu-item" onclick="InteractionHandler.splitEditor('popup');">Popup</div>
                         </div>
                     </div>
                 ` : ''}
