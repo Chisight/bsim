@@ -95,7 +95,7 @@ const WasmEngine = {
 
             if (this.useWorker) {
                 this.worker = new Worker('js/modules/sim_worker.js');
-                this.worker.onmessage = (e) => {
+                this.worker.onmessage = async (e) => {
                     if (e.data.action === 'ready') {
                         this.ready = true;
                         console.log('[WasmEngine] Core initialized successfully (WebWorker Mode).');
@@ -105,7 +105,35 @@ const WasmEngine = {
                             Sim.updateHUD();
                         }
                     } else if (e.data.action === 'error') {
-                        console.error('[WasmEngine] Worker error:', e.data.error);
+                        console.warn('[WasmEngine] WebWorker initialization failed. Falling back to single-threaded mode...', e.data.error);
+                        
+                        // Terminate the failed worker and switch modes
+                        this.worker.terminate();
+                        this.worker = null;
+                        this.useWorker = false;
+                        
+                        try {
+                            const fallbackUrl = 'js/wasm-bin/engine.wasm';
+                            this.memory = new WebAssembly.Memory({
+                                initial: 512,
+                                maximum: 2048,
+                                shared: false
+                            });
+                            
+                            const res = await tryInstantiate(fallbackUrl);
+                            this.instance = res.instance;
+                            this.memArray = new Int32Array(this.memory.buffer);
+                            
+                            this.ready = true;
+                            console.log('[WasmEngine] Core successfully recovered and initialized (Single-Threaded Mode).');
+                            if (window.Sim) {
+                                Sim.seedQueue();
+                                Sim.processQueue();
+                                Sim.updateHUD();
+                            }
+                        } catch (fallbackErr) {
+                            console.error('[WasmEngine] WebWorker fallback initialization failed completely:', fallbackErr);
+                        }
                     }
                 };
                 this.worker.postMessage({
