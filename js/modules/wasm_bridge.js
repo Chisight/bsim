@@ -15,6 +15,16 @@ const WasmEngine = {
     idMap: new Map(), // nodeId -> wasmIdx (Region A)
     flatNodes: [],
     flatWires: [],
+    initLog: [],
+
+    log(msg, type = 'info') {
+        const timestamp = new Date().toISOString();
+        this.initLog.push({ timestamp, msg, type });
+        const prefix = `[WasmEngine] ${msg}`;
+        if (type === 'error') console.error(prefix);
+        else if (type === 'warn') console.warn(prefix);
+        else console.log(prefix);
+    },
 
 
 
@@ -22,11 +32,20 @@ const WasmEngine = {
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for Wasm kernel initialization.
      */
     async init() {
+        this.log("Starting WebAssembly core initialization...");
+        
+        // Audit environment metrics
+        const sabSupported = typeof SharedArrayBuffer !== 'undefined';
+        const coIsolated = window.crossOriginIsolated ?? false;
+        this.log(`Environment: SharedArrayBuffer support = ${sabSupported ? 'YES' : 'NO'}`);
+        this.log(`Environment: Cross-Origin Isolation (COOP/COEP) = ${coIsolated ? 'YES' : 'NO'}`);
+
         let useShared = false;
         let wasmUrl = 'js/wasm-bin/engine.wasm';
 
-        if (typeof SharedArrayBuffer !== 'undefined') {
+        if (sabSupported) {
             try {
+                this.log("Attempting to allocate WebAssembly.Memory with shared: true...");
                 this.memory = new WebAssembly.Memory({
                     initial: 512, // 32MB baseline
                     maximum: 2048, // 128MB ceiling
@@ -34,12 +53,16 @@ const WasmEngine = {
                 });
                 useShared = true;
                 wasmUrl = 'js/wasm-bin/engine_shared.wasm';
+                this.log("Successfully allocated WebAssembly.Memory (shared mode). Target binary: engine_shared.wasm");
             } catch (e) {
-                console.warn('[WasmEngine] Shared memory allocation failed (missing headers or unsupported browser). Falling back to legacy mode.', e);
+                this.log("Shared WebAssembly.Memory allocation failed (missing headers or unsupported browser). Falling back to non-shared memory.", "warn");
             }
+        } else {
+            this.log("SharedArrayBuffer is not supported. Skipping shared memory allocation.");
         }
 
         if (!useShared) {
+            this.log("Allocating standard WebAssembly.Memory (non-shared mode). Target binary: engine.wasm");
             this.memory = new WebAssembly.Memory({
                 initial: 512,
                 maximum: 2048,
@@ -48,10 +71,17 @@ const WasmEngine = {
         }
 
         const tryInstantiate = async (url) => {
+            this.log(`Fetching WebAssembly binary from ${url}...`);
             const response = await fetch(url);
-            if (!response.ok) throw new Error(`HTTP ${response.status}: Failed to fetch WebAssembly binary from ${url}`);
+            if (!response.ok) {
+                const errText = `HTTP ${response.status}: Failed to fetch WebAssembly binary from ${url}`;
+                this.log(errText, "error");
+                throw new Error(errText);
+            }
+            this.log(`Fetch succeeded (${response.headers.get('Content-Length') || 'unknown'} bytes). Reading buffer...`);
             const bytes = await response.arrayBuffer();
 
+            this.log("Compiling and instantiating WebAssembly binary...");
             const { instance } = await WebAssembly.instantiate(bytes, {
                 env: {
                     memory: this.memory,
@@ -60,6 +90,7 @@ const WasmEngine = {
                     NQ_BASE: 65536
                 }
             });
+            this.log("WebAssembly instantiation succeeded.");
             return { instance, bytes };
         };
 
@@ -71,7 +102,7 @@ const WasmEngine = {
                     instance = res.instance;
                     bytes = res.bytes;
                 } catch (err) {
-                    console.warn('[WasmEngine] Shared WebAssembly instantiation failed. Falling back to non-shared mode...', err);
+                    this.log(`Shared WebAssembly instantiation failed: ${err.message}. Gracefully falling back to legacy single-threaded mode...`, "warn");
                     useShared = false;
                     wasmUrl = 'js/wasm-bin/engine.wasm';
                     this.memory = new WebAssembly.Memory({
@@ -94,18 +125,20 @@ const WasmEngine = {
             this.useWorker = useShared;
 
             if (this.useWorker) {
+                this.log("Launching background simulation thread via WebWorker (sim_worker.js)...");
                 this.worker = new Worker('js/modules/sim_worker.js');
+                
                 this.worker.onmessage = async (e) => {
                     if (e.data.action === 'ready') {
                         this.ready = true;
-                        console.log('[WasmEngine] Core initialized successfully (WebWorker Mode).');
+                        this.log("Core initialized successfully (WebWorker Mode). ready = true.");
                         if (window.Sim) {
                             Sim.seedQueue();
                             Sim.processQueue();
                             Sim.updateHUD();
                         }
                     } else if (e.data.action === 'error') {
-                        console.warn('[WasmEngine] WebWorker initialization failed. Falling back to single-threaded mode...', e.data.error);
+                        this.log(`Background WebWorker error reported: ${e.data.error}. Initiating recovery and falling back to single-threaded main thread mode...`, "warn");
                         
                         // Terminate the failed worker and switch modes
                         this.worker.terminate();
@@ -114,6 +147,7 @@ const WasmEngine = {
                         
                         try {
                             const fallbackUrl = 'js/wasm-bin/engine.wasm';
+                            this.log("Allocating non-shared WebAssembly.Memory for main-thread recovery...");
                             this.memory = new WebAssembly.Memory({
                                 initial: 512,
                                 maximum: 2048,
@@ -125,17 +159,19 @@ const WasmEngine = {
                             this.memArray = new Int32Array(this.memory.buffer);
                             
                             this.ready = true;
-                            console.log('[WasmEngine] Core successfully recovered and initialized (Single-Threaded Mode).');
+                            this.log("Core successfully recovered and initialized (Single-Threaded Mode). ready = true.");
                             if (window.Sim) {
                                 Sim.seedQueue();
                                 Sim.processQueue();
                                 Sim.updateHUD();
                             }
                         } catch (fallbackErr) {
-                            console.error('[WasmEngine] WebWorker fallback initialization failed completely:', fallbackErr);
+                            this.log(`WebWorker fallback recovery failed completely: ${fallbackErr.message}`, "error");
                         }
                     }
                 };
+                
+                this.log("Sending initialization payload (wasm bytes + shared memory buffer) to worker thread...");
                 this.worker.postMessage({
                     action: 'init',
                     wasmBytes: bytes,
@@ -143,7 +179,7 @@ const WasmEngine = {
                 });
             } else {
                 this.ready = true;
-                console.log('[WasmEngine] Core initialized successfully (Single-Threaded Mode).');
+                this.log("Core initialized successfully (Single-Threaded Mode). ready = true.");
                 if (window.Sim) {
                     Sim.seedQueue();
                     Sim.processQueue();
@@ -151,7 +187,7 @@ const WasmEngine = {
                 }
             }
         } catch (e) {
-            console.error('[WasmEngine] Initialization failed completely:', e);
+            this.log(`WebAssembly core initialization failed completely: ${e.message}`, "error");
         }
     },
 

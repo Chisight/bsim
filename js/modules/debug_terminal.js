@@ -648,10 +648,72 @@ const DebugTerminal = {
                 this.print("  - set <id> <v>: Set input node value.", "sys");
                 this.print("  - wire ...    : Connect two ports.", "sys");
                 this.print("  - synth <g>   : Compile logic from NANDs.", "sys");
+                this.print("  - wasm [check]: Exhaustive diagnostics for the WebAssembly simulation engine.", "sys");
                 break;
             case 'pwd':
                 this.print(this.cwd, 'sys');
                 break;
+            case 'wasm': {
+                const sub = args[1] ? args[1].toLowerCase() : 'check';
+                if (sub === 'check' || sub === 'status' || sub === 'debug') {
+                    this.print("--- WASM ENGINE DIAGNOSTICS ---", "warn");
+                    
+                    if (!window.WasmEngine) {
+                        this.print("Status: NOT LOADED (WasmEngine missing from global context)", "err");
+                        break;
+                    }
+
+                    const ready = window.WasmEngine.ready;
+                    const useWorker = window.WasmEngine.useWorker;
+                    
+                    this.print(`Engine Status: ${ready ? '<span style="color:#0f0; font-weight:bold;">ONLINE (Direct WebAssembly)</span>' : '<span style="color:#f55; font-weight:bold;">OFFLINE (V8 JavaScript Fallback)</span>'}`, 'sys');
+                    this.print(`Execution Mode: ${useWorker ? 'Multithreaded (WebWorker + SharedArrayBuffer)' : 'Single-threaded (Main Thread)'}`, 'sys');
+                    
+                    // Print environment checks
+                    this.print("<br>[Environment Checks]:", "sys");
+                    const sabSupported = typeof SharedArrayBuffer !== 'undefined';
+                    const coIsolated = window.crossOriginIsolated ?? false;
+                    this.print(`  - SharedArrayBuffer Support: ${sabSupported ? '<span style="color:#0f5">YES</span>' : '<span style="color:#f90">NO</span>'}`, 'sys');
+                    this.print(`  - Cross-Origin Isolation (COOP/COEP): ${coIsolated ? '<span style="color:#0f5">YES (Isolated)</span>' : '<span style="color:#f90">NO (Missing Security Headers)</span>'}`, 'sys');
+                    
+                    // Print active memory bounds
+                    if (window.WasmEngine.memory) {
+                        const bufferBytes = window.WasmEngine.memory.buffer.byteLength;
+                        const bufferPages = window.WasmEngine.memory.buffer.byteLength / 65536;
+                        this.print(`  - Linear Memory Size: ${bufferBytes.toLocaleString()} bytes (${bufferPages} pages)`, 'sys');
+                    }
+
+                    // Print Workspace purity checks
+                    const isPureNative = Sim.isPureNative();
+                    this.print(`  - Netlist Purity Validation: ${isPureNative ? '<span style="color:#0f5">PASSED (Native)</span>' : '<span style="color:#f90">FAILED (Contains Impure Gates)</span>'}`, 'sys');
+                    if (!isPureNative) {
+                        const impure = Sim.nodes.filter(n => !Engine.KERNEL.has(n.type));
+                        const impureTypes = [...new Set(impure.map(n => n.type))];
+                        this.print(`    * Impure Primitive/Custom Types found: ${impureTypes.join(', ')}`, 'warn');
+                    }
+
+                    // Print verbose init logs
+                    this.print("<br>[Initialization Log]:", "sys");
+                    if (window.WasmEngine.initLog && window.WasmEngine.initLog.length > 0) {
+                        window.WasmEngine.initLog.forEach(l => {
+                            let prefix = " ";
+                            let printType = "sys";
+                            if (l.type === 'error') { prefix = " [ERR] "; printType = "err"; }
+                            else if (l.type === 'warn') { prefix = " [WRN] "; printType = "warn"; }
+                            else if (l.type === 'info') { prefix = " [INF] "; printType = "sys"; }
+                            
+                            // Format timestamp cleanly
+                            const time = l.timestamp.split('T')[1].replace('Z', '');
+                            this.print(`  [${time}]${prefix}${l.msg}`, printType);
+                        });
+                    } else {
+                        this.print("  No initialization logs available.", "warn");
+                    }
+                } else {
+                    this.print("Usage: wasm [check | status | debug]", "err");
+                }
+                break;
+            }
             case 'cd':
                 // [AUDIT: v1.24.00 | SEC_ARCH_LEAD] - Safe boundary traversal for virtual file system.
                 let target = args[1];
