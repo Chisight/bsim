@@ -308,7 +308,7 @@ const Engine = {
                 }
 
                 sim.nodes.forEach(n => {
-                    const NATIVE_GATES = new Set(['NAND', 'CLOCK', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'TRISTATE', 'JUNCTION']);
+                    const NATIVE_GATES = new Set(['NAND', 'CLOCK', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'TRISTATE']);
                     if (NATIVE_GATES.has(n.type) && !n.isCustom) {
                         let newVal = WasmEngine.readState(n.id);
                         // [AUDIT: v1.26.06 | SEC_ARCH_LEAD] - Corrected High-Z decoding for all native primitives.
@@ -344,6 +344,19 @@ const Engine = {
                                 changed = true;
                                 if (typeof sim.updateNodeVisual === 'function') sim.updateNodeVisual(n);
                             }
+                        }
+                    }
+                });
+
+                // Second pass to resolve Junction states after all native gates have been synchronized
+                sim.nodes.forEach(n => {
+                    if (n.type === 'JUNCTION') {
+                        let newVal = this.getDrivingSignal(sim, n.id, 'j');
+                        if (n.val !== newVal || n._forcePropagate) {
+                            n._forcePropagate = false;
+                            n.val = newVal;
+                            changed = true;
+                            if (typeof sim.updateNodeVisual === 'function') sim.updateNodeVisual(n);
                         }
                     }
                 });
