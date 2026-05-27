@@ -65,7 +65,9 @@ const Engine = {
         visited.add(key);
 
         let high = false;
-        sim.wires.forEach(w => {
+        // Use transient O(1) adjacency map when available (built inside processQueue/_actualDrawWires)
+        const adj = sim._wireMap ? sim._wireMap.get(nodeId) : sim.wires;
+        if (adj) adj.forEach(w => {
             if (w.to.nodeId === nodeId && w.to.portId === portId) {
                 if (this.getSignal(sim, w.from.nodeId, w.from.portId, visited)) high = true;
             } else if (w.from.nodeId === nodeId && w.from.portId === portId) {
@@ -284,7 +286,7 @@ const Engine = {
                 }
                 sim.nodes.forEach(n => {
                     if (n.type.startsWith('IN-') || n.type === 'CLOCK') {
-                        if (JSON.stringify(n.val) !== JSON.stringify(n.state)) {
+                        if (!this.fastEqual(n.val, n.state)) {
                             n.val = Array.isArray(n.state) ? [...n.state] : n.state;
                             if (typeof sim.updateNodeVisual === 'function') sim.updateNodeVisual(n);
                             changed = true;
@@ -382,10 +384,10 @@ const Engine = {
                         });
 
                         const mappedOuts = this._mapChipOutputs(sim.library[n.type], rawInnerState);
-                        if (JSON.stringify(n.outputs) !== JSON.stringify(mappedOuts) || n._forcePropagate) {
+                        if (!this.fastEqual(n.outputs, mappedOuts) || n._forcePropagate) {
                             n.outputs = mappedOuts;
                             n._forcePropagate = false;
-                            n.val = JSON.parse(JSON.stringify(n.outputs));
+                            n.val = { ...n.outputs };
                             if (typeof sim.updateNodeVisual === 'function') sim.updateNodeVisual(n);
                             changed = true;
                         }
@@ -408,7 +410,7 @@ const Engine = {
                                 const drive = WasmEngine.readPinState(n.id, `in${b}`);
                                 nextState[b] = (drive === 2 || drive === 'Z' || drive === null) ? 'Z' : ((drive === 1 || drive === true) ? 1 : 0);
                             }
-                            if (JSON.stringify(n.state) !== JSON.stringify(nextState) || n._forcePropagate) {
+                            if (!this.fastEqual(n.state, nextState) || n._forcePropagate) {
                                 n._forcePropagate = false;
                                 n.state = nextState;
                                 n.val = [...nextState];
@@ -430,8 +432,17 @@ const Engine = {
         let iterations = 0;
         const MAX_ITERS = 1000;
 
-        // Build high-performance transient O(1) Node Map for hot execution loops
+        // Build high-performance transient O(1) Node Map and Wire Adjacency Map for hot execution loops
         sim._nodeMap = new Map(sim.nodes.map(n => [n.id, n]));
+        sim._wireMap = new Map();
+        sim.wires.forEach(w => {
+            if (!sim._wireMap.has(w.from.nodeId)) sim._wireMap.set(w.from.nodeId, []);
+            sim._wireMap.get(w.from.nodeId).push(w);
+            if (w.to.nodeId !== w.from.nodeId) {
+                if (!sim._wireMap.has(w.to.nodeId)) sim._wireMap.set(w.to.nodeId, []);
+                sim._wireMap.get(w.to.nodeId).push(w);
+            }
+        });
 
         if (!sim._nextQueue) sim._nextQueue = new Set();
         else sim._nextQueue.clear();
@@ -518,8 +529,9 @@ const Engine = {
             sim._nextQueue.clear();
         }
 
-        // Clean up high-performance transient Node Map
+        // Clean up high-performance transient Node Map and Wire Adjacency Map
         delete sim._nodeMap;
+        delete sim._wireMap;
 
         if (iterations >= MAX_ITERS) {
             console.error('[Simulator] Thermal Trip: Max propagation reached.');

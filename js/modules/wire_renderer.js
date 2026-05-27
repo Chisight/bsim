@@ -112,22 +112,35 @@ const WireRenderer = {
 
         let domIndex = 0;
 
+        // Hoist validWasmTypes and checkPure: computed once per draw call, not once per wire
+        const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'RAM', '0']);
+        const checkPure = (nodes, visited = new Set()) => {
+            if (visited.has(nodes)) return true; // Cycle detected, assume pure to break loop
+            visited.add(nodes);
+            return nodes.every(n => {
+                if (validWasmTypes.has(n.type)) return true;
+                if (Sim.library && Sim.library[n.type]) return checkPure(Sim.library[n.type].nodes, visited);
+                return false;
+            });
+        };
+        const isPureNative = checkPure(Sim.nodes);
+
+        // Build transient Wire Adjacency Map for O(1) getDrivingSignal lookups during this render pass
+        Sim._wireMap = new Map();
+        Sim.wires.forEach(w => {
+            if (!Sim._wireMap.has(w.from.nodeId)) Sim._wireMap.set(w.from.nodeId, []);
+            Sim._wireMap.get(w.from.nodeId).push(w);
+            if (w.to.nodeId !== w.from.nodeId) {
+                if (!Sim._wireMap.has(w.to.nodeId)) Sim._wireMap.set(w.to.nodeId, []);
+                Sim._wireMap.get(w.to.nodeId).push(w);
+            }
+        });
+
         Sim.wires.forEach((w, i) => {
             const p1 = Sim.getPortCoords(w.from.nodeId, w.from.portId);
             const p2 = Sim.getPortCoords(w.to.nodeId, w.to.portId);
             if (p1 && p2) {
                 let sig = null;
-                const validWasmTypes = new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'RAM', '0']);
-                const checkPure = (nodes, visited = new Set()) => {
-                    if (visited.has(nodes)) return true; // Cycle detected, assume pure to break loop
-                    visited.add(nodes);
-                    return nodes.every(n => {
-                        if (validWasmTypes.has(n.type)) return true;
-                        if (Sim.library && Sim.library[n.type]) return checkPure(Sim.library[n.type].nodes, visited);
-                        return false;
-                    });
-                };
-                const isPureNative = checkPure(Sim.nodes);
 
                 if (Sim.useWasm && isPureNative && window.WasmEngine && WasmEngine.ready && WasmEngine.wireIdxMap) {
                     sig = WasmEngine.readWireState(i);
@@ -141,6 +154,9 @@ const WireRenderer = {
                 domIndex = this._drawOrtho(svg, p1, p2, false, sig, i, domIndex);
             }
         });
+
+        // Clean up transient Wire Adjacency Map after render pass
+        delete Sim._wireMap;
 
         if (Sim.wiring.active) {
             const p1 = Sim.getPortCoords(Sim.wiring.start.nodeId, Sim.wiring.start.portId);
