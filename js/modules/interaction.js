@@ -186,7 +186,7 @@ const InteractionHandler = {
         // [AUDIT: v1.26.24 | SEC_ARCH_LEAD] - Global freeze on node topological drags during layout configurations.
         if (document.body.classList.contains('edit-mode-active') || document.body.classList.contains('pin-mutate-active')) return;
 
-        if (e.target.classList.contains('port')) {
+        if (e.target.classList.contains('port') && node.type !== 'JUNCTION') {
             return;
         }
         
