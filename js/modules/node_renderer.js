@@ -7,6 +7,7 @@ const NodeRenderer = {
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for node DOM instantiation.
      */
     renderNode(node) {
+        delete node._portOffsets;
         const div = document.createElement('div');
         div.id = node.id; 
         div.className = node.type === 'JUNCTION' ? 'gate junction' : 'gate';
@@ -234,18 +235,6 @@ const NodeRenderer = {
         div.ondblclick = (e) => InteractionHandler.handleNodeDblClick(e, node, div);
 
         document.getElementById('scene').appendChild(div);
-        
-        node._portOffsets = {};
-        const portEls = div.querySelectorAll('.port');
-        portEls.forEach(p => {
-            const pid = p.dataset.port;
-            const w = p.offsetWidth || 8;
-            const h = p.offsetHeight || 8;
-            node._portOffsets[pid] = {
-                x: p.offsetLeft + w / 2,
-                y: p.offsetTop + h / 2
-            };
-        });
 
         if (window.Sim && Sim._domCacheMap) Sim._domCacheMap.delete(node.id);
         Sim.updateNodeVisual(node);

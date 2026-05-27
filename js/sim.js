@@ -572,7 +572,24 @@ const Sim = {
         if (node.type === 'JUNCTION') {
             return { x: node.x, y: node.y };
         }
-        if (node._portOffsets && node._portOffsets[portId]) {
+        
+        if (!node._portOffsets) {
+            node._portOffsets = {};
+        }
+
+        if (node._portOffsets[portId] === undefined) {
+            const pEl = document.getElementById(nodeId)?.querySelector(`[data-port="${portId}"]`);
+            if (pEl) {
+                const w = pEl.offsetWidth || 8;
+                const h = pEl.offsetHeight || 8;
+                node._portOffsets[portId] = {
+                    x: pEl.offsetLeft + w / 2,
+                    y: pEl.offsetTop + h / 2
+                };
+            }
+        }
+
+        if (node._portOffsets[portId] !== undefined) {
             return { x: node.x + node._portOffsets[portId].x, y: node.y + node._portOffsets[portId].y };
         }
 
