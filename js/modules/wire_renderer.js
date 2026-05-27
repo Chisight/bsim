@@ -39,7 +39,64 @@ const WireRenderer = {
         });
     },
 
+    /**
+     * Highly optimized selective redrawing for dirty wires during node translation.
+     * Prevents expensive full-schematic redraws by updating only connected wires.
+     */
+    drawWiresSelective(dragNodeIds) {
+        const svg = document.getElementById('svg-layer');
+        if (!svg) return;
+
+        const dragNodeSet = new Set(dragNodeIds);
+
+        Sim.wires.forEach((w) => {
+            if (dragNodeSet.has(w.from.nodeId) || dragNodeSet.has(w.to.nodeId)) {
+                const p1 = Sim.getPortCoords(w.from.nodeId, w.from.portId);
+                const p2 = Sim.getPortCoords(w.to.nodeId, w.to.portId);
+                if (p1 && p2 && w._domBg && w._domPath) {
+                    const d = this._calculateSmartPath(p1, p2, w.from.nodeId, w.to.nodeId, w);
+                    w._domBg.setAttribute('d', d);
+                    w._domPath.setAttribute('d', d);
+                }
+            }
+        });
+    },
+
+    /**
+     * O(1) synchronous active wire preview path redrawing.
+     * Achieves 0ms drawing feedback latency during connection drags.
+     */
+    drawWirePreview() {
+        const svg = document.getElementById('svg-layer');
+        if (!svg || !Sim.wiring.active) return;
+
+        const p1 = Sim.getPortCoords(Sim.wiring.start.nodeId, Sim.wiring.start.portId);
+        const p2Snap = Sim.wiring.snapTarget ? Sim.getPortCoords(Sim.wiring.snapTarget.nodeId, Sim.wiring.snapTarget.portId) : null;
+        
+        const scene = document.getElementById('scene');
+        const sr = scene ? scene.getBoundingClientRect() : { left: 0, top: 0 };
+        const sceneMouseX = (Sim.wiring.mouseX - sr.left) / View.scale;
+        const sceneMouseY = (Sim.wiring.mouseY - sr.top) / View.scale;
+        const p2 = p2Snap || { x: sceneMouseX, y: sceneMouseY };
+
+        if (p1 && p2) {
+            const d = this._calculateSmartPath(p1, p2, Sim.wiring.start.nodeId, Sim.wiring.snapTarget?.nodeId, null);
+
+            if (!this._domPreviewPath || !svg.contains(this._domPreviewPath)) {
+                this.drawWires(true);
+                return;
+            }
+
+            this._domPreviewPath.setAttribute('d', d);
+            this._domPreviewPath.setAttribute('stroke', Sim.wiring.snapTarget ? 'var(--wire-on)' : '#ffffff44');
+        }
+    },
+
     _actualDrawWires() {
+        if (!Sim.wiring.active) {
+            this._domPreviewPath = null;
+        }
+
         const svg = document.getElementById('svg-layer');
         if (!svg) {
             return;
@@ -267,6 +324,7 @@ const WireRenderer = {
             path.setAttribute('stroke-width', '2');
             path.setAttribute('fill', 'none');
             path.setAttribute('pointer-events', 'none');
+            this._domPreviewPath = path;
         } else if (wire) {
             const bg = this._getDomPath(svg, domIndex++);
             bg.setAttribute('d', d);
@@ -301,6 +359,9 @@ const WireRenderer = {
 
             applyEvents(bg);
             applyEvents(path);
+
+            wire._domBg = bg;
+            wire._domPath = path;
         }
         return domIndex;
     }

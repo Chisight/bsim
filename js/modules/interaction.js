@@ -309,7 +309,7 @@ const InteractionHandler = {
                 if (item.oy !== undefined) item.wire.midY = item.oy + snapDy;
             });
             
-            WireRenderer.drawWires();
+            WireRenderer.drawWiresSelective(dragSet.map(item => item.node.id));
         };
         const onUp = () => {
             document.removeEventListener('mousemove', onMove);
