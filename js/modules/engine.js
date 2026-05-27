@@ -30,7 +30,7 @@ const Engine = {
     },
 
     getSignal(sim, nodeId, portId) {
-        const node = sim.nodes.find(n => n.id === nodeId);
+        const node = sim._nodeMap ? sim._nodeMap.get(nodeId) : sim.nodes.find(n => n.id === nodeId);
         if (!node) return 'Z';
         if (node.type === 'JUNCTION') {
             return this.getDrivingSignal(sim, nodeId, portId);
@@ -430,6 +430,9 @@ const Engine = {
         let iterations = 0;
         const MAX_ITERS = 1000;
 
+        // Build high-performance transient O(1) Node Map for hot execution loops
+        sim._nodeMap = new Map(sim.nodes.map(n => [n.id, n]));
+
         if (!sim._nextQueue) sim._nextQueue = new Set();
         else sim._nextQueue.clear();
 
@@ -477,7 +480,7 @@ const Engine = {
                         if (depth > 100) return;
                         sim.wires.forEach(w => {
                             if (w.from.nodeId === nid) {
-                                const ds = sim.nodes.find(n => n.id === w.to.nodeId);
+                                const ds = sim._nodeMap ? sim._nodeMap.get(w.to.nodeId) : sim.nodes.find(n => n.id === w.to.nodeId);
                                 if (ds) {
                                     sim._nextQueue.add(ds);
                                     if (ds.type === 'JUNCTION' && !visitedJuncs.has(ds.id)) {
@@ -486,7 +489,7 @@ const Engine = {
                                     }
                                 }
                             } else if (w.to.nodeId === nid) {
-                                const ds = sim.nodes.find(n => n.id === w.from.nodeId);
+                                const ds = sim._nodeMap ? sim._nodeMap.get(w.from.nodeId) : sim.nodes.find(n => n.id === w.from.nodeId);
                                 if (ds) {
                                     sim._nextQueue.add(ds);
                                     if (ds.type === 'JUNCTION' && !visitedJuncs.has(ds.id)) {
@@ -514,6 +517,9 @@ const Engine = {
             sim._nextQueue = temp;
             sim._nextQueue.clear();
         }
+
+        // Clean up high-performance transient Node Map
+        delete sim._nodeMap;
 
         if (iterations >= MAX_ITERS) {
             console.error('[Simulator] Thermal Trip: Max propagation reached.');

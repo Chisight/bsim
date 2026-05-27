@@ -162,7 +162,7 @@ window.onload = () => {
     // [AUDIT: v1.25.60 | SEC_ARCH_LEAD] - Restored MSB-at-top ordering for RAM and Custom chips; eradicated "crooked" pin offsets by enforcing a rigid 20px vertical spacing grid.
     // [AUDIT: v1.26.01 | SEC_ARCH_LEAD] - Phase 2 Modularization: Decoupled UI Orchestration, rendering engines, and notification subsystems from the simulator core.
     // [AUDIT: v1.26.06 | SEC_ARCH_LEAD] - Reverted to target version with integrated NAND parity fix.
-    window.LOADED_BSIM_VERSION = "1.27.15";
+    window.LOADED_BSIM_VERSION = "1.27.16";
 
     // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Purged legacy JIT DOM interceptor in favor of native parametric coordinate generation.
 
