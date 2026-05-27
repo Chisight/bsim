@@ -234,6 +234,19 @@ const NodeRenderer = {
         div.ondblclick = (e) => InteractionHandler.handleNodeDblClick(e, node, div);
 
         document.getElementById('scene').appendChild(div);
+        
+        node._portOffsets = {};
+        const portEls = div.querySelectorAll('.port');
+        portEls.forEach(p => {
+            const pid = p.dataset.port;
+            const w = p.offsetWidth || 8;
+            const h = p.offsetHeight || 8;
+            node._portOffsets[pid] = {
+                x: p.offsetLeft + w / 2,
+                y: p.offsetTop + h / 2
+            };
+        });
+
         if (window.Sim && Sim._domCacheMap) Sim._domCacheMap.delete(node.id);
         Sim.updateNodeVisual(node);
     }

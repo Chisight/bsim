@@ -567,6 +567,15 @@ const Sim = {
     /**
      */
     getPortCoords(nodeId, portId) {
+        const node = this.nodes.find(n => n.id === nodeId);
+        if (!node) return null;
+        if (node.type === 'JUNCTION') {
+            return { x: node.x, y: node.y };
+        }
+        if (node._portOffsets && node._portOffsets[portId]) {
+            return { x: node.x + node._portOffsets[portId].x, y: node.y + node._portOffsets[portId].y };
+        }
+
         const scene = document.getElementById('scene');
         const pEl = document.getElementById(nodeId)?.querySelector(`[data-port="${portId}"]`);
         if (!scene || !pEl) return null;
@@ -1169,6 +1178,11 @@ const Sim = {
                     nodes: this.nodes.map(n => this._cleanNode(n)).filter(n => n !== null),
                     wires: this.wires.map(w => this._cleanWire(w)).filter(w => w !== null)
                 };
+                if (this.library) {
+                    Object.values(this.library).forEach(chip => {
+                        if (chip) delete chip._flatCache;
+                    });
+                }
                 this.updateLibraryUI();
                 this.toast(`Chip "${n}" saved to ${folder ? 'folder ' + folder : 'library'}`, 'success');
                 this.autoSave();

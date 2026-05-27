@@ -246,9 +246,26 @@ const WasmEngine = {
             const gid = prefix ? `${prefix}:${n.id}` : n.id;
             const lib = resolveLib(n);
             if (lib) {
-                const res = this._flattenNetlist(lib.nodes, lib.wires, gid);
-                fNodes.push(...res.nodes);
-                fWires.push(...res.wires);
+                if (!lib._flatCache) {
+                    lib._flatCache = this._flattenNetlist(lib.nodes, lib.wires, "");
+                }
+                const instNodes = lib._flatCache.nodes.map(cn => {
+                    const cloned = JSON.parse(JSON.stringify(cn));
+                    cloned.id = gid ? `${gid}:${cloned.id}` : cloned.id;
+                    return cloned;
+                });
+                const instWires = lib._flatCache.wires.map(cw => ({
+                    from: {
+                        nodeId: gid ? `${gid}:${cw.from.nodeId}` : cw.from.nodeId,
+                        portId: cw.from.portId
+                    },
+                    to: {
+                        nodeId: gid ? `${gid}:${cw.to.nodeId}` : cw.to.nodeId,
+                        portId: cw.to.portId
+                    }
+                }));
+                fNodes.push(...instNodes);
+                fWires.push(...instWires);
             } else {
                 const cloned = JSON.parse(JSON.stringify(n));
                 cloned.id = gid;

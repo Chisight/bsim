@@ -416,16 +416,25 @@ const Engine = {
 
         let iterations = 0;
         const MAX_ITERS = 1000;
+
+        if (!sim._nextQueue) sim._nextQueue = new Set();
+        else sim._nextQueue.clear();
+
         while (sim.eventQueue.size > 0 && iterations < MAX_ITERS) {
             iterations++;
-            const nextQueue = new Set();
-            const sortedEvents = Array.from(sim.eventQueue).sort((a, b) => {
-                const isSeqA = ['DFF', 'TFF', 'CLOCK', 'RAM'].includes(a.type) ? 1 : 0;
-                const isSeqB = ['DFF', 'TFF', 'CLOCK', 'RAM'].includes(b.type) ? 1 : 0;
-                return isSeqA - isSeqB;
+
+            const combNodes = [];
+            const seqNodes = [];
+
+            sim.eventQueue.forEach(node => {
+                if (['DFF', 'TFF', 'CLOCK', 'RAM'].includes(node.type)) {
+                    seqNodes.push(node);
+                } else {
+                    combNodes.push(node);
+                }
             });
 
-            sortedEvents.forEach(node => {
+            const processNode = (node) => {
                 const newVal = this.calculateNextState(sim, node);
                 const rawNew = (typeof newVal === 'string' && newVal !== 'Z') ? JSON.parse(newVal) : newVal;
 
@@ -457,7 +466,7 @@ const Engine = {
                             if (w.from.nodeId === nid) {
                                 const ds = sim.nodes.find(n => n.id === w.to.nodeId);
                                 if (ds) {
-                                    nextQueue.add(ds);
+                                    sim._nextQueue.add(ds);
                                     if (ds.type === 'JUNCTION' && !visitedJuncs.has(ds.id)) {
                                         visitedJuncs.add(ds.id);
                                         traceDriven(ds.id, depth + 1);
@@ -466,7 +475,7 @@ const Engine = {
                             } else if (w.to.nodeId === nid) {
                                 const ds = sim.nodes.find(n => n.id === w.from.nodeId);
                                 if (ds) {
-                                    nextQueue.add(ds);
+                                    sim._nextQueue.add(ds);
                                     if (ds.type === 'JUNCTION' && !visitedJuncs.has(ds.id)) {
                                         visitedJuncs.add(ds.id);
                                         traceDriven(ds.id, depth + 1);
@@ -481,8 +490,16 @@ const Engine = {
                         TutorialEngine.checkProgress();
                     }
                 }
-            });
-            sim.eventQueue = nextQueue;
+            };
+
+            combNodes.forEach(processNode);
+            seqNodes.forEach(processNode);
+
+            // Swap double buffers
+            const temp = sim.eventQueue;
+            sim.eventQueue = sim._nextQueue;
+            sim._nextQueue = temp;
+            sim._nextQueue.clear();
         }
 
         if (iterations >= MAX_ITERS) {
