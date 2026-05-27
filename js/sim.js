@@ -144,6 +144,7 @@ const Sim = {
 
         View.init();
         this.loadAutoSave();
+        this.applyStyles();
         this.updateTabsUI();
         this.updateSidebar();
         this.updateHUD();
@@ -995,6 +996,7 @@ const Sim = {
                 <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">UI Scale (%): <div style="display:flex; gap:5px; align-items:center;"><input type="range" min="50" max="200" value="${this.uiScale || 100}" oninput="this.nextElementSibling.value=this.value; Sim.uiScale=parseInt(this.value); Sim.applyStyles(); Sim.autoSave();" style="width:70px;"><input type="number" min="50" max="200" value="${this.uiScale || 100}" oninput="this.previousElementSibling.value=this.value; Sim.uiScale=parseInt(this.value); Sim.applyStyles(); Sim.autoSave();" style="width:40px; background:#111; color:#fff; border:1px solid #334; text-align:center; font-family:'JetBrains Mono', monospace;"></div></div>
                 <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">Port Size: <select onchange="Sim.portSize=this.value; Sim.applyStyles(); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px; padding:2px;"><option value="small" ${this.portSize === 'small' ? 'selected' : ''}>Small</option><option value="medium" ${this.portSize === 'medium' || !this.portSize ? 'selected' : ''}>Medium</option><option value="large" ${this.portSize === 'large' ? 'selected' : ''}>Large</option></select></div>
                 <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">Indicator LED Size: <select onchange="Sim.dotSize=this.value; Sim.applyStyles(); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px; padding:2px;"><option value="small" ${this.dotSize === 'small' ? 'selected' : ''}>Small (8px)</option><option value="medium" ${this.dotSize === 'medium' || !this.dotSize ? 'selected' : ''}>Medium (12px)</option><option value="large" ${this.dotSize === 'large' ? 'selected' : ''}>Large (16px)</option></select></div>
+                <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">Junction Size: <select onchange="Sim.junctionSize=this.value; Sim.applyStyles(); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px; padding:2px;"><option value="small" ${this.junctionSize === 'small' ? 'selected' : ''}>Small (8px)</option><option value="medium" ${this.junctionSize === 'medium' || !this.junctionSize ? 'selected' : ''}>Medium (12px)</option><option value="large" ${this.junctionSize === 'large' ? 'selected' : ''}>Large (16px)</option></select></div>
                 <div style="height:1px; background:#333; margin:8px 0 4px 0;"></div>
                 <label style="display:flex; align-items:center; justify-content:space-between; gap:10px;"><span style="font-weight:bold; color:var(--wire-on);">Execution Engine:</span><select onchange="Sim.setEngine(this.value); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #444; padding:4px 8px; border-radius:4px; outline:none; cursor:pointer; font-family:'JetBrains Mono', monospace; font-size:11px;"><option value="wasm" ${this.useWasm ? 'selected' : ''}>WASM (High Performance)</option><option value="v8" ${!this.useWasm ? 'selected' : ''}>V8 JavaScript (Fallback)</option></select></label>
             </div>
@@ -1139,6 +1141,9 @@ const Sim = {
 
         const dotMap = { 'small': '8px', 'medium': '12px', 'large': '16px' };
         document.documentElement.style.setProperty('--dot-size', dotMap[this.dotSize || 'medium']);
+
+        const junctionMap = { 'small': '8px', 'medium': '12px', 'large': '16px' };
+        document.documentElement.style.setProperty('--junction-size', junctionMap[this.junctionSize || 'medium']);
 
         document.body.classList.toggle('no-animations', !!this.disableAnimations);
     },

@@ -308,7 +308,7 @@ const Engine = {
                 }
 
                 sim.nodes.forEach(n => {
-                    const NATIVE_GATES = new Set(['NAND', 'CLOCK', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'TRISTATE']);
+                    const NATIVE_GATES = new Set(['NAND', 'CLOCK', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'TRISTATE', 'JUNCTION']);
                     if (NATIVE_GATES.has(n.type) && !n.isCustom) {
                         let newVal = WasmEngine.readState(n.id);
                         // [AUDIT: v1.26.06 | SEC_ARCH_LEAD] - Corrected High-Z decoding for all native primitives.

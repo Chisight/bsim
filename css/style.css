@@ -239,11 +239,13 @@ nav .sub-menu .menu-item::after { display: none; }
 .gate.custom { border: 3px solid #ffca28; }
 .gate.active { border-color: var(--wire-on) !important; box-shadow: none; }
 .gate.junction { 
-    min-width: 16px !important; min-height: 16px !important; 
-    width: 16px !important; height: 16px !important; 
+    min-width: var(--junction-size, 12px) !important; min-height: var(--junction-size, 12px) !important; 
+    width: var(--junction-size, 12px) !important; height: var(--junction-size, 12px) !important; 
     padding: 0; border: none; background: var(--wire-off); 
     border-radius: 50%; z-index: 50;
-    box-shadow: none; margin-left: -8px; margin-top: -8px;
+    box-shadow: none;
+    margin-left: calc(var(--junction-size, 12px) / -2);
+    margin-top: calc(var(--junction-size, 12px) / -2);
 }
 .gate.junction.active { background: var(--wire-on); box-shadow: none; }
 .gate.junction .port {
