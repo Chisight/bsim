@@ -243,7 +243,8 @@ const UIOrchestrator = {
             { label: 'OUTPUT', type: 'OUTPUT' },
             { label: 'CLOCK', type: 'CLOCK' },
             { label: 'RAM', type: 'RAM' },
-            { label: '0', type: '0' }
+            { label: '0', type: '0' },
+            { label: 'JUNCTION', type: 'JUNCTION' }
         ];
 
         const primFolder = document.createElement('div');

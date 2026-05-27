@@ -657,7 +657,7 @@ const InteractionHandler = {
             // [AUDIT: v1.24.47 | SEC_ARCH_LEAD] - Stricter wire resolution referencing ports to prevent incorrect deletion of parallel multi-bit connections.
             // [AUDIT: v1.24.77 | SEC_ARCH_LEAD] - Hardened missing-wire exception handling for direct-action menus.
             menu.innerHTML = `
-                <div class="menu-item" onclick="InteractionHandler.splitActiveWire(${clickX}, ${clickY});">Add Node Here</div>
+                <div class="menu-item" onclick="InteractionHandler.splitActiveWire(${clickX}, ${clickY});">Add Junction Here</div>
                 <div class="menu-item danger" onclick="InteractionHandler.deleteActiveWire();">Delete Wire</div>
             `;
             
@@ -799,6 +799,7 @@ const InteractionHandler = {
                 </div>
                 <div class="menu-item" onclick="InteractionHandler.spawnGate('CLOCK');">Spawn Clock</div>
                 <div class="menu-item" style="color:#fff; font-weight:bold" onclick="InteractionHandler.spawnGate('NAND');">Spawn NAND</div>
+                <div class="menu-item" style="color:#00ffaa; font-weight:bold" onclick="InteractionHandler.spawnGate('JUNCTION');">Spawn Wire Junction</div>
                 ${customChipsHtml}
                 ${Sim.activeEditingChip ? `
                     <div class="menu-item has-sub" style="color:#ffca28; font-weight:bold; border-top:1px solid #334; margin-top:5px; padding-top:5px;">
