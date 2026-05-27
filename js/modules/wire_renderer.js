@@ -3,6 +3,8 @@
  */
 const WireRenderer = {
     _pool: [],
+    _drawPending: false,
+    _rafId: null,
     
     _getDomPath(svg, index) {
         while (this._pool.length <= index) {
@@ -16,7 +18,28 @@ const WireRenderer = {
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for SVG wire layer redraw.
      */
-    drawWires() {
+    drawWires(force = false) {
+        if (force) {
+            if (this._rafId) {
+                cancelAnimationFrame(this._rafId);
+                this._rafId = null;
+            }
+            this._drawPending = false;
+            this._actualDrawWires();
+            return;
+        }
+
+        if (this._drawPending) return;
+        this._drawPending = true;
+
+        this._rafId = requestAnimationFrame(() => {
+            this._drawPending = false;
+            this._rafId = null;
+            this._actualDrawWires();
+        });
+    },
+
+    _actualDrawWires() {
         const svg = document.getElementById('svg-layer');
         if (!svg) {
             return;
