@@ -346,6 +346,7 @@ const Sim = {
     /**
      */
     updateNodeVisual(n) {
+        delete n._portOffsets;
         const el = document.getElementById(n.id); if (!el) return;
 
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Apply saved geometric properties dynamically on visual update.
@@ -578,13 +579,14 @@ const Sim = {
         }
 
         if (node._portOffsets[portId] === undefined) {
+            const scene = document.getElementById('scene');
             const pEl = document.getElementById(nodeId)?.querySelector(`[data-port="${portId}"]`);
-            if (pEl) {
-                const w = pEl.offsetWidth || 8;
-                const h = pEl.offsetHeight || 8;
+            if (scene && pEl) {
+                const sr = scene.getBoundingClientRect();
+                const r = pEl.getBoundingClientRect();
                 node._portOffsets[portId] = {
-                    x: pEl.offsetLeft + w / 2,
-                    y: pEl.offsetTop + h / 2
+                    x: (r.left - sr.left + r.width / 2) / View.scale - node.x,
+                    y: (r.top - sr.top + r.height / 2) / View.scale - node.y
                 };
             }
         }
@@ -593,16 +595,7 @@ const Sim = {
             return { x: node.x + node._portOffsets[portId].x, y: node.y + node._portOffsets[portId].y };
         }
 
-        const scene = document.getElementById('scene');
-        const pEl = document.getElementById(nodeId)?.querySelector(`[data-port="${portId}"]`);
-        if (!scene || !pEl) return null;
-        const sr = scene.getBoundingClientRect();
-        const r = pEl.getBoundingClientRect();
-        const coords = {
-            x: (r.left - sr.left + r.width / 2) / View.scale,
-            y: (r.top - sr.top + r.height / 2) / View.scale
-        };
-        return coords;
+        return null;
     },
 
     /**
