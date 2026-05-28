@@ -559,7 +559,12 @@ const InteractionHandler = {
                 lbl.innerText = node.label;
                 lbl.style.pointerEvents = '';
                 if (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
-                    if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(node);
+                    if (typeof NodeRenderer !== 'undefined') {
+                        // Remove the existing element first to avoid duplicate stale ghost elements
+                        const existing = document.getElementById(node.id);
+                        if (existing) existing.remove();
+                        NodeRenderer.renderNode(node);
+                    }
                     Sim.updateWireVisuals();
                 }
                 Sim.autoSave();

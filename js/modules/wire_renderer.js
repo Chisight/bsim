@@ -353,10 +353,12 @@ const WireRenderer = {
             const path = this._getDomPath(svg, domIndex++);
             path.setAttribute('d', d);
             
+            // Normalize Hi-Z: both string 'Z' and numeric 2 represent high-impedance
             let sig = (val === true) ? 1 : (val === false ? 0 : val);
+            if (sig === 'Z') sig = 2;
             if (Array.isArray(val)) {
                 if (val.some(v => v === 1 || v === true)) sig = 1;
-                else if (val.every(v => v === 2)) sig = 2;
+                else if (val.every(v => v === 2 || v === 'Z')) sig = 2;
                 else sig = 0;
             }
 

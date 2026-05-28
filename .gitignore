@@ -43,3 +43,8 @@ modular_sim_audit_scratchpad.md
 !SCRIPTING.md
 .debug
 .debug/*
+
+# Python
+__pycache__/
+*.pyc
+
