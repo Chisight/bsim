@@ -251,8 +251,8 @@ const WasmEngine = {
                 const bits = parseInt(io.type.split('-')[1]) || 1;
                 if (targetIdx < currentIdx + bits) {
                     const bitOffset = targetIdx - currentIdx;
-                    // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Restored bit inversion to prevent upside-down 8-bit mapping.
-                    const bIdx = bits > 1 ? (bits - 1 - bitOffset) : 0;
+                    const flip = window.Sim && window.Sim.flipPinLogic;
+                    const bIdx = (bits > 1 && flip) ? (bits - 1 - bitOffset) : bitOffset;
                     return { nodeId: `${gid}:${io.id}`, portId: isInput ? `in${bIdx}` : `out${bIdx}` };
                 }
                 currentIdx += bits;
@@ -523,8 +523,8 @@ const WasmEngine = {
                         const bits = parseInt(io.type.split('-')[1]) || 1;
                         if (targetIdx < currentIdx + bits) {
                             const bitOffset = targetIdx - currentIdx;
-                            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Restored bit inversion to prevent upside-down 8-bit mapping.
-                            const bIdx = bits > 1 ? (bits - 1 - bitOffset) : 0;
+                            const flip = window.Sim && window.Sim.flipPinLogic;
+                            const bIdx = (bits > 1 && flip) ? (bits - 1 - bitOffset) : bitOffset;
                             queryNode = `${w.from.nodeId}:${io.id}`;
                             queryPort = `in${bIdx}`;
                             break;
@@ -945,8 +945,8 @@ const WasmEngine = {
                     const bits = parseInt(io.type.split('-')[1]) || 1;
                     if (targetIdx < currentIdx + bits) {
                         const bitOffset = targetIdx - currentIdx;
-                        // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Restored bit inversion to prevent upside-down 8-bit mapping.
-                        const bIdx = bits > 1 ? (bits - 1 - bitOffset) : 0;
+                        const flip = window.Sim && window.Sim.flipPinLogic;
+                        const bIdx = (bits > 1 && flip) ? (bits - 1 - bitOffset) : bitOffset;
                         targetNodeId = `${nodeId}:${io.id}`;
                         targetPortId = isInput ? `in${bIdx}` : `out${bIdx}`;
                         break;

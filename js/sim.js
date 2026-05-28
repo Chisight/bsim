@@ -103,6 +103,7 @@ const Sim = {
     showTooltips: true,
     tutorialMode: true,
     hudPos: 'top-right',
+    flipPinLogic: false,
 
     wiring: { active: false, start: null, mouseX: 0, mouseY: 0, snapTarget: null },
     eventQueue: new Set(),
@@ -1006,6 +1007,7 @@ const Sim = {
             </div>
             <div style="padding:15px; display:flex; flex-direction:column; gap:12px; overflow-y:auto; flex-grow:1; font-size:13px;">
                 <label style="display:flex; justify-content:space-between; align-items:center;"><span>Grid Snapping</span><input type="checkbox" ${this.snapNodes ? 'checked' : ''} onchange="Sim.snapNodes=this.checked; Sim.autoSave();"></label>
+                <label style="display:flex; justify-content:space-between; align-items:center;"><span>Flip Wiring Pin Logic (MSB-at-top)</span><input type="checkbox" ${this.flipPinLogic ? 'checked' : ''} onchange="Sim.flipPinLogic=this.checked; Sim.nodes.forEach(n => Sim.updateNodeVisual(n)); if (window.WireRenderer) WireRenderer.drawWires(); Sim._netlistDirty=true; Sim.seedQueue(); Sim.processQueue(); Sim.autoSave();"></label>
                 <label style="display:flex; justify-content:space-between; align-items:center;"><span>Bulk Delete Confirmation</span><input type="checkbox" ${this.confirmDelete ? 'checked' : ''} onchange="Sim.confirmDelete=this.checked; Sim.autoSave();"></label>
                 <label style="display:flex; justify-content:space-between; align-items:center;"><span>Show Notifications</span><input type="checkbox" ${this.showToasts ? 'checked' : ''} onchange="Sim.showToasts=this.checked; Sim.autoSave();"></label>
                 <label style="display:flex; justify-content:space-between; align-items:center;"><span style="color:var(--wire-on)">Debug Notifications</span><input type="checkbox" ${this.debugToasts ? 'checked' : ''} onchange="Sim.debugToasts=this.checked; Sim.autoSave();"></label>

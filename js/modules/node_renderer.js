@@ -44,8 +44,8 @@ const NodeRenderer = {
         if (node.type.startsWith('IN-')) {
             let dotsHtml = '';
             for (let i = 0; i < bits; i++) {
-                const bIdx = i; // TOP is LSB, BOTTOM is MSB
-                // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Evaluated flipPolarity vector directly against geometric calculation loops.
+                const flip = window.Sim && window.Sim.flipPinLogic;
+                const bIdx = (bits > 1 && flip) ? (bits - 1 - i) : i; // TOP is LSB, BOTTOM is MSB
                 const vIdx = node.flipPolarity ? (bits - 1 - i) : i;
                 const topStyle = bits === 1 ? "top:50%" : `top:calc(24px + ${((vIdx + 0.5) / bits)} * (100% - 30px))`;
                 // [AUDIT: v1.24.28 | SEC_ARCH_LEAD] - Adjusted pin layout percentage calculation to prevent header collision.
@@ -60,7 +60,8 @@ const NodeRenderer = {
         } else if (node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
             let dotsHtml = '';
             for (let i = 0; i < bits; i++) {
-                const bIdx = i; // TOP is LSB, BOTTOM is MSB
+                const flip = window.Sim && window.Sim.flipPinLogic;
+                const bIdx = (bits > 1 && flip) ? (bits - 1 - i) : i; // TOP is LSB, BOTTOM is MSB
                 const vIdx = node.flipPolarity ? (bits - 1 - i) : i;
                 const topStyle = bits === 1 ? "top:50%" : `top:calc(24px + ${((vIdx + 0.5) / bits)} * (100% - 30px))`;
                 // [AUDIT: v1.24.28 | SEC_ARCH_LEAD] - Adjusted pin layout percentage calculation to prevent header collision.
