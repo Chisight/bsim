@@ -8,6 +8,60 @@ const InteractionHandler = {
     activeContextY: null,
     customChipsList: [],
 
+    saveDbsimSnapshot() {
+        const menu = document.getElementById('context-menu');
+        if (menu) menu.style.display = 'none';
+
+        try {
+            let mainNodes = Sim.nodes;
+            let mainWires = Sim.wires;
+            if (Sim.workspaceStack && Sim.workspaceStack.length > 0) {
+                mainNodes = Sim.workspaceStack[0].nodes;
+                mainWires = Sim.workspaceStack[0].wires;
+            }
+
+            const cNodes = mainNodes.map(n => Sim._cleanNode(n)).filter(n => n !== null);
+            const cWires = mainWires.map(w => Sim._cleanWire(w)).filter(w => w !== null);
+            const cLib = {};
+            Object.keys(Sim.library).forEach(k => {
+                if (Sim.library[k]) {
+                    cLib[k] = {
+                        nodes: (Sim.library[k].nodes || []).map(n => Sim._cleanNode(n)).filter(n => n !== null),
+                        wires: (Sim.library[k].wires || []).map(w => Sim._cleanWire(w)).filter(w => w !== null),
+                        folder: Sim.library[k].folder || ''
+                    };
+                }
+            });
+
+            const snapshot = {
+                nodes: cNodes,
+                wires: cWires,
+                library: cLib,
+                meta: {
+                    version: (window.LOADED_BSIM_VERSION || "1.27.22") + "-Modular",
+                    exportedAt: new Date().toISOString(),
+                    type: "dbsim_snapshot",
+                    activeTabId: Sim.activeTabId,
+                    activeEditingChip: Sim.activeEditingChip
+                }
+            };
+
+            const filename = `debug_snapshot_${Date.now()}.dbsim`;
+            const blob = new Blob([JSON.stringify(snapshot, null, 2)], { type: 'application/json' });
+            const a = document.createElement('a');
+            a.href = URL.createObjectURL(blob);
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(a.href);
+            Sim.toast('DBSIM Snapshot saved successfully.', 'success');
+        } catch (e) {
+            console.error('Failed to save DBSIM Snapshot', e);
+            Sim.toast('Failed to save DBSIM Snapshot.', 'danger');
+        }
+    },
+
     deleteActiveNode() {
         const node = this.activeContextNode;
         if (node) {
@@ -801,6 +855,9 @@ const InteractionHandler = {
                 <div class="menu-item" style="color:#fff; font-weight:bold" onclick="InteractionHandler.spawnGate('NAND');">Spawn NAND</div>
                 <div class="menu-item" style="color:#00ffaa; font-weight:bold" onclick="InteractionHandler.spawnGate('JUNCTION');">Spawn Wire Junction</div>
                 ${customChipsHtml}
+                ${Sim.debugMode ? `
+                    <div class="menu-item" style="color:#00ffaa; font-weight:bold; border-top:1px solid #334; margin-top:5px; padding-top:5px;" onclick="InteractionHandler.saveDbsimSnapshot();">> Save DBSIM Snapshot</div>
+                ` : ''}
                 ${Sim.activeEditingChip ? `
                     <div class="menu-item has-sub" style="color:#ffca28; font-weight:bold; border-top:1px solid #334; margin-top:5px; padding-top:5px;">
                         Split Editor

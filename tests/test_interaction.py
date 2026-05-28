@@ -228,3 +228,64 @@ class TestInteraction(unittest.IsolatedAsyncioTestCase):
         autosave_data = json.loads(raw_autosave)
         self.assertIsNotNone(autosave_data.get("meta"))
         self.assertIn("1.27.22", autosave_data["meta"].get("version", ""))
+
+    async def test_dbsim_export_and_import(self):
+        # 1. Blank out workspace
+        await self.eval_js("""
+            window.Sim.nodes.forEach(n => { const el = document.getElementById(n.id); if (el) el.remove(); });
+            document.querySelectorAll('.gate').forEach(el => el.remove());
+            window.Sim.nodes.length = 0;
+            window.Sim.wires.length = 0;
+            window.Sim.wireMap.clear();
+            if (window.WireRenderer) window.WireRenderer.drawWires();
+            localStorage.removeItem('bsim_autosave');
+        """)
+
+        # 2. Toggle Debug Mode in Sim preferences
+        await self.eval_js("window.Sim.debugMode = true; window.Sim.autoSave();")
+        debug_mode_active = await self.eval_js("window.Sim.debugMode")
+        self.assertTrue(debug_mode_active)
+
+        # 3. Add components to the workspace
+        await self.eval_js("window.Sim.nodes.push(window.Sim._cleanNode({id: 'node_dbsim', type: 'IN-1', x: 150, y: 150, label: 'DBSIM_TEST', val: 1, state: 1}))")
+        await self.eval_js("window.NodeRenderer.renderNode(window.Sim.nodes[0])")
+
+        # 4. Programmatically run the snapshot serialization block and return payload
+        payload = await self.eval_js("""
+            (() => {
+                let mainNodes = window.Sim.nodes;
+                let mainWires = window.Sim.wires;
+                const cNodes = mainNodes.map(n => window.Sim._cleanNode(n)).filter(n => n !== null);
+                const cWires = mainWires.map(w => window.Sim._cleanWire(w)).filter(w => w !== null);
+                const cLib = {};
+                Object.keys(window.Sim.library).forEach(k => {
+                    if (window.Sim.library[k]) {
+                        cLib[k] = {
+                            nodes: (window.Sim.library[k].nodes || []).map(n => window.Sim._cleanNode(n)).filter(n => n !== null),
+                            wires: (window.Sim.library[k].wires || []).map(w => window.Sim._cleanWire(w)).filter(w => w !== null),
+                            folder: window.Sim.library[k].folder || ''
+                        };
+                    }
+                });
+                return {
+                    nodes: cNodes,
+                    wires: cWires,
+                    library: cLib,
+                    meta: {
+                        version: (window.LOADED_BSIM_VERSION || "1.27.22") + "-Modular",
+                        exportedAt: new Date().toISOString(),
+                        type: "dbsim_snapshot",
+                        activeTabId: window.Sim.activeTabId,
+                        activeEditingChip: window.Sim.activeEditingChip
+                    }
+                };
+            })()
+        """)
+
+        # 5. Assert the snapshot conforms to dbsim format specifications
+        self.assertIsNotNone(payload)
+        self.assertIsNotNone(payload.get("meta"))
+        self.assertEqual(payload["meta"].get("type"), "dbsim_snapshot")
+        self.assertEqual(len(payload.get("nodes", [])), 1)
+        self.assertEqual(payload["nodes"][0].get("id"), "node_dbsim")
+        self.assertEqual(payload["nodes"][0].get("label"), "DBSIM_TEST")

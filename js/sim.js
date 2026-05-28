@@ -104,6 +104,7 @@ const Sim = {
     tutorialMode: true,
     hudPos: 'top-right',
     flipPinLogic: true,
+    debugMode: false,
 
     wiring: { active: false, start: null, mouseX: 0, mouseY: 0, snapTarget: null },
     eventQueue: new Set(),
@@ -1011,6 +1012,7 @@ const Sim = {
                 <label style="display:flex; justify-content:space-between; align-items:center;"><span>Bulk Delete Confirmation</span><input type="checkbox" ${this.confirmDelete ? 'checked' : ''} onchange="Sim.confirmDelete=this.checked; Sim.autoSave();"></label>
                 <label style="display:flex; justify-content:space-between; align-items:center;"><span>Show Notifications</span><input type="checkbox" ${this.showToasts ? 'checked' : ''} onchange="Sim.showToasts=this.checked; Sim.autoSave();"></label>
                 <label style="display:flex; justify-content:space-between; align-items:center;"><span style="color:var(--wire-on)">Debug Notifications</span><input type="checkbox" ${this.debugToasts ? 'checked' : ''} onchange="Sim.debugToasts=this.checked; Sim.autoSave();"></label>
+                <label style="display:flex; justify-content:space-between; align-items:center;"><span style="color:#00ffaa; font-weight:bold;">Debug Mode</span><input type="checkbox" ${this.debugMode ? 'checked' : ''} onchange="Sim.debugMode=this.checked; Sim.autoSave();"></label>
                 <label style="display:flex; justify-content:space-between; align-items:center;"><span style="color:#ffca28">Disable UI Animations</span><input type="checkbox" ${this.disableAnimations ? 'checked' : ''} onchange="Sim.disableAnimations=this.checked; Sim.applyStyles(); Sim.autoSave();"></label>
                 <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">HUD Position: <select onchange="Sim.hudPos=this.value; Sim.updateHUD(); Sim.autoSave();" style="background:#111; color:#fff; border:1px solid #334; margin-left:5px; padding:2px;"><option value="top-right" ${this.hudPos === 'top-right' ? 'selected' : ''}>Top-Right</option><option value="top-left" ${this.hudPos === 'top-left' ? 'selected' : ''}>Top-Left</option><option value="bottom-left" ${this.hudPos === 'bottom-left' ? 'selected' : ''}>Bottom-Left</option></select></div>
                 <div style="margin-top:5px; font-size:11px; color:#aaa; display:flex; justify-content:space-between; align-items:center;">UI Scale (%): <div style="display:flex; gap:5px; align-items:center;"><input type="range" min="50" max="200" value="${this.uiScale || 100}" oninput="this.nextElementSibling.value=this.value; Sim.uiScale=parseInt(this.value); Sim.applyStyles(); Sim.autoSave();" style="width:70px;"><input type="number" min="50" max="200" value="${this.uiScale || 100}" oninput="this.previousElementSibling.value=this.value; Sim.uiScale=parseInt(this.value); Sim.applyStyles(); Sim.autoSave();" style="width:40px; background:#111; color:#fff; border:1px solid #334; text-align:center; font-family:'JetBrains Mono', monospace;"></div></div>
