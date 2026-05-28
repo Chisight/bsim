@@ -9,6 +9,11 @@ const DebugTerminal = {
     historyIndex: -1,
     usePredictions: true,
     useColors: true,
+    assertions: new Map(),
+    vcdRecording: false,
+    vcdHistory: new Map(),
+    _halted: false,
+    _lastTracedNodes: new Set(),
     
     // [AUDIT: v1.25.25 | SEC_ARCH_LEAD] - Injected default VFS symlink mapping to surface library components in the home workspace.
     symlinks: {
@@ -567,7 +572,7 @@ const DebugTerminal = {
 
         // 2. Try default commands
         if (!suggestion) {
-            const ALL_CMDS = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv', 'mkdir', 'tick', 'step', 'clock', 'force', 'unforce', 'watch', 'dump', 'cp', 'touch', 'find', 'bom', 'path', 'assert', 'peek', 'poke', 'reset', 'power', 'symbols', 'timing', 'ln', 'rename', 'predict', 'colors'];
+            const ALL_CMDS = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv', 'mkdir', 'tick', 'step', 'clock', 'force', 'unforce', 'watch', 'dump', 'cp', 'touch', 'find', 'bom', 'path', 'assert', 'peek', 'poke', 'reset', 'power', 'symbols', 'timing', 'ln', 'rename', 'predict', 'colors', 'vcd', 'coredump'];
             const match = ALL_CMDS.find(c => c.startsWith(val.toLowerCase()) && c !== val.toLowerCase());
             if (match) {
                 suggestion = val + match.substring(val.length);
@@ -739,8 +744,33 @@ const DebugTerminal = {
                             break;
                         case 'trace':
                             this.print("[HELP: trace] Trace signal paths between gates:", "sys");
-                            this.print("  Usage: trace &lt;nodeId&gt;", "sys");
-                            this.print("  - Traces downstream signal propagation to help pinpoint zero-delay combinational loops and feedback locks.", "sys");
+                            this.print("  Usage: trace &lt;nodeId&gt; [-r]", "sys");
+                            this.print("  - [-r]  : Enable recursive downstream path tracing to see full downstream propagation tree.", "sys");
+                            break;
+                        case 'assert':
+                            this.print("[HELP: assert] Configure stateful assertion breakpoint conditions:", "sys");
+                            this.print("  Usage: assert &lt;nodeId&gt; [expectedValue]", "sys");
+                            this.print("  - &lt;nodeId&gt;: Node to attach breakpoint.", "sys");
+                            this.print("  - [expectedValue]: Triggers halt if current value is different (defaults to 1).", "sys");
+                            this.print("  - assert clear [&lt;nodeId&gt;]: Clears assertion on node, or clears all assertions.", "sys");
+                            this.print("  - assert: Lists all active breakpoints and their pass/fail status.", "sys");
+                            this.print("  - (Legacy mode): assert &lt;nodeId&gt; &lt;portId&gt; &lt;expectedValue&gt; for 1-time check.", "sys");
+                            break;
+                        case 'vcd':
+                            this.print("[HELP: vcd] Text-based logic analyzer waveform capture:", "sys");
+                            this.print("  Usage: vcd [start | stop | clear | show]", "sys");
+                            this.print("  - start: Starts tracking signal state histories on every tick.", "sys");
+                            this.print("  - stop : Halts wave recording.", "sys");
+                            this.print("  - clear: Resets history buffer.", "sys");
+                            this.print("  - show : Renders high/low ASCII timing diagrams (last 20 ticks) of selected/asserted nodes.", "sys");
+                            break;
+                        case 'coredump':
+                            this.print("[HELP: coredump] Direct hex/Int32 view of Wasm linear memory regions:", "sys");
+                            this.print("  Usage: coredump [A | B | C | E] [offset] [length]", "sys");
+                            this.print("  - Region A: Logical States", "sys");
+                            this.print("  - Region B: Instructions", "sys");
+                            this.print("  - Region C: RAM/ROM Payloads", "sys");
+                            this.print("  - Region E: Power activity counters", "sys");
                             break;
                         case 'ls':
                             this.print("[HELP: ls] List contents of virtual directories or node elements:", "sys");
@@ -1413,67 +1443,125 @@ const DebugTerminal = {
             case 'step':
             case 'tick': {
                 const count = parseInt(args[1]) || 1;
+                this._halted = false; // Reset halt flag when manually ticking
                 // [AUDIT: v1.24.96 | SEC_ARCH_LEAD] - Support for manual Phase-Stepping to debug Zero-Delay Cascades.
                 if (args[2] !== undefined) {
                     const phase = parseInt(args[2]);
-                    for(let i=0; i<count; i++) WasmEngine.executeTick(phase);
-                    this.print(`Step: ${count} cycles in Phase ${phase} (Manual Commit).`, "warn");
+                    let halted = false;
+                    for (let i = 0; i < count; i++) {
+                        WasmEngine.executeTick(phase);
+                        if (this.vcdRecording) this.recordVcdState();
+                        if (!this.checkAssertions()) {
+                            this.print("Simulation halted due to assertion trigger.", "err");
+                            this._halted = true;
+                            halted = true;
+                            break;
+                        }
+                    }
+                    if (!halted) this.print(`Step: ${count} cycles in Phase ${phase} (Manual Commit).`, "warn");
                 } else {
                     // Full 3-phase cycle
-                    for(let i=0; i<count; i++) {
+                    let halted = false;
+                    for (let i = 0; i < count; i++) {
                         WasmEngine.executeTick(0); // Settle
+                        if (this.vcdRecording) this.recordVcdState();
+                        if (!this.checkAssertions()) { this._halted = true; halted = true; break; }
+
                         WasmEngine.executeTick(1); // Latch
+                        if (this.vcdRecording) this.recordVcdState();
+                        if (!this.checkAssertions()) { this._halted = true; halted = true; break; }
+
                         WasmEngine.executeTick(2); // Commit
+                        if (this.vcdRecording) this.recordVcdState();
+                        if (!this.checkAssertions()) { this._halted = true; halted = true; break; }
                     }
-                    this.print(`Executed ${count} full 3-phase simulation cycles.`, "ok");
+                    if (halted) {
+                        this.print("Simulation halted due to assertion trigger.", "err");
+                    } else {
+                        this.print(`Executed ${count} full 3-phase simulation cycles.`, "ok");
+                    }
                 }
                 break;
             }
             case 'assert': {
-                // [AUDIT: v1.24.69 | SEC_ARCH_LEAD] - Hardened Assert primitive with multi-bit Bus-Value aggregation and Wasm linear-memory probing.
-                if (args.length < 4) return this.print("Usage: assert <nodeId> <portId> <value>", "err");
-                const ctx = this.getContext();
-                let sn = this.resolveNode(ctx, args[1]);
-                if (!sn) return this.print(`Assert failed: Node ${args[1]} not found.`, "err");
-                
-                const expVal = parseInt(args[3]);
-                let actVal;
-                
-                // [AUDIT: v1.25.41 | SEC_ARCH_LEAD] - Strictly wrapped multi-bit bus arguments to avert NaN exceptions on unhydrated modules.
-                const typeBits = parseInt(sn.type.split('-')[1]);
-                const bits = (!isNaN(typeBits) && typeBits > 0) ? typeBits : 1;
-                const isGenericPort = !(/\d/.test(args[2])) && args[2] !== 'clk' && args[2] !== 'we';
+                // Determine if it is a legacy assert call (assert <nodeId> <portId> <value>)
+                // where args[2] is not a number.
+                const isLegacy = args.length === 4 && isNaN(parseInt(args[2]));
+                if (isLegacy) {
+                    // Legacy one-time assert behavior
+                    const ctx = this.getContext();
+                    let sn = this.resolveNode(ctx, args[1]);
+                    if (!sn) return this.print(`Assert failed: Node ${args[1]} not found.`, "err");
+                    
+                    const expVal = parseInt(args[3]);
+                    let actVal;
+                    
+                    const typeBits = parseInt(sn.type.split('-')[1]);
+                    const bits = (!isNaN(typeBits) && typeBits > 0) ? typeBits : 1;
+                    const isGenericPort = !(/\d/.test(args[2])) && args[2] !== 'clk' && args[2] !== 'we';
 
-                if (isGenericPort) {
-                    // [AUDIT: v1.24.73 | SEC_ARCH_LEAD] - Generic port assert resolution improved for OUT-1/IN-1 and bus ports to prevent 1-bit strict-lookup failures.
-                    let val = 0;
-                    for (let i = 0; i < bits; i++) {
-                        let bit = null;
-                        if (window.WasmEngine && WasmEngine.ready && !Sim._netlistDirty) {
-                            bit = WasmEngine.readPinState(sn.id, `in${i}`);
-                            if (bit === null || bit === undefined) bit = WasmEngine.readPinState(sn.id, `out${i}`);
-                            if (bit === null || bit === undefined) bit = WasmEngine.readPinState(sn.id, 'out');
-                        } else {
-                            bit = ctx.simObj.getDrivingSignal(sn.id, `in${i}`);
-                            if (bit === null || bit === undefined) bit = ctx.simObj.getSignal(sn.id, `out${i}`);
-                            if (bit === null || bit === undefined) bit = ctx.simObj.getSignal(sn.id, 'out');
+                    if (isGenericPort) {
+                        let val = 0;
+                        for (let i = 0; i < bits; i++) {
+                            let bit = null;
+                            if (window.WasmEngine && WasmEngine.ready && !Sim._netlistDirty) {
+                                bit = WasmEngine.readPinState(sn.id, `in${i}`);
+                                if (bit === null || bit === undefined) bit = WasmEngine.readPinState(sn.id, `out${i}`);
+                                if (bit === null || bit === undefined) bit = WasmEngine.readPinState(sn.id, 'out');
+                            } else {
+                                bit = ctx.simObj.getDrivingSignal(sn.id, `in${i}`);
+                                if (bit === null || bit === undefined) bit = ctx.simObj.getSignal(sn.id, `out${i}`);
+                                if (bit === null || bit === undefined) bit = ctx.simObj.getSignal(sn.id, 'out');
+                            }
+                            if (bit === 1) val |= (1 << i);
                         }
-                        if (bit === 1) val |= (1 << i);
-                    }
-                    actVal = val;
-                } else {
-                    if (window.WasmEngine && WasmEngine.ready && !Sim._netlistDirty) {
-                        actVal = WasmEngine.readPinState(sn.id, args[2]);
+                        actVal = val;
                     } else {
-                        actVal = args[2].startsWith('in') ? ctx.simObj.getDrivingSignal(sn.id, args[2]) : ctx.simObj.getSignal(sn.id, args[2]);
+                        if (window.WasmEngine && WasmEngine.ready && !Sim._netlistDirty) {
+                            actVal = WasmEngine.readPinState(sn.id, args[2]);
+                        } else {
+                            actVal = args[2].startsWith('in') ? ctx.simObj.getDrivingSignal(sn.id, args[2]) : ctx.simObj.getSignal(sn.id, args[2]);
+                        }
                     }
-                }
 
-                if (actVal !== expVal) {
-                    this.print(`ASSERTION FAULT: ${sn.id}[${args[2]}] Expected ${expVal}, got ${actVal}`, "err");
-                    throw new Error(`Assertion Fault: ${sn.id}[${args[2]}] !== ${expVal}`);
+                    if (actVal !== expVal) {
+                        this.print(`ASSERTION FAULT: ${sn.id}[${args[2]}] Expected ${expVal}, got ${actVal}`, "err");
+                        throw new Error(`Assertion Fault: ${sn.id}[${args[2]}] !== ${expVal}`);
+                    } else {
+                        this.print(`Assert PASS: ${sn.id}[${args[2]}] == ${expVal}`, "ok");
+                    }
                 } else {
-                    this.print(`Assert PASS: ${sn.id}[${args[2]}] == ${expVal}`, "ok");
+                    // Stateful breakpoint assertion breakpoints!
+                    const snMap = this.getAssertions();
+                    if (args[1] === 'clear') {
+                        if (args[2]) {
+                            const cleared = snMap.delete(args[2]) || snMap.delete(`node-${args[2]}`);
+                            if (cleared) this.print(`Assertion on '${args[2]}' cleared.`, "ok");
+                            else this.print(`No active assertion found for '${args[2]}'.`, "warn");
+                        } else {
+                            snMap.clear();
+                            this.print("All assertion breakpoints cleared.", "ok");
+                        }
+                    } else if (args[1]) {
+                        const ctx = this.getContext();
+                        const sn = ctx.nodes.find(n => n.id === args[1] || n.id === `node-${args[1]}`);
+                        if (!sn) return this.print(`Node '${args[1]}' not found.`, "err");
+                        
+                        const expVal = args[2] !== undefined ? parseInt(args[2]) : 1;
+                        snMap.set(sn.id, expVal);
+                        this.print(`Added breakpoint: assert '${sn.id}' == ${expVal}`, "ok");
+                    } else {
+                        if (snMap.size === 0) {
+                            this.print("No active assertion breakpoints.", "sys");
+                        } else {
+                            this.print("=== ACTIVE BREAKPOINT ASSERTIONS ===", "warn");
+                            snMap.forEach((exp, nid) => {
+                                const curr = this.getNodeValue(nid);
+                                const status = curr === exp ? '<span style="color:#0f5">PASS</span>' : '<span style="color:#f55; font-weight:bold;">FAIL</span>';
+                                this.print(`  - ${nid} == ${exp} (Current: ${curr}) [${status}]`, "sys");
+                            });
+                        }
+                    }
                 }
                 break;
             }
@@ -1688,10 +1776,85 @@ const DebugTerminal = {
                 if (!args[1]) return this.print("Missing target. Ex: synth XOR", "err");
                 this.synthesize(args[1].toUpperCase());
                 break;
-            case 'trace':
-                // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Route trace command to diagnostic topological mapper.
-                this.traceNode(args[1]);
+            case 'trace': {
+                const isRecursive = args.includes('-r') || args.includes('--recursive');
+                const nodeArgs = args.filter(a => a !== '-r' && a !== '--recursive');
+                const nodeId = nodeArgs[1];
+                if (isRecursive) {
+                    this.traceNodeRecursive(nodeId);
+                } else {
+                    this.traceNode(nodeId);
+                }
                 break;
+            }
+            case 'vcd': {
+                const action = args[1] ? args[1].toLowerCase() : 'show';
+                if (action === 'start') {
+                    this.vcdRecording = true;
+                    this.print("VCD real-time wave recording STARTED.", "ok");
+                } else if (action === 'stop') {
+                    this.vcdRecording = false;
+                    this.print("VCD real-time wave recording STOPPED.", "warn");
+                } else if (action === 'clear') {
+                    this.getVcdHistory().clear();
+                    this.print("VCD history buffer cleared.", "ok");
+                } else if (action === 'show') {
+                    this.renderVcdASCII();
+                } else {
+                    this.print("Usage: vcd [start | stop | clear | show]", "err");
+                }
+                break;
+            }
+            case 'coredump': {
+                if (!window.WasmEngine || !WasmEngine.ready || !WasmEngine.memArray) {
+                    return this.print("WasmEngine is offline or memory buffer not loaded.", "err");
+                }
+                
+                const region = args[1] ? args[1].toUpperCase() : 'A';
+                let offset = parseInt(args[2]) || 0;
+                let length = parseInt(args[3]) || 32;
+                
+                let baseOffset = 0;
+                let regionName = "";
+                
+                if (region === 'A') {
+                    baseOffset = WasmEngine.REGION_A_OFFSET;
+                    regionName = "Region A (Logic States)";
+                } else if (region === 'B') {
+                    baseOffset = WasmEngine.REGION_B_OFFSET;
+                    regionName = "Region B (Instruction Memory)";
+                } else if (region === 'C') {
+                    baseOffset = WasmEngine.REGION_C_OFFSET;
+                    regionName = "Region C (RAM/ROM Payloads)";
+                } else if (region === 'E') {
+                    baseOffset = WasmEngine.REGION_E_OFFSET;
+                    regionName = "Region E (Power Activity Counters)";
+                } else {
+                    return this.print("Unknown region. Use A, B, C, or E.", "err");
+                }
+                
+                this.print(`=== WASM COREDUMP: ${regionName} ===`, "warn");
+                this.print(`Printing ${length} Int32 values starting from offset ${offset}...`, "sys");
+                
+                const mem = WasmEngine.memArray;
+                const limit = baseOffset + offset + length;
+                
+                for (let i = baseOffset + offset; i < limit; i += 8) {
+                    const lineIndices = [];
+                    const lineValues = [];
+                    for (let j = 0; j < 8; j++) {
+                        const idx = i + j;
+                        if (idx >= limit) break;
+                        const val = mem[idx] ?? 0;
+                        lineIndices.push((idx - baseOffset).toString().padStart(6, ' '));
+                        lineValues.push(val.toString(16).toUpperCase().padStart(8, '0'));
+                    }
+                    this.print(`<span style="font-family:monospace; white-space:pre;">Index: ${lineIndices.join(' | ')}</span>`, "sys");
+                    this.print(`<span style="font-family:monospace; white-space:pre;">Value: ${lineValues.join(' | ')}</span>`, "ok");
+                }
+                this.print("====================================", "warn");
+                break;
+            }
             default:
                 this.print(`ERR: '${c}' is not recognized in the current ISA context.`, "err");
                 const suggestion = this.findClosestCommand(c);
@@ -1789,6 +1952,220 @@ const DebugTerminal = {
         this.print(`===================================`, "sys");
     },
 
+    getAssertions() {
+        if (!this.assertions) this.assertions = new Map();
+        return this.assertions;
+    },
+
+    getassertionsActive() {
+        return this.getAssertions().size > 0;
+    },
+
+    getVcdHistory() {
+        if (!this.vcdHistory) this.vcdHistory = new Map();
+        return this.vcdHistory;
+    },
+
+    getNodeValue(nodeId) {
+        if (!window.Sim) return null;
+        const ctx = this.getContext();
+        const sn = ctx.nodes.find(n => n.id === nodeId || n.id === `node-${nodeId}`);
+        if (!sn) return null;
+        
+        const typeBits = parseInt(sn.type.split('-')[1]);
+        const bits = (!isNaN(typeBits) && typeBits > 0) ? typeBits : 1;
+        
+        let val = 0;
+        for (let i = 0; i < bits; i++) {
+            let bit = null;
+            if (window.WasmEngine && WasmEngine.ready && !Sim._netlistDirty) {
+                bit = WasmEngine.readPinState(sn.id, `out${i}`);
+                if (bit === null || bit === undefined) bit = WasmEngine.readPinState(sn.id, `in${i}`);
+                if (bit === null || bit === undefined) bit = WasmEngine.readPinState(sn.id, 'out');
+            } else {
+                bit = ctx.simObj.getSignal(sn.id, `out${i}`);
+                if (bit === null || bit === undefined) bit = ctx.simObj.getDrivingSignal(sn.id, `in${i}`);
+                if (bit === null || bit === undefined) bit = ctx.simObj.getSignal(sn.id, 'out');
+            }
+            if (bit === 1) val |= (1 << i);
+        }
+        return val;
+    },
+
+    checkAssertions() {
+        const snMap = this.getAssertions();
+        if (snMap.size === 0) return true;
+        
+        let allPassed = true;
+        snMap.forEach((exp, nid) => {
+            const curr = this.getNodeValue(nid);
+            if (curr !== exp) {
+                this.print(`[ASSERTION TRIGGERED] Node '${nid}' evaluates to ${curr}, expected ${exp}!`, "err");
+                allPassed = false;
+            }
+        });
+        return allPassed;
+    },
+
+    getTrackedVcdNodes() {
+        const ctx = this.getContext();
+        const tracked = new Set();
+        
+        if (ctx.simObj && ctx.simObj.selection) {
+            ctx.simObj.selection.forEach(nid => tracked.add(nid));
+        }
+        
+        const assertions = this.getAssertions();
+        assertions.forEach((val, nid) => tracked.add(nid));
+        
+        if (this._lastTracedNodes) {
+            this._lastTracedNodes.forEach(nid => tracked.add(nid));
+        }
+        
+        if (tracked.size === 0) {
+            ctx.nodes.forEach(n => {
+                if (n.type.startsWith('IN-') || n.type.startsWith('OUT-') || n.type === 'CLOCK') {
+                    tracked.add(n.id);
+                }
+            });
+        }
+        
+        return Array.from(tracked);
+    },
+
+    recordVcdState() {
+        const nodes = this.getTrackedVcdNodes();
+        const history = this.getVcdHistory();
+        
+        nodes.forEach(nid => {
+            if (!history.has(nid)) {
+                history.set(nid, []);
+            }
+            const list = history.get(nid);
+            const val = this.getNodeValue(nid) ?? 0;
+            list.push(val);
+            if (list.length > 20) {
+                list.shift();
+            }
+        });
+    },
+
+    renderVcdASCII() {
+        const history = this.getVcdHistory();
+        if (history.size === 0) {
+            return this.print("VCD buffer is empty. Record some ticks first.", "warn");
+        }
+        
+        this.print("=== LOGIC ANALYZER WAVEFORMS (last 20 ticks) ===", "warn");
+        
+        history.forEach((h, nid) => {
+            if (h.length === 0) return;
+            
+            let top = "";
+            let bottom = "";
+            for (let i = 0; i < h.length; i++) {
+                const val = h[i];
+                const prev = i > 0 ? h[i - 1] : val;
+                
+                if (val === 0) {
+                    if (prev === 0) {
+                        top += "  ";
+                        bottom += "──";
+                    } else {
+                        top += "┐ ";
+                        bottom += "└─";
+                    }
+                } else {
+                    if (prev === 1) {
+                        top += "──";
+                        bottom += "  ";
+                    } else {
+                        top += "┌─";
+                        bottom += "┘ ";
+                    }
+                }
+            }
+            
+            const label = nid.padEnd(12).substring(0, 12);
+            this.print(`<span style="font-family:monospace; white-space:pre;">${label} [1] ${top}</span>`, "sys");
+            this.print(`<span style="font-family:monospace; white-space:pre;">             [0] ${bottom}</span>`, "sys");
+        });
+        
+        let maxLen = 0;
+        history.forEach(h => maxLen = Math.max(maxLen, h.length));
+        let timeline = "";
+        for (let i = 0; i < maxLen; i++) {
+            timeline += i.toString().padStart(2, ' ');
+        }
+        this.print(`<span style="font-family:monospace; white-space:pre;">             [T] ${timeline}</span>`, "sys");
+        this.print("=================================================", "warn");
+    },
+
+    traceNodeRecursive(nodeId) {
+        if (!window.Sim) return this.print("Simulator context offline.", "err");
+        
+        const ctx = this.getContext();
+        
+        let targetId = nodeId;
+        if (!targetId) {
+            if (ctx.simObj && ctx.simObj.selection && ctx.simObj.selection.size === 1) targetId = Array.from(ctx.simObj.selection)[0];
+            else return this.print("Specify a nodeId or select exactly one node. Ex: trace -r node-123", "err");
+        }
+        
+        const startNode = ctx.nodes.find(n => n.id === targetId || n.id === `node-${targetId}`);
+        if (!startNode) return this.print(`Node not found: ${targetId}`, "err");
+        
+        targetId = startNode.id;
+        
+        this.print(`=== RECURSIVE DOWNSTREAM TRACE: ${startNode.id} (${startNode.type}) ===`, "sys");
+        
+        const visited = new Set();
+        const self = this;
+        if (!this._lastTracedNodes) this._lastTracedNodes = new Set();
+        this._lastTracedNodes.clear();
+        
+        function traverse(currId, prefix = "") {
+            self._lastTracedNodes.add(currId);
+            if (visited.has(currId)) {
+                self.print(`${prefix} └── [LOOP DETECTED] -> ${currId}`, "warn");
+                return;
+            }
+            visited.add(currId);
+            
+            const currNode = ctx.nodes.find(n => n.id === currId);
+            if (!currNode) return;
+            
+            const downstream = ctx.wires.filter(w => w.from.nodeId === currId);
+            if (downstream.length === 0) return;
+            
+            downstream.forEach((w, index) => {
+                const isLast = index === downstream.length - 1;
+                const marker = isLast ? " └── " : " ├── ";
+                const childPrefix = prefix + (isLast ? "     " : " │   ");
+                
+                const destNode = ctx.nodes.find(n => n.id === w.to.nodeId);
+                const destType = destNode ? destNode.type : "UNKNOWN";
+                
+                let sig = 0;
+                if (ctx.simObj && typeof ctx.simObj.getSignal === 'function') {
+                    sig = ctx.simObj.getSignal(w.from.nodeId, w.from.portId);
+                }
+                
+                let destSig = 0;
+                if (ctx.simObj && typeof ctx.simObj.getSignal === 'function' && destNode) {
+                    destSig = ctx.simObj.getSignal(w.to.nodeId, w.to.portId);
+                }
+                
+                self.print(`${prefix}${marker}[${w.from.portId}] -> ${w.to.nodeId}[${w.to.portId}] (${destType}) | PinVal: ${sig} -> DstPinVal: ${destSig}`, "ok");
+                
+                traverse(w.to.nodeId, childPrefix);
+            });
+        }
+        
+        traverse(targetId);
+        this.print("===================================", "sys");
+    },
+
     /**
      * [AUDIT: v1.24.95 | SEC_ARCH_LEAD] - Levenshtein-distance algorithm for command suggestions.
      */
@@ -1810,7 +2187,7 @@ const DebugTerminal = {
 
     findClosestCommand(input) {
         // [AUDIT: v1.25.46 | SEC_ARCH_LEAD] - Added rename to Levenshtein distance resolver matrix.
-        const commands = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv', 'mkdir', 'tick', 'step', 'clock', 'force', 'unforce', 'watch', 'dump', 'cp', 'touch', 'find', 'bom', 'path', 'assert', 'peek', 'poke', 'reset', 'power', 'symbols', 'timing', 'ln', 'rename'];
+        const commands = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv', 'mkdir', 'tick', 'step', 'clock', 'force', 'unforce', 'watch', 'dump', 'cp', 'touch', 'find', 'bom', 'path', 'assert', 'peek', 'poke', 'reset', 'power', 'symbols', 'timing', 'ln', 'rename', 'vcd', 'coredump'];
         return commands
             .map(cmd => ({ cmd, distance: this.levenshtein(input, cmd) }))
             .filter(res => res.distance <= 2)

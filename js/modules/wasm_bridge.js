@@ -812,6 +812,12 @@ const WasmEngine = {
         if (!this.ready || !this.instance) {
             return;
         }
+        
+        // Prevent ticking if simulation is halted by an active assertion breakpoint
+        if (window.DebugTerminal && DebugTerminal._halted) {
+            return;
+        }
+
         const start = performance.now();
         try {
             this.instance.exports.tick(this.instructionCount, evalSeq);
@@ -826,6 +832,19 @@ const WasmEngine = {
         this.lastTickDuration = duration;
         if (duration > 16) {
             this.log(`Slow tick warning: frame took ${duration.toFixed(2)}ms (ceiling: 16ms)`, "warn");
+        }
+
+        // --- Hook VCD Recording & Assertion Checks ---
+        if (window.DebugTerminal) {
+            if (DebugTerminal.vcdRecording) {
+                DebugTerminal.recordVcdState();
+            }
+            if (DebugTerminal.getassertionsActive && DebugTerminal.getassertionsActive()) {
+                if (!DebugTerminal.checkAssertions()) {
+                    DebugTerminal._halted = true;
+                    DebugTerminal.print("[SYSTEM] Simulation execution halted due to assertion breakpoint trigger.", "err");
+                }
+            }
         }
     },
 

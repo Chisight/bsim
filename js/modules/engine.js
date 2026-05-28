@@ -423,6 +423,20 @@ const Engine = {
                 });
                 if (changed && typeof sim.updateHUD === 'function') sim.updateHUD();
                 if (window.WireRenderer) WireRenderer.drawWires();
+                
+                // --- Hook VCD Recording & Assertion Checks ---
+                if (window.DebugTerminal) {
+                    if (DebugTerminal.vcdRecording) {
+                        DebugTerminal.recordVcdState();
+                    }
+                    if (DebugTerminal.getassertionsActive && DebugTerminal.getassertionsActive()) {
+                        if (!DebugTerminal.checkAssertions()) {
+                            DebugTerminal._halted = true;
+                            DebugTerminal.print("[SYSTEM] Simulation execution halted due to assertion breakpoint trigger.", "err");
+                        }
+                    }
+                }
+                
                 sim.eventQueue.clear();
                 return;
             }
