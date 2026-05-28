@@ -307,6 +307,7 @@ const WasmEngine = {
         if (!this.ready) {
             return;
         }
+        this._trapLogged = false; // Reset trap-logged flag for fresh netlist
         const flattened = this._flattenNetlist(nodes, wires);
         this.flatNodes = flattened.nodes;
         this.flatWires = flattened.wires;
@@ -783,7 +784,15 @@ const WasmEngine = {
         if (!this.ready || !this.instance) {
             return;
         }
-        this.instance.exports.tick(this.instructionCount, evalSeq);
+        try {
+            this.instance.exports.tick(this.instructionCount, evalSeq);
+        } catch (e) {
+            // Trap (e.g. unreachable) — log once, don't crash the sim loop.
+            if (!this._trapLogged) {
+                console.error('[WasmEngine] Runtime trap during tick():', e.message);
+                this._trapLogged = true;
+            }
+        }
     },
 
     /**

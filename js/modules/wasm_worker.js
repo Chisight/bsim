@@ -23,10 +23,12 @@ self.onmessage = async (e) => {
         }
     } else if (action === 'tick') {
         if (!self.instance) return;
-        
-        // Execute the Three-Phase Commit protocol off the main thread
-        // [AUDIT: v1.24.95 | SEC_ARCH_LEAD] - Native execution boundary.
-        self.instance.exports.tick(instructionCount, evalSeq);
+        try {
+            self.instance.exports.tick(instructionCount, evalSeq);
+        } catch (e) {
+            // WASM trap — log and continue
+            console.error('[WasmWorker] Runtime trap during tick():', e.message);
+        }
         self.postMessage({ action: 'tick_done' });
     }
 };

@@ -26,7 +26,6 @@ const Sim = {
     useWasm: true,
     _toastTimer: null,
     shortCircuitStrikes: 0,
-    _netlistDirty: false,
 
     // [AUDIT: v1.25.40 | SEC_ARCH_LEAD] - Relocated fastEqual utility to prevent JIT de-optimization and recreation during high-frequency evaluation ticks.
     _fastEqual(a, b) {

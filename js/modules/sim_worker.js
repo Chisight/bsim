@@ -14,16 +14,19 @@ function runLoop() {
         return;
     }
     
-    // Execute one full logic evaluation pass
-    // The main thread uses execDepth = Math.max(20, nodes.length)
-    // We'll use a fixed depth of 50 for deep combinational paths
-    for (let i = 0; i < 50; i++) {
-        wasmInstance.exports.tick(instructionCount, 0);
+    try {
+        // Execute one full logic evaluation pass
+        for (let i = 0; i < 50; i++) {
+            wasmInstance.exports.tick(instructionCount, 0);
+        }
+        
+        // Sequential latches
+        wasmInstance.exports.tick(instructionCount, 1);
+        wasmInstance.exports.tick(instructionCount, 2);
+    } catch (e) {
+        // WASM trap (e.g. unreachable) — log and continue
+        console.error('[SimWorker] Runtime trap during tick():', e.message);
     }
-    
-    // Sequential latches
-    wasmInstance.exports.tick(instructionCount, 1);
-    wasmInstance.exports.tick(instructionCount, 2);
 
     // Yield back to the event loop so postMessage can be processed
     setTimeout(runLoop, 0);

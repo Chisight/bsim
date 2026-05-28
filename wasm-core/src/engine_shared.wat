@@ -6,7 +6,7 @@
 ;; =========================================================================
 
 (module
-  (import "env" "memory" (memory 1 2048))
+  (import "env" "memory" (memory 1 2048 shared))
   
   ;; [AUDIT: v1.24.98 | SEC_ARCH_LEAD] - Dynamic Guard Band Memory Allocation injected via env imports.
   (import "env" "SHADOW_BASE" (global $SHADOW_BASE i32))
