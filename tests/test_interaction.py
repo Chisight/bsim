@@ -166,3 +166,65 @@ class TestInteraction(unittest.IsolatedAsyncioTestCase):
         
         self.assertEqual(loaded_from_port, "out0")
         self.assertEqual(loaded_to_port, "in0")
+
+    async def test_versionless_modern_import(self):
+        # 1. Blank out workspace
+        await self.eval_js("""
+            window.Sim.nodes.forEach(n => { const el = document.getElementById(n.id); if (el) el.remove(); });
+            document.querySelectorAll('.gate').forEach(el => el.remove());
+            window.Sim.nodes.length = 0;
+            window.Sim.wires.length = 0;
+            window.Sim.wireMap.clear();
+            if (window.WireRenderer) window.WireRenderer.drawWires();
+            localStorage.removeItem('bsim_autosave');
+        """)
+
+        # 2. Setup a version-less modern layout string in local storage
+        modern_layout = {
+            "nodes": [
+                {"id": "in_bus", "type": "IN-8", "x": 120, "y": 160, "label": "IN_BUS", "val": 0, "state": 0},
+                {"id": "out_bus", "type": "OUT-8", "x": 320, "y": 160, "label": "OUT_BUS", "val": 0, "state": 0}
+            ],
+            "wires": [
+                {"from": {"nodeId": "in_bus", "portId": "out0"}, "to": {"nodeId": "out_bus", "portId": "in0"}}
+            ],
+            "tabs": [
+                {
+                    "id": "tab-1",
+                    "name": "Main",
+                    "nodes": [
+                        {"id": "in_bus", "type": "IN-8", "x": 120, "y": 160, "label": "IN_BUS", "val": 0, "state": 0},
+                        {"id": "out_bus", "type": "OUT-8", "x": 320, "y": 160, "label": "OUT_BUS", "val": 0, "state": 0}
+                    ],
+                    "wires": [
+                        {"from": {"nodeId": "in_bus", "portId": "out0"}, "to": {"nodeId": "out_bus", "portId": "in0"}}
+                    ]
+                }
+            ],
+            "activeTabId": "tab-1",
+            "prefs": {
+                "flipPinLogic": True,
+                "uiScale": 1.0
+            }
+        }
+        
+        escaped_layout = json.dumps(modern_layout)
+        await self.eval_js(f"localStorage.setItem('bsim_autosave', '{escaped_layout}')")
+
+        # 3. Reload the page bypassing cache
+        await self.ws.send(json.dumps({"id": 400, "method": "Page.reload", "params": {"ignoreCache": True}}))
+        await asyncio.sleep(3.0)
+
+        # 4. Assert that compatibility heuristics detected the epoch as 'modern'
+        # and did NOT execute legacy wire flipping (should remain out0/in0)
+        from_port = await self.eval_js("window.Sim.wires[0].from.portId")
+        to_port = await self.eval_js("window.Sim.wires[0].to.portId")
+        
+        self.assertEqual(from_port, "out0")
+        self.assertEqual(to_port, "in0")
+
+        # 5. Assert that write-back version locking stamped and saved the current version
+        raw_autosave = await self.eval_js("localStorage.getItem('bsim_autosave')")
+        autosave_data = json.loads(raw_autosave)
+        self.assertIsNotNone(autosave_data.get("meta"))
+        self.assertIn("1.27.22", autosave_data["meta"].get("version", ""))

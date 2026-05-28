@@ -16,6 +16,56 @@ const ProjectManager = {
             }
             return parseInt(m[1]) * 1000000 + parseInt(m[2]) * 1000 + parseInt(m[3]);
         },
+        detectEpoch(data) {
+            if (!data) return "legacy";
+            if (data.tabs && data.tabs.length > 0) return "modern";
+            if (data.prefs && (data.prefs.flipPinLogic !== undefined || data.prefs.uiScale !== undefined)) return "modern";
+            
+            const checkNodes = (nodes) => {
+                if (!Array.isArray(nodes)) return false;
+                for (const n of nodes) {
+                    if (!n) continue;
+                    if (n.customWidth !== undefined || n.customHeight !== undefined || n.flipPolarity !== undefined) {
+                        return true;
+                    }
+                }
+                return false;
+            };
+            if (checkNodes(data.nodes)) return "modern";
+            if (data.workspaceStack && data.workspaceStack.some(ws => checkNodes(ws.nodes))) return "modern";
+            if (data.library && Object.values(data.library).some(lib => checkNodes(lib.nodes))) return "modern";
+
+            const checkWires = (wires, nodes) => {
+                if (!Array.isArray(wires) || !Array.isArray(nodes)) return false;
+                for (const w of wires) {
+                    if (!w) continue;
+                    const eps = [w.from, w.to];
+                    for (const ep of eps) {
+                        if (!ep) continue;
+                        const cNode = nodes.find(n => n.id === ep.nodeId);
+                        if (!cNode) continue;
+                        if (['AND', 'OR', 'NOR', 'XOR', 'XNOR', 'NAND', 'NOT'].includes(cNode.type)) {
+                            if (['a', 'b', 'q'].includes(ep.portId)) {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                return false;
+            };
+            if (checkWires(data.wires, data.nodes)) return "modern";
+            if (data.workspaceStack) {
+                for (const ws of data.workspaceStack) {
+                    if (checkWires(ws.wires, ws.nodes)) return "modern";
+                }
+            }
+            if (data.library) {
+                for (const lib of Object.values(data.library)) {
+                    if (lib && checkWires(lib.wires, lib.nodes)) return "modern";
+                }
+            }
+            return "legacy";
+        },
         /**
          */
         migrate(data) {
@@ -42,7 +92,13 @@ const ProjectManager = {
             if (data.tabs) data.tabs.forEach(t => portRomToRam(t.nodes));
             if (data.library) Object.values(data.library).forEach(lib => portRomToRam(lib.nodes));
 
-            const fileVer = this.parseVer(data.meta?.version || "1.0.0");
+            let fileVerStr = data.meta?.version;
+            if (!fileVerStr) {
+                const epoch = this.detectEpoch(data);
+                fileVerStr = epoch === "modern" ? (window.LOADED_BSIM_VERSION || "1.27.22") : "1.0.0";
+                console.log(`[Migration] Missing version metadata. Detected epoch: ${epoch}. Assigning virtual version: ${fileVerStr}`);
+            }
+            const fileVer = this.parseVer(fileVerStr);
 
 
             // [AUDIT: v1.23.96 | SEC_ARCH_LEAD] - Updated fallback runtime expectation string to enforce new migration baseline.
@@ -510,6 +566,7 @@ const ProjectManager = {
                 Sim.updateWireVisuals();
                 Sim.seedQueue();
                 Sim.processQueue();
+                if (typeof Sim.autoSave === 'function') Sim.autoSave();
             }
         } catch (e) {
             console.error("[Persistence] Load Failure:", e);
