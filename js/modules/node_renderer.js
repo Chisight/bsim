@@ -186,7 +186,8 @@ const NodeRenderer = {
                         const bits = parseInt(p.type.split('-')[1]) || 1;
                         const labelBase = (p.label && p.label !== p.type) ? p.label : '';
                         for (let i = 0; i < bits; i++) {
-                            const bIdx = i;
+                            const flip = window.Sim && window.Sim.flipPinLogic;
+                            const bIdx = (bits > 1 && flip) ? (bits - 1 - i) : i;
                             const portId = `in${cIn}`;
                             // [AUDIT: v1.24.28 | SEC_ARCH_LEAD] - UI Scaling: Cascade bus labels to macro pins and prevent header collision.
                             const lbl = bits > 1 ? (labelBase + bIdx) : p.label;
@@ -202,7 +203,8 @@ const NodeRenderer = {
                         const bits = parseInt(p.type.split('-')[1]) || 1;
                         const labelBase = (p.label && p.label !== p.type) ? p.label : '';
                         for (let i = 0; i < bits; i++) {
-                            const bIdx = i;
+                            const flip = window.Sim && window.Sim.flipPinLogic;
+                            const bIdx = (bits > 1 && flip) ? (bits - 1 - i) : i;
                             const portId = `out${cOut}`;
                             // [AUDIT: v1.24.28 | SEC_ARCH_LEAD] - UI Scaling: Cascade bus labels to macro pins and prevent header collision.
                             const lbl = bits > 1 ? (labelBase + bIdx) : p.label;

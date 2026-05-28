@@ -431,7 +431,7 @@ const ProjectManager = {
                     Sim.tabs = parsed.tabs;
                     Sim.activeTabId = parsed.activeTabId || Sim.tabs[0].id;
                 } else {
-                    Sim.tabs = [{ id: 'tab-1', name: 'Main', nodes: parsed.nodes || [], wires: [], historyStack: [], historyIndex: -1 }];
+                    Sim.tabs = [{ id: 'tab-1', name: 'Main', nodes: parsed.nodes || [], wires: parsed.wires || [], historyStack: [], historyIndex: -1 }];
                     Sim.activeTabId = 'tab-1';
                 }
                 

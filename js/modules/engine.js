@@ -81,6 +81,9 @@ const Engine = {
     calculateNextState(sim, node) {
         if (node.type === 'JUNCTION') return this.getDrivingSignal(sim, node.id, 'j');
         if (node.type === '0') return 0;
+        if (node.type.startsWith('IN-')) {
+            return node.state !== undefined ? node.state : (node.val !== undefined ? node.val : 0);
+        }
         if (node.type === 'NOT') {
             return this.getDrivingSignal(sim, node.id, 'a') ? 0 : 1;
         }
@@ -255,6 +258,7 @@ const Engine = {
         sim.nodes.forEach(n => {
             if (n.type.startsWith('IN-') || n.type === 'CLOCK' || n.type === '0') {
                 sim.eventQueue.add(n);
+                n._forcePropagate = true;
             }
         });
     },
