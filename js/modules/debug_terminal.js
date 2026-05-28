@@ -655,7 +655,31 @@ const DebugTerminal = {
                 break;
             case 'wasm': {
                 const sub = args[1] ? args[1].toLowerCase() : 'check';
-                if (sub === 'check' || sub === 'status' || sub === 'debug') {
+                if (sub === 'inspect') {
+                    const targetId = args[2];
+                    if (!targetId) {
+                        this.print("Usage: wasm inspect <nodeId>", "err");
+                        break;
+                    }
+                    if (!window.WasmEngine || !window.WasmEngine.ready) {
+                        this.print("WasmEngine is offline or not loaded.", "err");
+                        break;
+                    }
+                    const mapped = window.WasmEngine.idMap.get(targetId);
+                    if (mapped === undefined) {
+                        this.print(`Node '${targetId}' has no compiled WASM slots (unconnected, virtual, or not in execution graph).`, "warn");
+                        break;
+                    }
+                    
+                    const state = window.WasmEngine.readState(targetId);
+                    const type = window.WasmEngine.flatNodes.find(n => n.id === targetId)?.type || "Unknown";
+                    this.print(`--- WASM NODE INSPECTOR: ${targetId} ---`, "warn");
+                    this.print(`Type: ${type}`, "sys");
+                    this.print(`Compiled Region A Slot(s): ${Array.isArray(mapped) ? `[${mapped.join(', ')}]` : mapped}`, "sys");
+                    this.print(`Current Slot Value(s) in memory: <span style="color:#0f5">${JSON.stringify(state)}</span>`, "sys");
+                    break;
+                }
+                else if (sub === 'check' || sub === 'status' || sub === 'debug') {
                     this.print("--- WASM ENGINE DIAGNOSTICS ---", "warn");
                     
                     if (!window.WasmEngine) {
@@ -683,9 +707,27 @@ const DebugTerminal = {
                         this.print(`  - Linear Memory Size: ${bufferBytes.toLocaleString()} bytes (${bufferPages} pages)`, 'sys');
                     }
 
+                    // Print performance telemetry
+                    this.print("<br>[Performance Telemetry]:", "sys");
+                    if (useWorker) {
+                        const avg = window.WasmEngine.avgWorkerTickDuration || 0;
+                        const rate = window.WasmEngine.workerTickCount || 0;
+                        this.print(`  - Average Worker Pass Duration: <span style="color:#0f5">${avg.toFixed(2)}ms</span> (${rate} passes/sec)`, 'sys');
+                        
+                        this.print("Measuring WebWorker communication latency...", "sys");
+                        window.WasmEngine.pingWorker().then(latency => {
+                            this.print(`  - WebWorker Round-trip Latency: <span style="color:#0f5">${latency.toFixed(2)}ms</span>`, 'sys');
+                        }).catch(err => {
+                            this.print(`  - WebWorker Latency Measurement Failed: ${err}`, 'err');
+                        });
+                    } else {
+                        const lastTick = window.WasmEngine.lastTickDuration || 0;
+                        this.print(`  - Last Tick Duration: <span style="color:#0f5">${lastTick.toFixed(2)}ms</span>`, 'sys');
+                    }
+
                     // Print Workspace purity checks
                     const isPureNative = Sim.isPureNative();
-                    this.print(`  - Netlist Purity Validation: ${isPureNative ? '<span style="color:#0f5">PASSED (Native)</span>' : '<span style="color:#f90">FAILED (Contains Impure Gates)</span>'}`, 'sys');
+                    this.print(`<br>  - Netlist Purity Validation: ${isPureNative ? '<span style="color:#0f5">PASSED (Native)</span>' : '<span style="color:#f90">FAILED (Contains Impure Gates)</span>'}`, 'sys');
                     if (!isPureNative) {
                         const isNodePure = (n) => {
                             if (Engine.KERNEL.has(n.type)) return true;
@@ -726,7 +768,7 @@ const DebugTerminal = {
                         this.print("  No initialization logs available.", "warn");
                     }
                 } else {
-                    this.print("Usage: wasm [check | status | debug]", "err");
+                    this.print("Usage: wasm [check | status | debug | inspect <nodeId>]", "err");
                 }
                 break;
             }

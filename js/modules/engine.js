@@ -281,6 +281,7 @@ const Engine = {
                         from: { ...w.from, portId: mapPort(w.from.portId) },
                         to: { ...w.to, portId: mapPort(w.to.portId) }
                     }));
+                    WasmEngine.log(`Netlist dirtiness detected. Rebuilding Wasm execution graph (syncLayout)...`);
                     WasmEngine.syncLayout(sim.nodes, mappedWires);
                     sim._netlistDirty = false;
                 }

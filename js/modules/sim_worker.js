@@ -9,6 +9,11 @@ let running = false;
 let execDepth = 50;
 let loopTimeout = null;
 
+// Telemetry counters
+let tickCount = 0;
+let totalDuration = 0;
+let lastReportTime = performance.now();
+
 // We will use Atomics for synchronization if we want to get fancy, 
 // but simply looping with a small delay allows message processing.
 function runLoop() {
@@ -17,6 +22,7 @@ function runLoop() {
         return;
     }
     
+    const start = performance.now();
     try {
         // Execute one full logic evaluation pass
         for (let i = 0; i < execDepth; i++) {
@@ -29,6 +35,23 @@ function runLoop() {
     } catch (e) {
         // WASM trap (e.g. unreachable) — log and continue
         console.error('[SimWorker] Runtime trap during tick():', e.message);
+    }
+    const duration = performance.now() - start;
+
+    tickCount++;
+    totalDuration += duration;
+
+    const now = performance.now();
+    if (now - lastReportTime >= 1000) {
+        const avg = totalDuration / tickCount;
+        self.postMessage({
+            action: 'telemetry',
+            avgTickDuration: avg,
+            tickCount: tickCount
+        });
+        tickCount = 0;
+        totalDuration = 0;
+        lastReportTime = now;
     }
 
     // Yield back to the event loop so postMessage can be processed
@@ -73,5 +96,8 @@ self.onmessage = async (e) => {
             clearTimeout(loopTimeout);
             loopTimeout = null;
         }
+    }
+    else if (data.action === 'ping') {
+        self.postMessage({ action: 'pong' });
     }
 };

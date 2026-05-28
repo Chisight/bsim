@@ -26,6 +26,26 @@ const WasmEngine = {
         else console.log(prefix);
     },
 
+    avgWorkerTickDuration: 0,
+    workerTickCount: 0,
+    lastTickDuration: 0,
+
+    pingWorker() {
+        if (!this.useWorker || !this.worker) return Promise.reject("Worker not active");
+        return new Promise((resolve) => {
+            const start = performance.now();
+            const callback = (e) => {
+                if (e.data.action === 'pong') {
+                    this.worker.removeEventListener('message', callback);
+                    const latency = performance.now() - start;
+                    resolve(latency);
+                }
+            };
+            this.worker.addEventListener('message', callback);
+            this.worker.postMessage({ action: 'ping' });
+        });
+    },
+
 
 
     /**
@@ -169,6 +189,12 @@ const WasmEngine = {
                             Sim.seedQueue();
                             Sim.processQueue();
                             Sim.updateHUD();
+                        }
+                    } else if (e.data.action === 'telemetry') {
+                        this.avgWorkerTickDuration = e.data.avgTickDuration;
+                        this.workerTickCount = e.data.tickCount;
+                        if (this.avgWorkerTickDuration > 16) {
+                            this.log(`Worker slow tick warning: average pass took ${this.avgWorkerTickDuration.toFixed(2)}ms`, "warn");
                         }
                     } else if (e.data.action === 'error') {
                         await triggerFallback(e.data.error);
@@ -786,6 +812,7 @@ const WasmEngine = {
         if (!this.ready || !this.instance) {
             return;
         }
+        const start = performance.now();
         try {
             this.instance.exports.tick(this.instructionCount, evalSeq);
         } catch (e) {
@@ -794,6 +821,11 @@ const WasmEngine = {
                 console.error('[WasmEngine] Runtime trap during tick():', e.message);
                 this._trapLogged = true;
             }
+        }
+        const duration = performance.now() - start;
+        this.lastTickDuration = duration;
+        if (duration > 16) {
+            this.log(`Slow tick warning: frame took ${duration.toFixed(2)}ms (ceiling: 16ms)`, "warn");
         }
     },
 
