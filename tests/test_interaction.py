@@ -22,6 +22,10 @@ class TestInteraction(unittest.IsolatedAsyncioTestCase):
         self.listener_task = asyncio.create_task(self.listen())
         await asyncio.sleep(0.5)
 
+        # Force page reload bypassing cache to load updated engine.js
+        await self.ws.send(json.dumps({"id": 99, "method": "Page.reload", "params": {"ignoreCache": True}}))
+        await asyncio.sleep(3.0)
+
     async def asyncTearDown(self):
         self.listener_task.cancel()
         await self.ws.close()

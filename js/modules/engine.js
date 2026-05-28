@@ -37,7 +37,12 @@ const Engine = {
         }
         if (node.type.startsWith('IN-')) {
             if (Array.isArray(node.state)) {
-                const idx = parseInt(portId.replace('out', ''));
+                let idx = parseInt(portId.replace('out', ''));
+                const bits = node.state.length;
+                const flip = window.Sim && window.Sim.flipPinLogic;
+                if (bits > 1 && flip) {
+                    idx = bits - 1 - idx;
+                }
                 return node.state[idx];
             }
             return node.state;
@@ -84,6 +89,12 @@ const Engine = {
         if (node.type.startsWith('IN-')) {
             return node.state !== undefined ? node.state : (node.val !== undefined ? node.val : 0);
         }
+        if (node.isCustom) {
+            const chipDef = sim.library[node.type];
+            if (!chipDef) return node.val || 0;
+            const ins = this._assembleChipInputs(sim, node, (pid) => this.getDrivingSignal(sim, node.id, pid));
+            return this.simulateInternalCircuit(sim, chipDef, ins);
+        }
         if (node.type === 'NOT') {
             return this.getDrivingSignal(sim, node.id, 'a') ? 0 : 1;
         }
@@ -112,6 +123,7 @@ const Engine = {
         if (node.type === 'DFF') {
             const d = this.getDrivingSignal(sim, node.id, 'd');
             const clk = this.getDrivingSignal(sim, node.id, 'clk');
+            if (node._lastClk === undefined) node._lastClk = 0;
             let q = (node.val && node.val.q !== undefined) ? node.val.q : 0;
             if (clk === 1 && node._lastClk === 0) q = d;
             node._lastClk = clk;
@@ -120,6 +132,7 @@ const Engine = {
         if (node.type === 'TFF') {
             const t = this.getDrivingSignal(sim, node.id, 't');
             const clk = this.getDrivingSignal(sim, node.id, 'clk');
+            if (node._lastClk === undefined) node._lastClk = 0;
             let q = (node.val && node.val.q !== undefined) ? node.val.q : 0;
             if (clk === 1 && node._lastClk === 0 && t === 1) q = q ? 0 : 1;
             node._lastClk = clk;
@@ -158,16 +171,12 @@ const Engine = {
             const bits = parseInt(node.type.split('-')[1]) || 1;
             if (bits === 1) return this.getDrivingSignal(sim, node.id, 'in0');
             const nextState = [];
+            const flip = window.Sim && window.Sim.flipPinLogic;
             for (let i = 0; i < bits; i++) {
-                nextState.push(this.getDrivingSignal(sim, node.id, `in${i}`) ? 1 : 0);
+                const pinIdx = (bits > 1 && flip) ? (bits - 1 - i) : i;
+                nextState.push(this.getDrivingSignal(sim, node.id, `in${pinIdx}`) ? 1 : 0);
             }
             return nextState;
-        }
-        if (node.isCustom) {
-            const chipDef = sim.library[node.type];
-            if (!chipDef) return node.val || 0;
-            const ins = this._assembleChipInputs(sim, node, (pid) => this.getDrivingSignal(sim, node.id, pid));
-            return this.simulateInternalCircuit(sim, chipDef, ins);
         }
         return node.val !== undefined ? node.val : 0;
     },
@@ -185,11 +194,13 @@ const Engine = {
                 cIdx++;
             } else {
                 const bVal = [];
+                const flip = window.Sim && window.Sim.flipPinLogic;
                 for (let b = 0; b < bits; b++) {
-                    bVal.push(getDriveFn(`in${cIdx}`));
-                    cIdx++;
+                    const pinIdx = (bits > 1 && flip) ? (bits - 1 - b) : b;
+                    bVal.push(getDriveFn(`in${cIdx + pinIdx}`));
                 }
                 res[p.id] = bVal;
+                cIdx += bits;
             }
         });
         return res;
@@ -206,17 +217,18 @@ const Engine = {
                 res[`out${cIdx}`] = val;
                 cIdx++;
             } else {
+                const flip = window.Sim && window.Sim.flipPinLogic;
                 if (Array.isArray(val)) {
-                    val.forEach((b, i) => {
-                        res[`out${cIdx}`] = b;
-                        cIdx++;
-                    });
+                    for (let i = 0; i < bits; i++) {
+                        const valIdx = (bits > 1 && flip) ? (bits - 1 - i) : i;
+                        res[`out${cIdx + i}`] = val[valIdx];
+                    }
                 } else {
                     for (let i = 0; i < bits; i++) {
-                        res[`out${cIdx}`] = 0;
-                        cIdx++;
+                        res[`out${cIdx + i}`] = 0;
                     }
                 }
+                cIdx += bits;
             }
         });
         return res;
@@ -502,6 +514,9 @@ const Engine = {
                     }
 
                     node.val = rawNew;
+                    if (node.isCustom) {
+                        node.outputs = typeof rawNew === 'object' && rawNew !== null ? { ...rawNew } : {};
+                    }
                     node._oscillating = false;
                     if (typeof sim.updateNodeVisual === 'function') sim.updateNodeVisual(node);
 

@@ -107,6 +107,7 @@ class TestEngineParity(unittest.IsolatedAsyncioTestCase):
         await asyncio.sleep(3.0)
         
         await self.eval_js("window.Sim.setEngine('v8')")
+        await self.eval_js("window.Sim.flipPinLogic = true")
         await self.eval_js("window.Sim.seedQueue(); window.Sim.processQueue();")
 
         v8_outputs = []
@@ -124,5 +125,5 @@ class TestEngineParity(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(wasm_outputs[0], [[1, 0, 0, 0, 0, 0, 0, 0], [0, 1, 0, 0, 0, 0, 0, 0]])
         self.assertEqual(wasm_outputs[5], [[0, 1, 1, 0, 0, 0, 0, 0], [1, 1, 1, 0, 0, 0, 0, 0]])
         
-        # Assert parity count
-        self.assertEqual(len(wasm_outputs), len(v8_outputs))
+        # Assert exact parity between WASM and V8 simulation outputs
+        self.assertEqual(wasm_outputs, v8_outputs)

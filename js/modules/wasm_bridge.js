@@ -263,7 +263,7 @@ const WasmEngine = {
         // Only expand nodes that are in Sim.library and not kernel primitives / IO
         const resolveLib = (n) => {
             if (n.type.startsWith('IN-') || n.type.startsWith('OUT-') || n.type.startsWith('PROBE-')) return null;
-            if (KERNEL.has(n.type)) return null;
+            if (KERNEL.has(n.type) && !n.isCustom) return null;
             if (window.Sim && Sim.library && Sim.library[n.type]) return Sim.library[n.type];
             return null; // unknown type — leave as-is; isPureNative check will gate WASM use
         };

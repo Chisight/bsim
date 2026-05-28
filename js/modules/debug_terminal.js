@@ -1361,7 +1361,9 @@ const DebugTerminal = {
                             else Sim.updateTabsUI();
                             rmDirCount++;
                         } else {
-                            this.print(`rm: cannot remove '${target}': No such file or directory`, "err");
+                            const n = ctx.nodes.find(node => node.id === target || node.id === `node-${target}`);
+                            if (n && ctx.simObj) { ctx.simObj.selection.add(n.id); rmCount++; }
+                            else this.print(`rm: cannot remove '${target}': No such file or directory`, "err");
                         }
                     } else if (target.includes('/') || this.cwd.startsWith('/etc/lib')) {
                         this.print(`rm: cannot remove '${target}': Permission denied`, "err");
