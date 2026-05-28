@@ -103,7 +103,7 @@ const Sim = {
     showTooltips: true,
     tutorialMode: true,
     hudPos: 'top-right',
-    flipPinLogic: false,
+    flipPinLogic: true,
 
     wiring: { active: false, start: null, mouseX: 0, mouseY: 0, snapTarget: null },
     eventQueue: new Set(),
