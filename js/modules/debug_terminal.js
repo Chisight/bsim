@@ -7,6 +7,8 @@ const DebugTerminal = {
     cwd: '/home/bsim', // Virtual File System Root
     history: [],
     historyIndex: -1,
+    usePredictions: true,
+    useColors: true,
     
     // [AUDIT: v1.25.25 | SEC_ARCH_LEAD] - Injected default VFS symlink mapping to surface library components in the home workspace.
     symlinks: {
@@ -120,9 +122,11 @@ const DebugTerminal = {
             #dt-out { flex: 1; padding: 10px; overflow-y: auto; color: #ddd; word-wrap: break-word; user-select: text !important; -webkit-user-select: text !important; cursor: text; }
             #dt-out::-webkit-scrollbar { width: 8px; }
             #dt-out::-webkit-scrollbar-thumb { background: #334; }
-            #dt-in-row { display: flex; align-items: center; background: #000; border-top: 1px solid #222; padding: 0 10px; }
+            #dt-in-row { display: flex; align-items: center; background: #000; border-top: 1px solid #222; padding: 0 10px; position: relative; }
             #dt-prompt { color: #0f5; font-weight: bold; margin-right: 8px; white-space: nowrap; user-select: none; }
-            #dt-in { background: transparent; color: #fff; border: none; padding: 10px 0; outline: none; width: 100%; font-family: inherit; font-size: inherit; flex: 1; }
+            #dt-in-container { position: relative; flex: 1; display: flex; align-items: center; }
+            #dt-in { background: transparent; color: #fff; border: none; padding: 10px 0; outline: none; width: 100%; font-family: inherit; font-size: inherit; position: relative; z-index: 2; caret-color: #fff; }
+            #dt-ghost { position: absolute; left: 0; top: 0; padding: 10px 0; border: none; color: #555; background: transparent; pointer-events: none; font-family: inherit; font-size: inherit; white-space: pre; z-index: 1; }
             .dt-msg { margin-bottom: 4px; line-height: 1.4; user-select: text !important; -webkit-user-select: text !important; }
             .dt-msg::selection { background: rgba(0, 255, 170, 0.3); }
             .dt-err { color: #ff5555; }
@@ -131,6 +135,14 @@ const DebugTerminal = {
             .dt-ok { color: #00ffaa; }
             .dt-menu-item { padding: 6px 15px; color: #aaa; cursor: pointer; user-select: none; }
             .dt-menu-item:hover { background: #252530; color: #fff; }
+            
+            /* Monochrome Override when colors are toggled off */
+            #dt-wrap.dt-no-colors .dt-prompt { color: #fff !important; }
+            #dt-wrap.dt-no-colors span { color: #fff !important; }
+            #dt-wrap.dt-no-colors .dt-err { color: #ff6666 !important; }
+            #dt-wrap.dt-no-colors .dt-warn { color: #ffca28 !important; }
+            #dt-wrap.dt-no-colors .dt-sys { color: #ddd !important; }
+            #dt-wrap.dt-no-colors .dt-ok { color: #fff !important; }
         `;
         document.head.appendChild(style);
     },
@@ -149,7 +161,10 @@ const DebugTerminal = {
             <div id="dt-out"></div>
             <div id="dt-in-row">
                 <span id="dt-prompt">bsim:<span id="dt-prompt-cwd">~</span>$</span>
-                <input id="dt-in" type="text" autocomplete="off" spellcheck="false" />
+                <div id="dt-in-container">
+                    <div id="dt-ghost"></div>
+                    <input id="dt-in" type="text" autocomplete="off" spellcheck="false" />
+                </div>
             </div>
         `;
         document.body.appendChild(this.ui);
@@ -162,6 +177,7 @@ const DebugTerminal = {
         });
 
         this.inp = document.getElementById('dt-in');
+        this.ghost = document.getElementById('dt-ghost');
         
         this.out.addEventListener('click', () => {
             if (window.getSelection().toString().length === 0) {
@@ -222,6 +238,7 @@ const DebugTerminal = {
                 this.inp.value = '';
                 this.clearHighlight();
                 this._acState = null;
+                if (this.ghost) this.ghost.innerText = '';
                 if (cmd) {
                     this.history.push(cmd);
                     if (this.history.length > 100) this.history.shift();
@@ -233,15 +250,24 @@ const DebugTerminal = {
                 if (this.history.length > 0 && this.historyIndex > 0) {
                     this.historyIndex--;
                     this.inp.value = this.history[this.historyIndex];
+                    if (this.ghost) this.ghost.innerText = '';
                 }
             } else if (e.key === 'ArrowDown') {
                 e.preventDefault();
                 if (this.historyIndex < this.history.length - 1) {
                     this.historyIndex++;
                     this.inp.value = this.history[this.historyIndex];
+                    if (this.ghost) this.ghost.innerText = '';
                 } else {
                     this.historyIndex = this.history.length;
                     this.inp.value = '';
+                    if (this.ghost) this.ghost.innerText = '';
+                }
+            } else if (e.key === 'ArrowRight') {
+                if (this.inp.selectionStart === this.inp.value.length && this.ghost && this.ghost.innerText) {
+                    e.preventDefault();
+                    this.inp.value = this.ghost.innerText;
+                    this.updateGhost();
                 }
             } else if (e.key === 'Tab') {
                 e.preventDefault();
@@ -250,6 +276,10 @@ const DebugTerminal = {
                 this.clearHighlight();
                 this._acState = null;
             }
+        };
+
+        this.inp.oninput = () => {
+            this.updateGhost();
         };
     },
 
@@ -510,6 +540,44 @@ const DebugTerminal = {
         if (this._acState.parts.length > 1 && parts[0].toLowerCase() !== 'cd') {
             const fullId = match.startsWith('node-') ? match : 'node-' + match;
             this.highlightNode(fullId);
+        }
+    },
+
+    updateGhost() {
+        if (!this.usePredictions || !this.ghost) {
+            if (this.ghost) this.ghost.innerText = '';
+            return;
+        }
+        const val = this.inp.value;
+        if (!val) {
+            this.ghost.innerText = '';
+            return;
+        }
+
+        let suggestion = '';
+
+        // 1. Try history matches (from newest to oldest)
+        for (let i = this.history.length - 1; i >= 0; i--) {
+            const h = this.history[i];
+            if (h.startsWith(val) && h !== val) {
+                suggestion = h;
+                break;
+            }
+        }
+
+        // 2. Try default commands
+        if (!suggestion) {
+            const ALL_CMDS = ['help', 'exit', 'clear', 'verbosity', 'ls', 'spawn', 'rm', 'set', 'wire', 'sim', 'status', 'synth', 'trace', 'pwd', 'cd', 'mv', 'mkdir', 'tick', 'step', 'clock', 'force', 'unforce', 'watch', 'dump', 'cp', 'touch', 'find', 'bom', 'path', 'assert', 'peek', 'poke', 'reset', 'power', 'symbols', 'timing', 'ln', 'rename', 'predict', 'colors'];
+            const match = ALL_CMDS.find(c => c.startsWith(val.toLowerCase()) && c !== val.toLowerCase());
+            if (match) {
+                suggestion = val + match.substring(val.length);
+            }
+        }
+
+        if (suggestion) {
+            this.ghost.innerText = suggestion;
+        } else {
+            this.ghost.innerText = '';
         }
     },
 
@@ -910,6 +978,41 @@ const DebugTerminal = {
             }
             case 'exit': this.toggle(false); break;
             case 'clear': this.out.innerHTML = ''; break;
+            case 'predict':
+                if (args[1]) {
+                    const arg = args[1].toLowerCase();
+                    if (arg === 'on') {
+                        this.usePredictions = true;
+                        this.print("Inline predictive completion enabled.", "ok");
+                    } else if (arg === 'off') {
+                        this.usePredictions = false;
+                        this.ghost.innerText = '';
+                        this.print("Inline predictive completion disabled.", "ok");
+                    } else {
+                        this.print("Usage: predict [on|off]", "err");
+                    }
+                } else {
+                    this.print(`Inline predictions: ${this.usePredictions ? 'ON' : 'OFF'}`, "sys");
+                }
+                break;
+            case 'colors':
+                if (args[1]) {
+                    const arg = args[1].toLowerCase();
+                    if (arg === 'on') {
+                        this.useColors = true;
+                        document.getElementById('dt-wrap').classList.remove('dt-no-colors');
+                        this.print("Colorized output enabled.", "ok");
+                    } else if (arg === 'off') {
+                        this.useColors = false;
+                        document.getElementById('dt-wrap').classList.add('dt-no-colors');
+                        this.print("Colorized output disabled.", "ok");
+                    } else {
+                        this.print("Usage: colors [on|off]", "err");
+                    }
+                } else {
+                    this.print(`Colorized output: ${this.useColors ? 'ON' : 'OFF'}`, "sys");
+                }
+                break;
             case 'verbosity':
                 if (args[1]) { this.verbosity = parseInt(args[1]); this.print(`Verbosity -> ${this.verbosity}`); }
                 break;
