@@ -6,17 +6,20 @@
 let wasmInstance = null;
 let instructionCount = 0;
 let running = false;
+let execDepth = 50;
+let loopTimeout = null;
 
 // We will use Atomics for synchronization if we want to get fancy, 
 // but simply looping with a small delay allows message processing.
 function runLoop() {
+    loopTimeout = null;
     if (!running || !wasmInstance || instructionCount === 0) {
         return;
     }
     
     try {
         // Execute one full logic evaluation pass
-        for (let i = 0; i < 50; i++) {
+        for (let i = 0; i < execDepth; i++) {
             wasmInstance.exports.tick(instructionCount, 0);
         }
         
@@ -29,7 +32,9 @@ function runLoop() {
     }
 
     // Yield back to the event loop so postMessage can be processed
-    setTimeout(runLoop, 0);
+    if (running && instructionCount > 0) {
+        loopTimeout = setTimeout(runLoop, 0);
+    }
 }
 
 self.onmessage = async (e) => {
@@ -56,12 +61,17 @@ self.onmessage = async (e) => {
     } 
     else if (data.action === 'graph_built') {
         instructionCount = data.instructionCount;
-        if (!running) {
-            running = true;
+        execDepth = data.execDepth || 50;
+        running = true;
+        if (!loopTimeout && instructionCount > 0) {
             runLoop();
         }
     }
     else if (data.action === 'pause') {
         running = false;
+        if (loopTimeout) {
+            clearTimeout(loopTimeout);
+            loopTimeout = null;
+        }
     }
 };

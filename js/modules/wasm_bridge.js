@@ -225,8 +225,8 @@ const WasmEngine = {
                 const bits = parseInt(io.type.split('-')[1]) || 1;
                 if (targetIdx < currentIdx + bits) {
                     const bitOffset = targetIdx - currentIdx;
-                    // LSB is at the top, so bitOffset cleanly maps directly to bIdx
-                    const bIdx = bitOffset;
+                    // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Restored bit inversion to prevent upside-down 8-bit mapping.
+                    const bIdx = bits > 1 ? (bits - 1 - bitOffset) : 0;
                     return { nodeId: `${gid}:${io.id}`, portId: isInput ? `in${bIdx}` : `out${bIdx}` };
                 }
                 currentIdx += bits;
@@ -769,9 +769,11 @@ const WasmEngine = {
         console.log(`[WasmEngine] Optimized execution graph built with ${this.instructionCount} instructions.`);
         
         if (this.useWorker && this.worker) {
+            const execDepth = Math.max(20, this.flatNodes.length);
             this.worker.postMessage({
                 action: 'graph_built',
-                instructionCount: this.instructionCount
+                instructionCount: this.instructionCount,
+                execDepth: execDepth
             });
         }
     },
