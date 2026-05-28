@@ -5,6 +5,8 @@ const DebugTerminal = {
     verbosity: 2,
     visible: false,
     cwd: '/home/bsim', // Virtual File System Root
+    history: [],
+    historyIndex: -1,
     
     // [AUDIT: v1.25.25 | SEC_ARCH_LEAD] - Injected default VFS symlink mapping to surface library components in the home workspace.
     symlinks: {
@@ -220,7 +222,27 @@ const DebugTerminal = {
                 this.inp.value = '';
                 this.clearHighlight();
                 this._acState = null;
-                if (cmd) this.exec(cmd);
+                if (cmd) {
+                    this.history.push(cmd);
+                    if (this.history.length > 100) this.history.shift();
+                    this.historyIndex = this.history.length;
+                    this.exec(cmd);
+                }
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                if (this.history.length > 0 && this.historyIndex > 0) {
+                    this.historyIndex--;
+                    this.inp.value = this.history[this.historyIndex];
+                }
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                if (this.historyIndex < this.history.length - 1) {
+                    this.historyIndex++;
+                    this.inp.value = this.history[this.historyIndex];
+                } else {
+                    this.historyIndex = this.history.length;
+                    this.inp.value = '';
+                }
             } else if (e.key === 'Tab') {
                 e.preventDefault();
                 this.handleTab();
@@ -631,25 +653,79 @@ const DebugTerminal = {
         const c = args[0].toLowerCase();
 
         switch (c) {
-            case 'help':
-                // [AUDIT: v1.24.95 | SEC_ARCH_LEAD] - Expanded help index for kernel telemetry and analysis commands.
-                this.print("[SYSTEM] ARCHITECTURAL PRIMITIVES:", "sys");
-                this.print("  - tick <n> [p]: Advance simulation. Phase: 0=Settle, 1=Latch, 2=Commit.", "sys");
-                this.print("  - trace <id>  : Trace signal paths to identify zero-delay loops.", "sys");
-                this.print("  - power       : Extract pJ switching activity from Region E.", "sys");
-                this.print("  - symbols     : Map linear memory addresses to high-level node IDs.", "sys");
-                this.print("  - timing <f>  : Configure gate delays (7nm, 28nm, ideal).", "sys");
-                this.print("  - reset       : Flush Region A and re-center the viewport.", "sys");
-                this.print("  - ls [-l]     : List workspace nodes or VFS contents.", "sys");
-                this.print("  - spawn <t>   : Add a node (e.g., spawn NAND 100 100).", "sys");
-                this.print("  - rm <id>     : Delete nodes or directories.", "sys");
-                // [AUDIT: v1.25.26 | SEC_ARCH_LEAD] - Exposed ln command parameter documentation.
-                this.print("  - ln -s <t> <l>: Create virtual directory symlink (e.g., ln -s /etc/lib ./lib).", "sys");
-                this.print("  - set <id> <v>: Set input node value.", "sys");
-                this.print("  - wire ...    : Connect two ports.", "sys");
-                this.print("  - synth <g>   : Compile logic from NANDs.", "sys");
-                this.print("  - wasm [check]: Exhaustive diagnostics for the WebAssembly simulation engine.", "sys");
+            case 'help': {
+                const cmdArg = args[1] ? args[1].toLowerCase() : null;
+                if (cmdArg) {
+                    switch (cmdArg) {
+                        case 'wasm':
+                            this.print("[HELP: wasm] Diagnostics for the WebAssembly simulation engine:", "sys");
+                            this.print("  Usage: wasm [check | status | debug | inspect &lt;nodeId&gt;]", "sys");
+                            this.print("  - check/status/debug : Display diagnostics, memory page bounds, and active WebWorker latency metrics.", "sys");
+                            this.print("  - inspect &lt;nodeId&gt;   : Retrieve the low-level compiled Region A slot indices and the exact binary values stored in linear memory.", "sys");
+                            break;
+                        case 'tick':
+                            this.print("[HELP: tick] Advance simulation logic manually:", "sys");
+                            this.print("  Usage: tick &lt;n&gt; [phase]", "sys");
+                            this.print("  - &lt;n&gt;   : The number of clock/evaluation passes to run.", "sys");
+                            this.print("  - [phase]: Optional sequence phase (0 = settle logic, 1 = latch sequential, 2 = commit sequential).", "sys");
+                            break;
+                        case 'trace':
+                            this.print("[HELP: trace] Trace signal paths between gates:", "sys");
+                            this.print("  Usage: trace &lt;nodeId&gt;", "sys");
+                            this.print("  - Traces downstream signal propagation to help pinpoint zero-delay combinational loops and feedback locks.", "sys");
+                            break;
+                        case 'ls':
+                            this.print("[HELP: ls] List contents of virtual directories or node elements:", "sys");
+                            this.print("  Usage: ls [-l] [path]", "sys");
+                            this.print("  - [-l]  : Verbose output showing absolute gate coordinates and exact state values.", "sys");
+                            this.print("  - [path]: Target directory (e.g. /home/bsim/ or /etc/lib/primitives). Defaults to current directory.", "sys");
+                            break;
+                        case 'spawn':
+                            this.print("[HELP: spawn] Instantiate a new logical gate:", "sys");
+                            this.print("  Usage: spawn &lt;type&gt; &lt;x&gt; &lt;y&gt;", "sys");
+                            this.print("  - &lt;type&gt;: Gate type (e.g., NAND, NOT, AND, OR, DFF, TFF, etc.).", "sys");
+                            this.print("  - &lt;x&gt; &lt;y&gt;: Absolute canvas coordinates for placement.", "sys");
+                            break;
+                        case 'rm':
+                            this.print("[HELP: rm] Delete a node or virtual element:", "sys");
+                            this.print("  Usage: rm &lt;nodeId&gt;", "sys");
+                            this.print("  - Deletes the specified logic component by its global unique ID.", "sys");
+                            break;
+                        case 'ln':
+                            this.print("[HELP: ln] Create a virtual directory symlink:", "sys");
+                            this.print("  Usage: ln -s &lt;target&gt; &lt;link_name&gt;", "sys");
+                            this.print("  - Creates a symbolic link in the virtual file system (e.g. linking to custom library folders).", "sys");
+                            break;
+                        case 'set':
+                            this.print("[HELP: set] Set the state value of an input node:", "sys");
+                            this.print("  Usage: set &lt;nodeId&gt; &lt;value&gt;", "sys");
+                            this.print("  - &lt;value&gt;: Target state to set (e.g. integer 0/1, integer parsed to bits, or comma-separated bits).", "sys");
+                            break;
+                        default:
+                            this.print(`No detailed help manual found for command '${cmdArg}'.`, "warn");
+                    }
+                    break;
+                }
+                
+                // Generic Help output
+                this.print("[SYSTEM] ARCHITECTURAL PRIMITIVES (v1.27.19):", "sys");
+                this.print("  - help [command] : Show this overview or specific detailed command manual.", "sys");
+                this.print("  - tick <n> [p]   : Advance simulation. Phase: 0=Settle, 1=Latch, 2=Commit.", "sys");
+                this.print("  - trace <id>     : Trace signal paths to identify zero-delay loops.", "sys");
+                this.print("  - power          : Extract pJ switching activity from Region E.", "sys");
+                this.print("  - symbols        : Map linear memory addresses to high-level node IDs.", "sys");
+                this.print("  - timing <f>     : Configure gate delays (7nm, 28nm, ideal).", "sys");
+                this.print("  - reset          : Flush Region A and re-center the viewport.", "sys");
+                this.print("  - ls [-l] [path] : List workspace nodes or VFS contents.", "sys");
+                this.print("  - spawn <t> x y  : Add a node (e.g., spawn NAND 100 100).", "sys");
+                this.print("  - rm <id>        : Delete nodes or directories.", "sys");
+                this.print("  - ln -s <t> <l>  : Create virtual directory symlink (e.g., ln -s /etc/lib ./lib).", "sys");
+                this.print("  - set <id> <v>   : Set input node value.", "sys");
+                this.print("  - wire ...       : Connect two ports.", "sys");
+                this.print("  - synth <g>      : Compile logic from NANDs.", "sys");
+                this.print("  - wasm [check]   : Exhaustive diagnostics for the WebAssembly simulation engine.", "sys");
                 break;
+            }
             case 'pwd':
                 this.print(this.cwd, 'sys');
                 break;
@@ -1178,27 +1254,55 @@ const DebugTerminal = {
                 const ctx = this.getContext();
                 const sn = this.resolveNode(ctx, args[1]);
                 if (!sn) return this.print(`set: '${args[1]}' not found.`, "err");
-                const val = parseInt(args[2]);
-                if (isNaN(val)) return this.print("Value must be a number.", "err");
+                
+                let val;
+                if (args[2].includes(',')) {
+                    val = args[2].split(',').map(x => parseInt(x.trim()) || 0);
+                } else {
+                    const parsed = parseInt(args[2]);
+                    if (isNaN(parsed)) return this.print("Value must be a number or comma-separated bits.", "err");
+                    // If multi-bit node, convert number to bit array
+                    if (sn.type.startsWith('IN-')) {
+                        const bits = parseInt(sn.type.split('-')[1]) || 1;
+                        if (bits > 1) {
+                            val = [];
+                            for (let i = 0; i < bits; i++) {
+                                val.push((parsed >> i) & 1);
+                            }
+                        } else {
+                            val = parsed;
+                        }
+                    } else {
+                        val = parsed;
+                    }
+                }
+                
                 sn.val = val;
                 sn.state = val;
                 if (ctx.simObj) {
                     ctx.simObj.updateNodeVisual(sn);
                     ctx.simObj.seedQueue(); ctx.simObj.processQueue();
                 }
-                this.print(`Set ${sn.id} to ${val}`, "ok");
+                this.print(`Set ${sn.id} to ${JSON.stringify(val)}`, "ok");
                 break;
             }
-            case 'wire':
+            case 'wire': {
                 if (args.length < 5) return this.print("Usage: wire <node1> <port1> <node2> <port2>", "err");
+                const ctx = this.getContext();
+                const node1 = this.resolveNode(ctx, args[1]);
+                const node2 = this.resolveNode(ctx, args[3]);
+                if (!node1) return this.print(`wire: Node '${args[1]}' not found.`, "err");
+                if (!node2) return this.print(`wire: Node '${args[3]}' not found.`, "err");
+                
                 Sim.wires.push({
-                    from: { nodeId: args[1], portId: args[2], isOutput: true },
-                    to: { nodeId: args[3], portId: args[4], isOutput: false }
+                    from: { nodeId: node1.id, portId: args[2], isOutput: true },
+                    to: { nodeId: node2.id, portId: args[4], isOutput: false }
                 });
                 WireRenderer.drawWires();
                 Sim.seedQueue(); Sim.processQueue();
-                this.print(`Wired ${args[1]}[${args[2]}] to ${args[3]}[${args[4]}]`, "ok");
+                this.print(`Wired ${node1.id}[${args[2]}] to ${node2.id}[${args[4]}]`, "ok");
                 break;
+            }
             case 'sim':
                 Sim.seedQueue(); Sim.processQueue();
                 this.print("Propagation tick queued.", "ok");
