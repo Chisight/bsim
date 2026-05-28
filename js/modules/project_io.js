@@ -405,7 +405,8 @@ const ProjectManager = {
                     wires: wsStack.length > 0 ? wsStack[0].wires : cWires, 
                     library: safeLib, directories: Sim.directories || [], workspaceStack: wsStack, activeEditingChip: Sim.activeEditingChip,
                     tabs: safeTabs, activeTabId: Sim.activeTabId,
-                    prefs: { snapNodes: Sim.snapNodes, snapWires: Sim.snapWires, confirmDelete: Sim.confirmDelete, showStats: Sim.showStats, showTooltips: Sim.showTooltips, tutorialMode: Sim.tutorialMode, hudPos: Sim.hudPos, toastPos: Sim.toastPos, disableAnimations: Sim.disableAnimations, portSize: Sim.portSize, dotSize: Sim.dotSize, junctionSize: Sim.junctionSize, uiScale: Sim.uiScale, flipPinLogic: Sim.flipPinLogic, polarity: Sim.polarity || {} } 
+                    prefs: { snapNodes: Sim.snapNodes, snapWires: Sim.snapWires, confirmDelete: Sim.confirmDelete, showStats: Sim.showStats, showTooltips: Sim.showTooltips, tutorialMode: Sim.tutorialMode, hudPos: Sim.hudPos, toastPos: Sim.toastPos, disableAnimations: Sim.disableAnimations, portSize: Sim.portSize, dotSize: Sim.dotSize, junctionSize: Sim.junctionSize, uiScale: Sim.uiScale, flipPinLogic: Sim.flipPinLogic, polarity: Sim.polarity || {} },
+                    meta: { version: (window.LOADED_BSIM_VERSION || "1.27.22") + "-Modular", exportedAt: new Date().toISOString() }
                 };
                 localStorage.setItem('bsim_autosave', JSON.stringify(project));
             } catch (e) {

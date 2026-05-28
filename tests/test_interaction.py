@@ -118,3 +118,51 @@ class TestInteraction(unittest.IsolatedAsyncioTestCase):
         await self.eval_js("window.Sim.toggleBit('in1', 0)")
         out_val = await self.eval_js("window.Sim.nodes.find(n => n.id === 'out1').val")
         self.assertEqual(out_val, 1)
+
+    async def test_reload_wire_persistence(self):
+        # 1. Blank out workspace
+        await self.eval_js("""
+            window.Sim.nodes.forEach(n => { const el = document.getElementById(n.id); if (el) el.remove(); });
+            document.querySelectorAll('.gate').forEach(el => el.remove());
+            window.Sim.nodes.length = 0;
+            window.Sim.wires.length = 0;
+            window.Sim.wireMap.clear();
+            if (window.WireRenderer) window.WireRenderer.drawWires();
+            localStorage.removeItem('bsim_autosave');
+        """)
+
+        # Ensure empty workspace
+        nodes_len = await self.eval_js("window.Sim.nodes.length")
+        wires_len = await self.eval_js("window.Sim.wires.length")
+        self.assertEqual(nodes_len, 0)
+        self.assertEqual(wires_len, 0)
+
+        # 2. Add an IN-8 and an OUT-8 node
+        await self.eval_js("window.Sim.nodes.push(window.Sim._cleanNode({id: 'in_bus', type: 'IN-8', x: 100, y: 150, label: 'IN_BUS', val: 0, state: 0}))")
+        await self.eval_js("window.Sim.nodes.push(window.Sim._cleanNode({id: 'out_bus', type: 'OUT-8', x: 300, y: 150, label: 'OUT_BUS', val: 0, state: 0}))")
+        await self.eval_js("window.Sim.nodes.forEach(n => window.NodeRenderer.renderNode(n))")
+
+        # 3. Create a wire from in_bus port 'out0' to out_bus port 'in0'
+        await self.eval_js("window.Sim.wires.push(window.Sim._cleanWire({from: {nodeId: 'in_bus', portId: 'out0'}, to: {nodeId: 'out_bus', portId: 'in0'}}))")
+        await self.eval_js("window.WireRenderer.drawWires()")
+
+        # Verify drawn ports
+        from_port = await self.eval_js("window.Sim.wires[0].from.portId")
+        to_port = await self.eval_js("window.Sim.wires[0].to.portId")
+        self.assertEqual(from_port, "out0")
+        self.assertEqual(to_port, "in0")
+
+        # 4. Trigger autoSave and wait for the debounced write to complete
+        await self.eval_js("window.Sim.autoSave()")
+        await asyncio.sleep(1.0)
+
+        # 5. Reload the page (simulating Ctrl+Shift+R / page refresh)
+        await self.ws.send(json.dumps({"id": 300, "method": "Page.reload", "params": {"ignoreCache": True}}))
+        await asyncio.sleep(3.0)
+
+        # 6. Retrieve the wire ports after reload and assert they did NOT flip
+        loaded_from_port = await self.eval_js("window.Sim.wires[0].from.portId")
+        loaded_to_port = await self.eval_js("window.Sim.wires[0].to.portId")
+        
+        self.assertEqual(loaded_from_port, "out0")
+        self.assertEqual(loaded_to_port, "in0")
