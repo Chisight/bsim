@@ -129,3 +129,31 @@ class TestEngineParity(unittest.IsolatedAsyncioTestCase):
         
         # Assert exact parity between WASM and V8 simulation outputs
         self.assertEqual(wasm_outputs, v8_outputs)
+
+    async def test_macro_runner_parity(self):
+        base_dir = os.path.dirname(__file__)
+        layout_path = os.path.join(base_dir, "fixtures", "cpu_layout.json")
+        spec_path = os.path.join(base_dir, "fixtures", "cpu_test_spec.json")
+
+        with open(layout_path, "r", encoding="utf-8") as f:
+            layout_str = f.read()
+
+        with open(spec_path, "r", encoding="utf-8") as f:
+            spec = json.load(f)
+
+        import sys
+        if base_dir not in sys.path:
+            sys.path.insert(0, base_dir)
+        from macro_runner import MacroTestRunner
+        runner = MacroTestRunner()
+        
+        # Reuse existing browser WebSocket connection
+        runner.ws = self.ws
+        runner.ws_url = self.ws_url
+        runner.pending = self.pending
+
+        await runner.load_layout(layout_str)
+        
+        # Verify spec compiles and runs identically across both engines
+        await runner.execute_test(spec, "wasm")
+        await runner.execute_test(spec, "v8")
