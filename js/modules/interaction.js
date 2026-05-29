@@ -64,7 +64,7 @@ const InteractionHandler = {
                 wires: cWires,
                 library: cLib,
                 meta: {
-                    version: (window.LOADED_BSIM_VERSION || "1.27.30") + "-Modular",
+                    version: (window.LOADED_BSIM_VERSION || "1.27.31") + "-Modular",
                     exportedAt: new Date().toISOString(),
                     type: "dbsim_snapshot",
                     activeTabId: Sim.activeTabId,
