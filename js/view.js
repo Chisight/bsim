@@ -70,15 +70,11 @@ const View = {
         }, { passive: false });
     },
 
-    /**
-     * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for viewport matrix synchronization.
-     */
     apply() {
-        document.getElementById('scene').style.transform = `translate(${this.x}px, ${this.y}px) scale(${this.scale})`;
-        document.getElementById('svg-layer').style.transform = `translate(${this.x}px, ${this.y}px) scale(${this.scale})`;
-        const gs = 20 * this.scale;
-        document.getElementById('grid-layer').style.backgroundPosition = `${this.x}px ${this.y}px`;
-        document.getElementById('grid-layer').style.backgroundSize = `${gs}px ${gs}px`;
+        const transformStr = `translate(${this.x}px, ${this.y}px) scale(${this.scale})`;
+        document.getElementById('scene').style.transform = transformStr;
+        document.getElementById('svg-layer').style.transform = transformStr;
+        document.getElementById('grid-layer').style.transform = transformStr;
     }
 };
 

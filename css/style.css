@@ -211,10 +211,11 @@ nav .sub-menu .menu-item::after { display: none; }
 .workspace-split.split-right #workspace { border-right: 2px solid var(--border); }
 
 #grid-layer {
-    position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none;
+    position: absolute; top: -20000px; left: -20000px; width: 80000px; height: 80000px; pointer-events: none;
     background-image: radial-gradient(#1a1a23 1.5px, transparent 1.5px);
     background-size: 20px 20px;
     z-index: 1;
+    transform-origin: 0 0;
 }
 
 #scene { 

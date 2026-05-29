@@ -6,7 +6,7 @@ const NodeRenderer = {
     /**
      * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for node DOM instantiation.
      */
-    renderNode(node) {
+    renderNode(node, container = null) {
         delete node._portOffsets;
         const div = document.createElement('div');
         div.id = node.id; 
@@ -237,7 +237,8 @@ const NodeRenderer = {
         div.onclick = (e) => InteractionHandler.handleNodeClick(e, node, div, bits);
         div.ondblclick = (e) => InteractionHandler.handleNodeDblClick(e, node, div);
 
-        document.getElementById('scene').appendChild(div);
+        const parent = container || document.getElementById('scene');
+        if (parent) parent.appendChild(div);
 
         if (window.Sim && Sim._domCacheMap) Sim._domCacheMap.delete(node.id);
         Sim.updateNodeVisual(node);

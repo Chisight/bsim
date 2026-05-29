@@ -1,6 +1,6 @@
 /**
  * Browser-Sim Core Engine
- * Version: 1.27.28
+ * Version: 1.27.29
  */
 const _getSimStorage = () => (window.location.search.includes('chip') || window.self !== window.top) ? sessionStorage : localStorage;
 
@@ -908,21 +908,27 @@ const Sim = {
         });
 
         // Clear workspace
-        this.nodes.forEach(n => { const el = document.getElementById(n.id); if (el) el.remove(); });
-        document.querySelectorAll('.gate').forEach(el => el.remove());
+        const scene = document.getElementById('scene');
+        if (scene) scene.innerHTML = '';
+        const svg = document.getElementById('svg-layer');
+        if (svg) svg.innerHTML = '';
+        if (typeof WireRenderer !== 'undefined') {
+            WireRenderer._pool = [];
+            WireRenderer._domPreviewPath = null;
+        }
         this.nodes = [];
         this.wires = [];
         this.wireMap.clear();
-        const scene = document.getElementById('scene');
-        if (scene) scene.innerHTML = '';
 
         // Load chip internals
         const chip = this.library[name];
+        const fragment = document.createDocumentFragment();
         chip.nodes.forEach(n => {
             const cloned = JSON.parse(JSON.stringify(n));
             this.nodes.push(cloned);
-            if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(cloned);
+            if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(cloned, fragment);
         });
+        if (scene) scene.appendChild(fragment);
         this.wires = JSON.parse(JSON.stringify(chip.wires));
         this.activeEditingChip = name;
 
@@ -1142,23 +1148,29 @@ const Sim = {
         this.activeSplitChip = null;
 
         // 2. Clear current workspace
-        this.nodes.forEach(n => { const el = document.getElementById(n.id); if (el) el.remove(); });
-        document.querySelectorAll('.gate').forEach(el => el.remove());
-        this.nodes = []; this.wires = []; this.wireMap.clear();
         const scene = document.getElementById('scene');
         if (scene) scene.innerHTML = '';
+        const svg = document.getElementById('svg-layer');
+        if (svg) svg.innerHTML = '';
+        if (typeof WireRenderer !== 'undefined') {
+            WireRenderer._pool = [];
+            WireRenderer._domPreviewPath = null;
+        }
+        this.nodes = []; this.wires = []; this.wireMap.clear();
 
         // 3. Load new state
         this.activeTabId = id;
         const newTab = this.tabs.find(t => t.id === id);
         if (newTab) {
+            const fragment = document.createDocumentFragment();
             (newTab.nodes || []).forEach(n => {
                 const c = this._cleanNode(n);
                 if (c) {
                     this.nodes.push(c);
-                    if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(c);
+                    if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(c, fragment);
                 }
             });
+            if (scene) scene.appendChild(fragment);
             this.wires = (newTab.wires || []).map(w => this._cleanWire(w)).filter(w => w !== null);
             if (window.History) {
                 History.stack = newTab.historyStack ? [...newTab.historyStack] : [];
@@ -1721,12 +1733,16 @@ const Sim = {
     uiNewChip() {
         this.modal('New Chip', 'Clear workspace? Your saved library will be kept.', 'confirm', (ok) => {
             if (ok) {
-                this.nodes.forEach(n => { const el = document.getElementById(n.id); if (el) el.remove(); });
-                document.querySelectorAll('.gate').forEach(el => el.remove());
-                this.nodes = []; this.wires = []; this.wireMap.clear();
-                if (window.History) { History.stack = []; History.index = -1; History.updateButtons(); }
                 const scene = document.getElementById('scene');
                 if (scene) scene.innerHTML = '';
+                const svg = document.getElementById('svg-layer');
+                if (svg) svg.innerHTML = '';
+                if (typeof WireRenderer !== 'undefined') {
+                    WireRenderer._pool = [];
+                    WireRenderer._domPreviewPath = null;
+                }
+                this.nodes = []; this.wires = []; this.wireMap.clear();
+                if (window.History) { History.stack = []; History.index = -1; History.updateButtons(); }
                 this.updateWireVisuals(); this.seedQueue();
             }
         });
@@ -1945,19 +1961,25 @@ const Sim = {
         };
 
         const parent = this.workspaceStack.pop();
-        this.nodes.forEach(n => { const el = document.getElementById(n.id); if (el) el.remove(); });
-        document.querySelectorAll('.gate').forEach(el => el.remove());
-        this.nodes = []; this.wires = []; this.wireMap.clear();
         const scene = document.getElementById('scene');
         if (scene) scene.innerHTML = '';
+        const svg = document.getElementById('svg-layer');
+        if (svg) svg.innerHTML = '';
+        if (typeof WireRenderer !== 'undefined') {
+            WireRenderer._pool = [];
+            WireRenderer._domPreviewPath = null;
+        }
+        this.nodes = []; this.wires = []; this.wireMap.clear();
 
+        const fragment = document.createDocumentFragment();
         parent.nodes.forEach(n => {
             if (n.isCustom && n.type === this.activeEditingChip) {
                 n.meta = JSON.parse(JSON.stringify(this.library[this.activeEditingChip]));
             }
             this.nodes.push(n);
-            NodeRenderer.renderNode(n);
+            NodeRenderer.renderNode(n, fragment);
         });
+        if (scene) scene.appendChild(fragment);
         this.wires = parent.wires;
 
         if (window.History) {

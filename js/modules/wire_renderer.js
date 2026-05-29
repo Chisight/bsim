@@ -7,10 +7,14 @@ const WireRenderer = {
     _rafId: null,
     
     _getDomPath(svg, index) {
-        while (this._pool.length <= index) {
-            const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
-            svg.appendChild(p);
-            this._pool.push(p);
+        if (this._pool.length <= index) {
+            const fragment = document.createDocumentFragment();
+            while (this._pool.length <= index) {
+                const p = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+                fragment.appendChild(p);
+                this._pool.push(p);
+            }
+            svg.appendChild(fragment);
         }
         return this._pool[index];
     },
