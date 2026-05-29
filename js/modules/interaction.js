@@ -725,6 +725,7 @@ const InteractionHandler = {
         if (e.button === 2) {
             e.preventDefault(); e.stopPropagation();
             InteractionHandler.activeContextWire = wire;
+            InteractionHandler._wireJustRightClicked = true;
             const menu = document.getElementById('context-menu');
             if (!menu) return;
 
@@ -808,6 +809,10 @@ const InteractionHandler = {
 
         ws.oncontextmenu = (e) => {
             e.preventDefault();
+            if (InteractionHandler._wireJustRightClicked) {
+                InteractionHandler._wireJustRightClicked = false;
+                return;
+            }
             if (Sim._isDraggingPan || e.buttons === 3) return; // Ignore menu if panning or finishing a right-click drag pan
             if (e.target !== ws && e.target.id !== 'grid-layer') return;
             
@@ -943,6 +948,9 @@ const InteractionHandler = {
         });
 
         ws.addEventListener('mousedown', (e) => {
+            if (window.InteractionHandler) {
+                InteractionHandler._wireJustRightClicked = false;
+            }
             // 1. Canvas Wire Interception (Default)
             if (!Sim.wiring.active && window.InteractionHandler) {
                 const wr = ws.getBoundingClientRect();
