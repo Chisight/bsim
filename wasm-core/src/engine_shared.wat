@@ -208,12 +208,35 @@
                                   local.get $opcode i32.const 11 i32.eq
                               (if (result i32)
                                 (then
-                                  local.get $val_a i32.const 1 i32.eq
-                                  (if (result i32) (then i32.const 1)
-                                    (else local.get $val_b i32.const 1 i32.eq
-                                      (if (result i32) (then i32.const 1)
-                                        (else local.get $val_a i32.const 0 i32.eq
-                                          (if (result i32) (then i32.const 0) (else local.get $val_b))
+                                  ;; Check if either is 3 (Error)
+                                  local.get $val_a i32.const 3 i32.eq
+                                  local.get $val_b i32.const 3 i32.eq i32.or
+                                  (if (result i32)
+                                    (then i32.const 3)
+                                    (else
+                                      ;; Check for contention: (a==1 && b==0) || (a==0 && b==1)
+                                      local.get $val_a i32.const 1 i32.eq
+                                      local.get $val_b i32.const 0 i32.eq i32.and
+                                      local.get $val_a i32.const 0 i32.eq
+                                      local.get $val_b i32.const 1 i32.eq i32.and i32.or
+                                      (if (result i32)
+                                        (then i32.const 3)
+                                        (else
+                                          ;; If either is 1, return 1
+                                          local.get $val_a i32.const 1 i32.eq
+                                          local.get $val_b i32.const 1 i32.eq i32.or
+                                          (if (result i32)
+                                            (then i32.const 1)
+                                            (else
+                                              ;; If either is 0, return 0
+                                              local.get $val_a i32.const 0 i32.eq
+                                              local.get $val_b i32.const 0 i32.eq i32.or
+                                              (if (result i32)
+                                                (then i32.const 0)
+                                                (else i32.const 2)
+                                              )
+                                            )
+                                          )
                                         )
                                       )
                                     )

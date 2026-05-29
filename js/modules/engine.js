@@ -37,37 +37,73 @@ const Engine = {
 
     getSignal(sim, nodeId, portId, visited = new Set()) {
         const node = sim._nodeMap ? sim._nodeMap.get(nodeId) : sim.nodes.find(n => n.id === nodeId);
-        if (!node) return 'Z';
+        if (!node) {
+            console.log(`[DEBUG_GET_SIGNAL] Node ${nodeId} not found, returning Z`);
+            return 'Z';
+        }
         if (node.type === 'JUNCTION') {
-            return this.getDrivingSignal(sim, nodeId, portId, visited);
+            const res = this.getDrivingSignal(sim, nodeId, portId, visited);
+            console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> ${res}`);
+            return res;
         }
         if (node.type.startsWith('IN-')) {
+            let res = node.state;
             if (Array.isArray(node.state)) {
                 let idx = parseInt(portId.replace('out', ''));
-                if (isNaN(idx)) return 0;
-                return node.state[idx] !== undefined ? node.state[idx] : 0;
+                if (isNaN(idx)) res = 0;
+                else res = node.state[idx] !== undefined ? node.state[idx] : 0;
             }
+            console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> ${res}`);
+            return res;
+        }
+        if (node.type === 'CLOCK') {
+            console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> ${node.state}`);
             return node.state;
         }
-        if (node.type === 'CLOCK') return node.state;
-        if (node.type === '0') return 0;
+        if (node.type === '0') {
+            console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> 0`);
+            return 0;
+        }
         if (node.type === 'TRISTATE') {
-            // Return Hi-Z ('Z') when disabled so bus wiring collapses correctly
-            return node.val !== undefined ? node.val : 'Z';
+            if (portId !== 'out') {
+                console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> Z (non-output)`);
+                return 'Z';
+            }
+            const res = node.val !== undefined ? node.val : 'Z';
+            console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> ${res}`);
+            return res;
         }
         if (node.type === 'RAM') {
-            if (node.val && node.val[portId] !== undefined) return node.val[portId];
-            return 0;
+            if (!portId.startsWith('out')) {
+                console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> Z (non-output)`);
+                return 'Z';
+            }
+            const res = (node.val && node.val[portId] !== undefined) ? node.val[portId] : 0;
+            console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> ${res}`);
+            return res;
         }
         if (node.type === 'DFF' || node.type === 'TFF') {
-            if (node.val && node.val[portId] !== undefined) return node.val[portId];
-            return 0;
+            if (portId !== 'q' && portId !== 'nq') {
+                console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> Z (non-output)`);
+                return 'Z';
+            }
+            const res = (node.val && node.val[portId] !== undefined) ? node.val[portId] : 0;
+            console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> ${res}`);
+            return res;
         }
         if (node.isCustom) {
-            if (node.outputs && node.outputs[portId] !== undefined) return node.outputs[portId];
-            return 0;
+            const res = (node.outputs && node.outputs[portId] !== undefined) ? node.outputs[portId] : 'Z';
+            console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> ${res} (custom)`);
+            return res;
         }
-        return node.val !== undefined ? node.val : 0;
+        // Standard gates (AND, OR, NAND, NOR, XOR, XNOR, NOT)
+        if (portId !== 'q' && portId !== 'out') {
+            console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> Z (non-output standard gate)`);
+            return 'Z';
+        }
+        const res = node.val !== undefined ? node.val : 0;
+        console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> ${res} (standard gate)`);
+        return res;
     },
 
     getDrivingSignal(sim, nodeId, portId, visited = new Set()) {
