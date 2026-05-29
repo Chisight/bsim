@@ -1060,7 +1060,7 @@ const WasmEngine = {
             let current = rootNodes.find(n => n.id === parts[0]);
             if (!current) return null;
             for (let i = 1; i < parts.length; i++) {
-                if (!current.meta) return null;
+                if (!current.meta || !current.meta.nodes) return null;
                 current = current.meta.nodes.find(n => n.id === parts[i]);
                 if (!current) return null;
             }
