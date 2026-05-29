@@ -75,7 +75,9 @@ const Engine = {
         if (visited.has(key)) return 0;
         visited.add(key);
 
-        let high = false;
+        let hasHigh = false;
+        let hasLow = false;
+        let hasError = false;
         let hasDriver = false;  // tracks whether ANY non-Hi-Z source drives this net
         // Use transient O(1) adjacency map when available (built inside processQueue/_actualDrawWires)
         const adj = sim._wireMap ? sim._wireMap.get(nodeId) : sim.wires;
@@ -87,19 +89,28 @@ const Engine = {
                 sig = this.getSignal(sim, w.to.nodeId, w.to.portId, visited);
             }
             if (sig !== null) {
-                if (sig !== 'Z' && sig !== 2) hasDriver = true;  // real 0 or 1 driver
-                if (sig === 1 || sig === true) high = true;
+                if (sig !== 'Z' && sig !== 2) {
+                    hasDriver = true;  // real driver
+                    if (sig === 'E' || sig === 3) {
+                        hasError = true;
+                    } else if (sig === 1 || sig === true) {
+                        hasHigh = true;
+                    } else {
+                        hasLow = true;
+                    }
+                }
             }
         });
 
         // If no non-Hi-Z driver exists, the net is floating (Hi-Z)
         if (!hasDriver) return 'Z';
-        return high ? 1 : 0;
+        if (hasError || (hasHigh && hasLow)) return 'E';
+        return hasHigh ? 1 : 0;
     },
 
     calculateNextState(sim, node, visited = new Set()) {
-        // Helper: convert Hi-Z to 0 for gate logic (floating input = logic low)
-        const g = (sig) => (sig === 'Z' || sig === 2) ? 0 : (sig ? 1 : 0);
+        // Helper: convert Hi-Z or Error to 0 for gate logic (floating/error input = logic low)
+        const g = (sig) => (sig === 'Z' || sig === 2 || sig === 'E' || sig === 3) ? 0 : (sig ? 1 : 0);
 
         if (node.type === 'JUNCTION') return this.getDrivingSignal(sim, node.id, 'j', visited);
         if (node.type === '0') return 0;
@@ -549,7 +560,7 @@ const Engine = {
 
             const processNode = (node) => {
                 const newVal = this.calculateNextState(sim, node);
-                const rawNew = (typeof newVal === 'string' && newVal !== 'Z') ? JSON.parse(newVal) : newVal;
+                const rawNew = (typeof newVal === 'string' && newVal !== 'Z' && newVal !== 'E') ? JSON.parse(newVal) : newVal;
 
                 if (!this.fastEqual(node.val, rawNew) || node._forcePropagate) {
                     if (!this.fastEqual(node.val, rawNew)) node.toggles = (node.toggles || 0) + 1;

@@ -418,7 +418,7 @@ const InteractionHandler = {
         if (document.body.classList.contains('edit-mode-active')) return;
         Sim.wakeQueue();
         e.stopPropagation();
-        if (e.target.classList.contains('port')) return;
+        if (e.target && e.target.classList && e.target.classList.contains('port')) return;
 
         if (node.type === 'CLOCK') {
             Sim.modal('Configure Clock', 'Set Frequency (0.1Hz - 100Hz):', 'prompt', (val) => {
@@ -554,6 +554,7 @@ const InteractionHandler = {
 
             const commit = () => {
                 if (!lbl.contains(input)) return;
+                input.onblur = null; // Prevent double-triggering during DOM removal!
                 const val = input.value.trim();
                 node.label = val;
                 lbl.innerText = node.label;

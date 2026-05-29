@@ -345,14 +345,16 @@ const WireRenderer = {
             // Normalize Hi-Z: both string 'Z' and numeric 2 represent high-impedance
             let sig = (val === true) ? 1 : (val === false ? 0 : val);
             if (sig === 'Z') sig = 2;
+            if (sig === 'E') sig = 3;
             if (Array.isArray(val)) {
-                if (val.some(v => v === 1 || v === true)) sig = 1;
+                if (val.some(v => v === 3 || v === 'E')) sig = 3;
+                else if (val.some(v => v === 1 || v === true)) sig = 1;
                 else if (val.every(v => v === 2 || v === 'Z')) sig = 2;
                 else sig = 0;
             }
 
-            path.setAttribute('class', 'wire-main' + (sig === 1 ? ' active' : (sig === 2 ? ' highz' : ' inactive')));
-            path.setAttribute('stroke', sig === 1 ? 'var(--wire-on)' : (sig === 2 ? '#ffff00' : 'var(--wire-off)'));
+            path.setAttribute('class', 'wire-main' + (sig === 1 ? ' active' : (sig === 2 ? ' highz' : (sig === 3 ? ' contention' : ' inactive'))));
+            path.setAttribute('stroke', sig === 1 ? 'var(--wire-on)' : (sig === 2 ? '#ffff00' : (sig === 3 ? '#ff3333' : 'var(--wire-off)')));
             path.setAttribute('stroke-width', Array.isArray(val) ? '4' : '2');
             path.setAttribute('fill', 'none');
 

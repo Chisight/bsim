@@ -293,3 +293,104 @@ class TestInteraction(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(payload.get("nodes", [])), 1)
         self.assertEqual(payload["nodes"][0].get("id"), "node_dbsim")
         self.assertEqual(payload["nodes"][0].get("label"), "DBSIM_TEST")
+
+    async def test_tristate_contention_and_renaming_lockup(self):
+        # Set engine to V8 mode for custom logic checks
+        await self.eval_js("window.Sim.setEngine('v8')")
+
+        # 1. Blank out workspace
+        await self.eval_js("""
+            window.Sim.nodes.forEach(n => { const el = document.getElementById(n.id); if (el) el.remove(); });
+            document.querySelectorAll('.gate').forEach(el => el.remove());
+            window.Sim.nodes.length = 0;
+            window.Sim.wires.length = 0;
+            window.Sim.wireMap.clear();
+            if (window.WireRenderer) window.WireRenderer.drawWires();
+            localStorage.removeItem('bsim_autosave');
+        """)
+
+        # 2. Add components: two tristates, a junction, and four inputs to control the tristates
+        await self.eval_js("""
+            window.Sim.nodes.push(window.Sim._cleanNode({id: 't1', type: 'TRISTATE', x: 200, y: 100, label: 'T1'}));
+            window.Sim.nodes.push(window.Sim._cleanNode({id: 't2', type: 'TRISTATE', x: 200, y: 300, label: 'T2'}));
+            window.Sim.nodes.push(window.Sim._cleanNode({id: 'j1', type: 'JUNCTION', x: 400, y: 200, label: 'J1'}));
+
+            window.Sim.nodes.push(window.Sim._cleanNode({id: 't1_in', type: 'IN-1', x: 50, y: 50, label: 'T1_IN', val: 0, state: 0}));
+            window.Sim.nodes.push(window.Sim._cleanNode({id: 't1_en', type: 'IN-1', x: 50, y: 150, label: 'T1_EN', val: 0, state: 0}));
+            window.Sim.nodes.push(window.Sim._cleanNode({id: 't2_in', type: 'IN-1', x: 50, y: 250, label: 'T2_IN', val: 0, state: 0}));
+            window.Sim.nodes.push(window.Sim._cleanNode({id: 't2_en', type: 'IN-1', x: 50, y: 350, label: 'T2_EN', val: 0, state: 0}));
+
+            window.Sim.nodes.forEach(n => window.NodeRenderer.renderNode(n));
+        """)
+
+        # 3. Connect control lines and tristate outputs to the junction
+        await self.eval_js("""
+            window.Sim.wires.push(window.Sim._cleanWire({from: {nodeId: 't1_in', portId: 'out0'}, to: {nodeId: 't1', portId: 'in'}}));
+            window.Sim.wires.push(window.Sim._cleanWire({from: {nodeId: 't1_en', portId: 'out0'}, to: {nodeId: 't1', portId: 'en'}}));
+            window.Sim.wires.push(window.Sim._cleanWire({from: {nodeId: 't2_in', portId: 'out0'}, to: {nodeId: 't2', portId: 'in'}}));
+            window.Sim.wires.push(window.Sim._cleanWire({from: {nodeId: 't2_en', portId: 'out0'}, to: {nodeId: 't2', portId: 'en'}}));
+            window.Sim.wires.push(window.Sim._cleanWire({from: {nodeId: 't1', portId: 'out'}, to: {nodeId: 'j1', portId: 'j'}}));
+            window.Sim.wires.push(window.Sim._cleanWire({from: {nodeId: 't2', portId: 'out'}, to: {nodeId: 'j1', portId: 'j'}}));
+
+            window.WireRenderer.drawWires();
+        """)
+
+        # Scenario A: Both tristates disabled (none are outputting) -> high impedance 'Z'
+        await self.eval_js("""
+            window.Sim.nodes.find(n => n.id === 't1_en').state = 0;
+            window.Sim.nodes.find(n => n.id === 't1_en').val = 0;
+            window.Sim.nodes.find(n => n.id === 't2_en').state = 0;
+            window.Sim.nodes.find(n => n.id === 't2_en').val = 0;
+            window.Sim.seedQueue();
+            window.Sim.processQueue();
+        """)
+        sig = await self.eval_js("window.Sim.getDrivingSignal('j1', 'j')")
+        self.assertEqual(sig, 'Z')
+
+        # Scenario B: T1 enabled outputting 1, T2 disabled -> J1 should be 1
+        await self.eval_js("""
+            window.Sim.nodes.find(n => n.id === 't1_en').state = 1;
+            window.Sim.nodes.find(n => n.id === 't1_en').val = 1;
+            window.Sim.nodes.find(n => n.id === 't1_in').state = 1;
+            window.Sim.nodes.find(n => n.id === 't1_in').val = 1;
+            window.Sim.seedQueue();
+            window.Sim.processQueue();
+        """)
+        sig = await self.eval_js("window.Sim.getDrivingSignal('j1', 'j')")
+        self.assertEqual(sig, 1)
+
+        # Scenario C: T1 enabled outputting 1, T2 enabled outputting 0 -> contention error 'E'
+        await self.eval_js("""
+            window.Sim.nodes.find(n => n.id === 't2_en').state = 1;
+            window.Sim.nodes.find(n => n.id === 't2_en').val = 1;
+            window.Sim.nodes.find(n => n.id === 't2_in').state = 0;
+            window.Sim.nodes.find(n => n.id === 't2_in').val = 0;
+            window.Sim.seedQueue();
+            window.Sim.processQueue();
+        """)
+        sig = await self.eval_js("window.Sim.getDrivingSignal('j1', 'j')")
+        self.assertEqual(sig, 'E')
+
+        # 4. Test Renaming Lockup: Rename an input component and ensure it doesn't freeze or lock
+        await self.eval_js("""
+            const targetNode = window.Sim.nodes.find(n => n.id === 't1_in');
+            const targetDiv = document.getElementById('t1_in');
+            window.InteractionHandler.handleNodeDblClick(new Event('dblclick'), targetNode, targetDiv);
+            
+            const inputEl = targetDiv.querySelector('.gate-label input');
+            if (inputEl) {
+                inputEl.value = 'RENAMED_INPUT';
+                inputEl.blur();
+            }
+        """)
+        
+        # Verify the renamed node exists, has the updated label, and retains drag handlers
+        node_label = await self.eval_js("window.Sim.nodes.find(n => n.id === 't1_in').label")
+        self.assertEqual(node_label, 'RENAMED_INPUT')
+        
+        div_exists = await self.eval_js("document.getElementById('t1_in') !== null")
+        self.assertTrue(div_exists)
+        
+        drag_handler_type = await self.eval_js("typeof document.getElementById('t1_in').onmousedown")
+        self.assertEqual(drag_handler_type, 'function')
+
