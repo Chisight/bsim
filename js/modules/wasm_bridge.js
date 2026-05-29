@@ -488,8 +488,12 @@ const WasmEngine = {
             return drivers.size > 0 ? Array.from(drivers) : [0]; // Unconnected inputs default to GROUND (0)
         };
 
+        const busCache = new Map();
         const buildBusTree = (drivers) => {
             if (drivers.length === 1) return drivers[0];
+            const cacheKey = [...drivers].sort((a, b) => a - b).join(',');
+            if (busCache.has(cacheKey)) return busCache.get(cacheKey);
+
             let currentIdx = drivers[0];
             for (let i = 1; i < drivers.length; i++) {
                 const vTargetIdx = virtualNodeCount++;
@@ -501,6 +505,7 @@ const WasmEngine = {
                 this.instructionCount++;
                 currentIdx = vTargetIdx;
             }
+            busCache.set(cacheKey, currentIdx);
             return currentIdx;
         };
 
@@ -536,9 +541,9 @@ const WasmEngine = {
                     }
                 }
             }
-            // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Resolve all drivers for the current wire to ensure proper state propagation in the linear memory array.
+            // [AUDIT: w1.23.81 | SEC_ARCH_LEAD] - Resolve all drivers for the current wire to ensure proper state propagation in the linear memory array.
             const dIdx = resolveAllDriverIndices(queryNode, queryPort);
-            if (dIdx.length > 0) this.wireIdxMap.set(i, dIdx[0]);
+            if (dIdx.length > 0) this.wireIdxMap.set(i, buildBusTree(dIdx));
         });
 
         // Implement Robust Kahn's Algorithm for Topological Sorting.
