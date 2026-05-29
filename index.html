@@ -5,8 +5,8 @@
     <meta charset="UTF-8">
     <title>bSim</title>
     <link rel="icon" type="image/svg+xml" href="assets/bSim-logo-nand.svg">
-    <script>window.EXPECTED_BSIM_VERSION = "1.27.25";</script>
-    <script>window.LOADED_BSIM_VERSION = "1.27.25";</script>
+    <script>window.EXPECTED_BSIM_VERSION = "1.27.26";</script>
+    <script>window.LOADED_BSIM_VERSION = "1.27.26";</script>
     <link rel="stylesheet" href="css/style.css">
     <link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap" rel="stylesheet">
 </head>
@@ -20,7 +20,7 @@
                 onclick="document.getElementById('sidebar').classList.toggle('mobile-open')">☰</button>
             <img src="assets/bSim-logo-nand.svg" alt="bSim Logo"
                 style="height: 31.25px; margin-right: 8px; transition: transform 0.2s ease;">
-            <span style="font-size:10px; color:var(--wire-on); padding-top: 4px;">v1.27.25</span>
+            <span style="font-size:10px; color:var(--wire-on); padding-top: 4px;">v1.27.26</span>
         </div>
 
         <style>
@@ -148,32 +148,32 @@
     </div>
 
     <!-- Core Modules -->
-    <script src="js/history.js?v=1.27.25"></script>
-    <script src="js/view.js?v=1.27.25"></script>
+    <script src="js/history.js?v=1.27.26"></script>
+    <script src="js/view.js?v=1.27.26"></script>
 
     <!-- Analysis & Project Modules -->
-    <script src="js/modules/project_io.js?v=1.27.25"></script>
-    <script src="js/modules/analyzer.js?v=1.27.25"></script>
-    <script src="js/modules/node_renderer.js?v=1.27.25"></script>
-    <script src="js/modules/wire_renderer.js?v=1.27.25"></script>
+    <script src="js/modules/project_io.js?v=1.27.26"></script>
+    <script src="js/modules/analyzer.js?v=1.27.26"></script>
+    <script src="js/modules/node_renderer.js?v=1.27.26"></script>
+    <script src="js/modules/wire_renderer.js?v=1.27.26"></script>
     <!-- wasm bridge -->
     <script type="module">
-        import WasmEngine from './js/modules/wasm_bridge.js?v=1.27.25';
+        import WasmEngine from './js/modules/wasm_bridge.js?v=1.27.26';
         window.WasmEngine = WasmEngine; // Expose to global scope for dev console access
         WasmEngine.init();
     </script>
 
-    <script src="js/modules/interaction.js?v=1.27.25"></script>
-    <script src="js/modules/tutorial.js?v=1.27.25"></script>
-    <script src="js/modules/synth_ui.js?v=1.27.25"></script>
-    <script src="js/modules/debug_terminal.js?v=1.27.25"></script>
+    <script src="js/modules/interaction.js?v=1.27.26"></script>
+    <script src="js/modules/tutorial.js?v=1.27.26"></script>
+    <script src="js/modules/synth_ui.js?v=1.27.26"></script>
+    <script src="js/modules/debug_terminal.js?v=1.27.26"></script>
 
     <!-- Core Modules -->
-    <script src="js/modules/engine.js?v=1.27.25"></script>
-    <script src="js/modules/ui_orchestrator.js?v=1.27.25"></script>
-    <script src="js/synthesizer.js?v=1.27.25"></script>
-    <script src="js/sim.js?v=1.27.25"></script>
-    <script src="js/app.js?v=1.27.25"></script>
+    <script src="js/modules/engine.js?v=1.27.26"></script>
+    <script src="js/modules/ui_orchestrator.js?v=1.27.26"></script>
+    <script src="js/synthesizer.js?v=1.27.26"></script>
+    <script src="js/sim.js?v=1.27.26"></script>
+    <script src="js/app.js?v=1.27.26"></script>
 
     <script>
         // [AUDIT: v1.24.75 | SEC_ARCH_LEAD] - Unified menu state locking for persistent input focus without breaking CSS hover cascade.

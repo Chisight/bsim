@@ -1,6 +1,6 @@
 /**
  * Browser-Sim Core Engine
- * Version: 1.27.25
+ * Version: 1.27.26
  */
 const _getSimStorage = () => (window.location.search.includes('chip') || window.self !== window.top) ? sessionStorage : localStorage;
 
