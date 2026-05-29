@@ -2,6 +2,8 @@
  * Browser-Sim Core Engine
  * Version: 1.27.22
  */
+const _getSimStorage = () => (window.location.search.includes('chip') || window.self !== window.top) ? sessionStorage : localStorage;
+
 const Sim = {
     nodes: [],
     wires: [],
@@ -434,7 +436,7 @@ const Sim = {
             while (paddedArr.length < bits) paddedArr.push(0);
 
             // LSB is at index 0
-            const val = paddedArr.reduce((acc, b, i) => acc | ((b === 1 ? 1 : 0) << i), 0);
+            const val = paddedArr.reduce((acc, b, i) => acc + (BigInt(b === 1 || b === true ? 1 : 0) * (1n << BigInt(i))), 0n);
 
             if (!this._domCacheMap) this._domCacheMap = new Map();
             let cache = this._domCacheMap.get(n.id);
@@ -677,9 +679,13 @@ const Sim = {
         if (this.debugToasts) this.toast(`Connecting ${n1Id} to ${n2Id}`, 'debug');
         console.log(`[DEBUG] connectNodes triggered | From: ${n1Id}[${p1Id}] -> To: ${n2Id}[${p2Id}]`);
         const wire = { from: { nodeId: n1Id, portId: p1Id }, to: { nodeId: n2Id, portId: p2Id } };
-        if (!this.wires.find(w => w.from.nodeId === n1Id && w.to.nodeId === n2Id && w.from.portId === p1Id && w.to.portId === p2Id)) {
-            this.wires.push(wire);
-            this.updateWireVisuals();
+        if (window.History) {
+            History.execute(new AddWireCommand(wire));
+        } else {
+            if (!this.wires.find(w => w.from.nodeId === n1Id && w.to.nodeId === n2Id && w.from.portId === p1Id && w.to.portId === p2Id)) {
+                this.wires.push(wire);
+                this.updateWireVisuals();
+            }
         }
     },
 
@@ -882,7 +888,8 @@ const Sim = {
             wires: this.wires.map(w => this._cleanWire(w)).filter(w => w !== null),
             wireMap: new Map(this.wireMap),
             historyStack: window.History ? [...History.stack] : [],
-            historyIndex: window.History ? History.index : -1
+            historyIndex: window.History ? History.index : -1,
+            activeEditingChip: this.activeEditingChip
         });
 
         // Clear workspace
@@ -953,18 +960,49 @@ const Sim = {
 
                 // 3. Remove from library
                 delete this.library[name];
+                if (!this._deletedChips) this._deletedChips = new Set();
+                this._deletedChips.add(name);
 
                 // 4. Handle exit if editing
                 if (isEditingThis) {
+                    if (this.workspaceStack.length > 0) {
+                        const parent = this.workspaceStack[0];
+                        this.workspaceStack = [];
+                        this.nodes = parent.nodes;
+                        this.wires = parent.wires;
+                        this.wireMap = parent.wireMap || new Map();
+                        
+                        document.getElementById('scene').innerHTML = '';
+                        this.nodes.forEach(n => {
+                            if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(n);
+                        });
+                        if (window.History) {
+                            History.stack = parent.historyStack || [];
+                            History.index = parent.historyIndex !== undefined ? parent.historyIndex : -1;
+                            History.updateButtons();
+                        }
+                    } else {
+                        const t = this.tabs.find(x => x.id === this.activeTabId);
+                        if (t) {
+                            this.nodes = t.nodes || [];
+                            this.wires = t.wires || [];
+                            this.wireMap.clear();
+                            document.getElementById('scene').innerHTML = '';
+                            this.nodes.forEach(n => {
+                                if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(n);
+                            });
+                            if (window.History) {
+                                History.stack = t.historyStack || [];
+                                History.index = t.historyIndex !== undefined ? t.historyIndex : -1;
+                                History.updateButtons();
+                            }
+                        }
+                    }
                     this.activeEditingChip = null;
-                    this.workspaceStack = []; // Atomic Reset: Prevent phantom logic boards
-                    this.nodes = [];
-                    this.wires = [];
-                    this.wireMap.clear();
-                    document.getElementById('scene').innerHTML = '';
                     this.updateLibraryUI();
+                    this.updateWireVisuals();
                     document.getElementById('btn-exit-chip').style.display = 'none';
-                    this.toast('Active chip deleted. Workspace cleared.', 'danger');
+                    this.toast('Active chip deleted. Workspace reverted to parent.', 'danger');
                 } else {
                     this.updateLibraryUI();
                     this.updateWireVisuals();
@@ -1146,7 +1184,7 @@ const Sim = {
     uiNewProject() {
         this.modal('New Project', 'Warning: This will wipe your library, workspace, and autosave. Continue?', 'confirm', (ok) => {
             if (ok) {
-                localStorage.removeItem('bsim_autosave');
+                _getSimStorage().removeItem('bsim_autosave');
                 location.reload();
             }
         });
@@ -1262,6 +1300,12 @@ const Sim = {
     },
 
     enterNodeEditMode(nodeId, mode) {
+        if (this._editModeAbortController) {
+            this._editModeAbortController.abort();
+        }
+        this._editModeAbortController = new AbortController();
+        const signal = this._editModeAbortController.signal;
+
         if (mode === 'pin-dots') mode = 'pin-leds';
         const node = this.nodes.find(n => n.id === nodeId);
         const el = document.getElementById(nodeId);
@@ -1348,7 +1392,7 @@ const Sim = {
                 else if (hLeft || hRight) target.style.cursor = 'ew-resize';
                 else target.style.cursor = 'move';
             };
-            target.addEventListener('mousemove', this._editHover);
+            target.addEventListener('mousemove', this._editHover, { signal });
         } else {
             el.style.cursor = 'se-resize';
         }
@@ -1478,11 +1522,11 @@ const Sim = {
                 document.removeEventListener('mousemove', onMove);
                 document.removeEventListener('mouseup', onUp);
             };
-            document.addEventListener('mousemove', onMove);
-            document.addEventListener('mouseup', onUp);
+            document.addEventListener('mousemove', onMove, { signal });
+            document.addEventListener('mouseup', onUp, { signal });
         };
 
-        target.addEventListener('mousedown', this._editModeDown);
+        target.addEventListener('mousedown', this._editModeDown, { signal });
         this.toast(`Edit Mode: ${mode === 'pins' ? 'Drag to move, Shift+Drag to resize' : 'Drag bottom-right to scale'}. Double-click board to save.`, 'info', 0);
     },
 
@@ -1500,6 +1544,11 @@ const Sim = {
         // [AUDIT: v1.24.42 | SEC_ARCH_LEAD] - Updated node edit exit hook for LED nomenclature sync.
         let target = state.mode === 'pins' || state.mode === 'pin-leds' ? pinCont : (state.mode === 'info' ? infoCont : (state.mode === 'label' ? lblCont : el));
         if (state.mode === 'pin-labels' || state.mode === 'pin-both' || state.mode === 'ports') target = el?.querySelector('.port-edit-proxy');
+
+        if (this._editModeAbortController) {
+            this._editModeAbortController.abort();
+            this._editModeAbortController = null;
+        }
 
         if (target && this._editModeDown) {
             target.removeEventListener('mousedown', this._editModeDown);
@@ -1672,7 +1721,7 @@ const Sim = {
      */
     uiQuit() {
         this.modal('Quit', 'Discard current session and clear autosave before exiting?', 'danger', (discard) => {
-            if (discard) localStorage.removeItem('bsim_autosave');
+            if (discard) _getSimStorage().removeItem('bsim_autosave');
             window.close();
         });
     },
@@ -1903,9 +1952,9 @@ const Sim = {
         }
 
         this.updateWireVisuals();
-        this.activeEditingChip = null;
+        this.activeEditingChip = parent.activeEditingChip || null;
         const exitBtn = document.getElementById('btn-exit-chip');
-        if (exitBtn) exitBtn.style.display = 'none';
+        if (exitBtn) exitBtn.style.display = this.activeEditingChip ? 'inline' : 'none';
         this.updateLibraryUI();
         this.toast('Returned to parent workspace', 'info');
         this.seedQueue();

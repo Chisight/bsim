@@ -14,7 +14,11 @@ const History = {
         console.debug('[DEBUG] History.execute fired for command:', cmd.constructor.name, cmd);
         // Clear redo stack
         this.stack = this.stack.slice(0, this.index + 1);
-        cmd.do();
+        if (window.Sim && typeof Sim.mutateTopology === 'function') {
+            Sim.mutateTopology(() => { cmd.do(); });
+        } else {
+            cmd.do();
+        }
         this.stack.push(cmd);
         if (this.stack.length > this.max) this.stack.shift(); else this.index++;
         this.updateButtons();
@@ -26,7 +30,11 @@ const History = {
     undo() {
         if (this.index >= 0) {
             const cmd = this.stack[this.index];
-            cmd.undo();
+            if (window.Sim && typeof Sim.mutateTopology === 'function') {
+                Sim.mutateTopology(() => { cmd.undo(); });
+            } else {
+                cmd.undo();
+            }
             this.index--;
             this.updateButtons();
             Sim.autoSave();
@@ -40,7 +48,11 @@ const History = {
         if (this.index < this.stack.length - 1) {
             this.index++;
             const cmd = this.stack[this.index];
-            cmd.do();
+            if (window.Sim && typeof Sim.mutateTopology === 'function') {
+                Sim.mutateTopology(() => { cmd.do(); });
+            } else {
+                cmd.do();
+            }
             this.updateButtons();
             Sim.autoSave();
         } else {
@@ -93,12 +105,13 @@ class DeleteNodeCommand {
         this.attachedWires = [];
     }
     do() {
-        if (this.attachedWires.length === 0) {
-            this.attachedWires = Sim.wires.filter(w => w.from.nodeId === this.node.id || w.to.nodeId === this.node.id);
-        }
+        this.attachedWires = Sim.wires.filter(w => w.from.nodeId === this.node.id || w.to.nodeId === this.node.id);
         Sim.nodes = Sim.nodes.filter(n => n.id !== this.node.id);
         const el = document.getElementById(this.node.id);
         if (el) el.remove();
+        if (Sim._domCacheMap) {
+            Sim._domCacheMap.delete(this.node.id);
+        }
         
         Sim.wires = Sim.wires.filter(w => !this.attachedWires.includes(w));
         Sim.updateWireVisuals();

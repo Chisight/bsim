@@ -38,7 +38,8 @@ const Engine = {
         if (node.type.startsWith('IN-')) {
             if (Array.isArray(node.state)) {
                 let idx = parseInt(portId.replace('out', ''));
-                return node.state[idx];
+                if (isNaN(idx)) return 0;
+                return node.state[idx] !== undefined ? node.state[idx] : 0;
             }
             return node.state;
         }
@@ -90,11 +91,11 @@ const Engine = {
         return high ? 1 : 0;
     },
 
-    calculateNextState(sim, node) {
+    calculateNextState(sim, node, visited = new Set()) {
         // Helper: convert Hi-Z to 0 for gate logic (floating input = logic low)
         const g = (sig) => (sig === 'Z' || sig === 2) ? 0 : (sig ? 1 : 0);
 
-        if (node.type === 'JUNCTION') return this.getDrivingSignal(sim, node.id, 'j');
+        if (node.type === 'JUNCTION') return this.getDrivingSignal(sim, node.id, 'j', visited);
         if (node.type === '0') return 0;
         if (node.type.startsWith('IN-')) {
             return node.state !== undefined ? node.state : (node.val !== undefined ? node.val : 0);
@@ -159,7 +160,7 @@ const Engine = {
             if (!node.lastTick) node.lastTick = now;
             if (now - node.lastTick >= interval) {
                 node.state = node.state ? 0 : 1;
-                node.lastTick = now;
+                node.lastTick = node.lastTick + interval;
             }
             return node.state;
         }
@@ -194,10 +195,8 @@ const Engine = {
             const bits = parseInt(node.type.split('-')[1]) || 1;
             if (bits === 1) return g(this.getDrivingSignal(sim, node.id, 'in0'));
             const nextState = [];
-            const flip = window.Sim && window.Sim.flipPinLogic && (sim === window.Sim);
             for (let i = 0; i < bits; i++) {
-                const pinIdx = (bits > 1 && flip) ? (bits - 1 - i) : i;
-                nextState.push(g(this.getDrivingSignal(sim, node.id, `in${pinIdx}`)));
+                nextState.push(g(this.getDrivingSignal(sim, node.id, `in${i}`)));
             }
             return nextState;
         }

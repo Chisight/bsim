@@ -105,7 +105,7 @@ const UIOrchestrator = {
             const paddedArr = [...valArr];
             while (paddedArr.length < bits) paddedArr.push(0);
 
-            const val = paddedArr.reduce((acc, b, i) => acc | ((b === 1 ? 1 : 0) << i), 0);
+            const val = paddedArr.reduce((acc, b, i) => acc + (BigInt(b === 1 || b === true ? 1 : 0) * (1n << BigInt(i))), 0n);
             
             if (!sim._domCacheMap) sim._domCacheMap = new Map();
             let cache = sim._domCacheMap.get(n.id);

@@ -5,6 +5,7 @@
  * [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Entry trace for main application bootstrap.
  */
 window.onload = () => {
+    const storage = (window.location.search.includes('chip') || window.self !== window.top) ? sessionStorage : localStorage;
     // Inject marquee div if missing
     if (!document.getElementById('selection-marquee')) {
         const mq = document.createElement('div');
@@ -94,7 +95,7 @@ window.onload = () => {
         fetch(url)
             .then(res => res.json())
             .then(data => {
-                localStorage.setItem('bsim_autosave', JSON.stringify(data));
+                storage.setItem('bsim_autosave', JSON.stringify(data));
                 ProjectManager.loadAutoSave();
                 Sim.updateTabsUI();
                 Sim.updateLibraryUI();
@@ -182,7 +183,7 @@ window.onload = () => {
             }
 
             // Check 2: Upgraded Engine vs Existing Local Storage State
-            const storedVer = localStorage.getItem('bsim_state_version');
+            const storedVer = sessionStorage.getItem('bsim_state_version');
             if (!storedVer || storedVer !== window.LOADED_BSIM_VERSION) {
                 if (window.Sim && window.Sim.nodes && window.Sim.nodes.length > 0) isStale = true;
                 if (window.Sim && window.Sim.library && Object.keys(window.Sim.library).length > 0) isStale = true;
@@ -195,7 +196,7 @@ window.onload = () => {
                 document.body.appendChild(toast);
             }
 
-            localStorage.setItem('bsim_state_version', window.LOADED_BSIM_VERSION);
+            sessionStorage.setItem('bsim_state_version', window.LOADED_BSIM_VERSION);
         }, 2000); // Delayed execution to ensure workspace load completion
     });
 };
