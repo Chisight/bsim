@@ -146,6 +146,16 @@ const Sim = {
             if (Sim.nodes.some(n => n.type === 'CLOCK') || Sim.eventQueue.size > 0) requestAnimationFrame(runQueue); else running = false;
         };
 
+        // When the browser tab becomes visible again, clamp all clock lastTick values to now.
+        // Without this, performance.now() will have advanced while the tab was hidden, causing
+        // every CLOCK node to fire many accumulated ticks at once and flood the event queue.
+        document.addEventListener('visibilitychange', () => {
+            if (document.visibilityState === 'visible') {
+                const now = performance.now();
+                Sim.nodes.forEach(n => { if (n.type === 'CLOCK') n.lastTick = now; });
+            }
+        });
+
         UIOrchestrator.initHandlers(this);
 
         View.init();
@@ -352,7 +362,9 @@ const Sim = {
     /**
      */
     updateNodeVisual(n) {
-        delete n._portOffsets;
+        // NOTE: _portOffsets is intentionally NOT cleared here. It is only invalidated when
+        // a node moves (updateNodePosition) or is fully re-rendered (renderNode). Clearing it
+        // here caused a getBoundingClientRect reflow storm on every wire draw after any state change.
         const el = document.getElementById(n.id); if (!el) return;
 
         // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Apply saved geometric properties dynamically on visual update.
