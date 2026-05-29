@@ -25,7 +25,7 @@ class TestTerminalAndMacro(unittest.IsolatedAsyncioTestCase):
 
         # Force page reload bypassing cache to load updated engine.js
         await self.ws.send(json.dumps({"id": 99, "method": "Page.reload", "params": {"ignoreCache": True}}))
-        await asyncio.sleep(3.0)
+        await asyncio.sleep(5.0)
 
         # Clear environment to get a pristine start
         await self.eval_js("""

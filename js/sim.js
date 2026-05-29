@@ -772,6 +772,7 @@ const Sim = {
      */
     setEngine(type) {
         this.useWasm = (type === 'wasm');
+        this._netlistDirty = true;
         this.toast('Engine switched to ' + type.toUpperCase(), 'info');
         this.updateHUD();
     },

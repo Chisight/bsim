@@ -4,6 +4,9 @@ const WasmEngine = {
     worker: null,
     instance: null,
     memArray: null,
+    _tickReqId: 0,
+    SYNC_SLOT_REQ: 262100,
+    SYNC_SLOT_ACK: 262101,
     REGION_A_OFFSET: 0,
     // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Align JS bridge with expanded 1MB Wasm instruction boundary.
     REGION_B_OFFSET: 262144, // 1048576 bytes / 4 bytes per Int32
@@ -462,7 +465,7 @@ const WasmEngine = {
                         if (isInputProxy) {
                             // [AUDIT: v1.23.81 | SEC_ARCH_LEAD] - Prevent parent macro boundary jump to preserve deep hierarchical netlist recursion in Wasm compiler.
                             if (currPortId.startsWith('out')) trace(currNodeId, `in${num}`);
-                            else if (currPortId.startsWith('in')) trace(currNodeId, node.type === 'IN-1' ? 'out' : `out${num}`);
+                            else if (currPortId.startsWith('in')) trace(currNodeId, node.type === 'IN-1' ? 'out0' : `out${num}`);
                         } else {
                             if (currPortId.startsWith('in')) trace(currNodeId, `out${num}`);
                             else if (currPortId.startsWith('out')) trace(currNodeId, `in${num}`);
@@ -578,7 +581,7 @@ const WasmEngine = {
                     const num = currPortId.replace(/\D/g, '') || '0';
                     if (isInputProxy) {
                         if (currPortId.startsWith('out')) trace(currNodeId, `in${num}`);
-                        else if (currPortId.startsWith('in')) trace(currNodeId, node.type === 'IN-1' ? 'out' : `out${num}`);
+                        else if (currPortId.startsWith('in')) trace(currNodeId, node.type === 'IN-1' ? 'out0' : `out${num}`);
                     } else {
                         if (currPortId.startsWith('in')) trace(currNodeId, `out${num}`);
                         else if (currPortId.startsWith('out')) trace(currNodeId, `in${num}`);
@@ -981,8 +984,8 @@ const WasmEngine = {
 
                     if (isDriver) return { id: cId, port: cPort };
 
-                    // [AUDIT: v1.23.60 | SEC_ARCH_LEAD] - Handle junction and multi-bit proxy port unwinding.
-                    if (cNode.type.startsWith('IN-') || cNode.type.startsWith('OUT-') || cNode.type.startsWith('PROBE-') || cNode.type === 'JUNCTION') {
+                    const isInternalIO = (cNode.type.startsWith('IN-') || cNode.type.startsWith('OUT-') || cNode.type.startsWith('PROBE-')) && cId.includes(':');
+                    if (isInternalIO || cNode.type === 'JUNCTION') {
                         if (cNode.type === 'JUNCTION') {
                             const nxt = trace(cId, 'j');
                             if (nxt) return nxt;
@@ -994,7 +997,7 @@ const WasmEngine = {
                                     const nxt = trace(cId, `in${num}`);
                                     if (nxt) return nxt;
                                 } else if (cPort.startsWith('in')) {
-                                    const nxt = trace(cId, cNode.type === 'IN-1' ? 'out' : `out${num}`);
+                                    const nxt = trace(cId, cNode.type === 'IN-1' ? 'out0' : `out${num}`);
                                     if (nxt) return nxt;
                                 }
                             } else {
@@ -1098,6 +1101,32 @@ const WasmEngine = {
         console.table(map);
         console.groupEnd();
         return map;
+    },
+
+    triggerTickAndWait() {
+        if (!this.ready || !this.memArray) return;
+        
+        if (this.useWorker && this.worker) {
+            const req = ++this._tickReqId;
+            Atomics.store(this.memArray, this.SYNC_SLOT_REQ, req);
+            Atomics.notify(this.memArray, this.SYNC_SLOT_REQ, 1);
+            
+            // Spin-lock until worker acknowledges the tick (should take < 100 microseconds)
+            const start = performance.now();
+            while (Atomics.load(this.memArray, this.SYNC_SLOT_ACK) !== req) {
+                if (performance.now() - start > 100) {
+                    // Fallback to prevent freezing if worker crashed
+                    break;
+                }
+            }
+        } else {
+            const execDepth = Math.max(20, this.flatNodes.length);
+            for (let i = 0; i < execDepth; i++) {
+                this.executeTick(0);
+            }
+            this.executeTick(1);
+            this.executeTick(2);
+        }
     }
 };
 

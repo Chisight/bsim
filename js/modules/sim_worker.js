@@ -9,6 +9,11 @@ let running = false;
 let execDepth = 50;
 let loopTimeout = null;
 
+let memArray = null;
+let lastAck = 0;
+const SYNC_SLOT_REQ = 262100;
+const SYNC_SLOT_ACK = 262101;
+
 // Telemetry counters
 let tickCount = 0;
 let totalDuration = 0;
@@ -18,40 +23,49 @@ let lastReportTime = performance.now();
 // but simply looping with a small delay allows message processing.
 function runLoop() {
     loopTimeout = null;
-    if (!running || !wasmInstance || instructionCount === 0) {
+    if (!running || !wasmInstance || instructionCount === 0 || !memArray) {
+        if (running && instructionCount > 0) {
+            loopTimeout = setTimeout(runLoop, 0);
+        }
         return;
     }
     
-    const start = performance.now();
-    try {
-        // Execute one full logic evaluation pass
-        for (let i = 0; i < execDepth; i++) {
-            wasmInstance.exports.tick(instructionCount, 0);
+    const req = Atomics.load(memArray, SYNC_SLOT_REQ);
+    if (req !== lastAck) {
+        const start = performance.now();
+        try {
+            // Execute one full logic evaluation pass
+            for (let i = 0; i < execDepth; i++) {
+                wasmInstance.exports.tick(instructionCount, 0);
+            }
+            
+            // Sequential latches
+            wasmInstance.exports.tick(instructionCount, 1);
+            wasmInstance.exports.tick(instructionCount, 2);
+        } catch (e) {
+            // WASM trap (e.g. unreachable) — log and continue
+            console.error('[SimWorker] Runtime trap during tick():', e.message);
         }
-        
-        // Sequential latches
-        wasmInstance.exports.tick(instructionCount, 1);
-        wasmInstance.exports.tick(instructionCount, 2);
-    } catch (e) {
-        // WASM trap (e.g. unreachable) — log and continue
-        console.error('[SimWorker] Runtime trap during tick():', e.message);
-    }
-    const duration = performance.now() - start;
+        const duration = performance.now() - start;
 
-    tickCount++;
-    totalDuration += duration;
+        tickCount++;
+        totalDuration += duration;
 
-    const now = performance.now();
-    if (now - lastReportTime >= 1000) {
-        const avg = totalDuration / tickCount;
-        self.postMessage({
-            action: 'telemetry',
-            avgTickDuration: avg,
-            tickCount: tickCount
-        });
-        tickCount = 0;
-        totalDuration = 0;
-        lastReportTime = now;
+        Atomics.store(memArray, SYNC_SLOT_ACK, req);
+        lastAck = req;
+
+        const now = performance.now();
+        if (now - lastReportTime >= 1000) {
+            const avg = totalDuration / tickCount;
+            self.postMessage({
+                action: 'telemetry',
+                avgTickDuration: avg,
+                tickCount: tickCount
+            });
+            tickCount = 0;
+            totalDuration = 0;
+            lastReportTime = now;
+        }
     }
 
     // Yield back to the event loop so postMessage can be processed
@@ -76,6 +90,8 @@ self.onmessage = async (e) => {
             
             const { instance } = await WebAssembly.instantiate(wasmBytes, { env });
             wasmInstance = instance;
+            memArray = new Int32Array(memory.buffer);
+            lastAck = Atomics.load(memArray, SYNC_SLOT_ACK);
             
             self.postMessage({ action: 'ready' });
         } catch (err) {

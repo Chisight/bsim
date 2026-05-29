@@ -29,20 +29,15 @@ const Engine = {
         return true;
     },
 
-    getSignal(sim, nodeId, portId) {
+    getSignal(sim, nodeId, portId, visited = new Set()) {
         const node = sim._nodeMap ? sim._nodeMap.get(nodeId) : sim.nodes.find(n => n.id === nodeId);
         if (!node) return 'Z';
         if (node.type === 'JUNCTION') {
-            return this.getDrivingSignal(sim, nodeId, portId);
+            return this.getDrivingSignal(sim, nodeId, portId, visited);
         }
         if (node.type.startsWith('IN-')) {
             if (Array.isArray(node.state)) {
                 let idx = parseInt(portId.replace('out', ''));
-                const bits = node.state.length;
-                const flip = window.Sim && window.Sim.flipPinLogic;
-                if (bits > 1 && flip) {
-                    idx = bits - 1 - idx;
-                }
                 return node.state[idx];
             }
             return node.state;
@@ -171,25 +166,35 @@ const Engine = {
         if (node.type === 'RAM') {
             const aBits = node.addressPins || 4;
             const addr = [];
-            for (let i = 0; i < aBits; i++) addr.push(g(this.getDrivingSignal(sim, node.id, `in${i}`)));
+            const flip = window.Sim && window.Sim.flipPinLogic;
+            for (let i = 0; i < aBits; i++) {
+                const pinIdx = flip ? (aBits - 1 - i) : i;
+                addr.push(g(this.getDrivingSignal(sim, node.id, `in${pinIdx}`)));
+            }
             const addrVal = addr.reduce((acc, b, i) => acc | (b << i), 0);
             const we = g(this.getDrivingSignal(sim, node.id, 'we'));
             if (we === 1) {
                 if (!node.memoryData) node.memoryData = new Array(Math.pow(2, aBits)).fill(0);
                 const din = [];
-                for (let i = 0; i < 8; i++) din.push(g(this.getDrivingSignal(sim, node.id, `din${i}`)));
+                for (let i = 0; i < 8; i++) {
+                    const pinIdx = flip ? (8 - 1 - i) : i;
+                    din.push(g(this.getDrivingSignal(sim, node.id, `din${pinIdx}`)));
+                }
                 node.memoryData[addrVal] = din.reduce((acc, b, i) => acc | (b << i), 0);
             }
             const outVal = (node.memoryData && node.memoryData[addrVal] !== undefined) ? node.memoryData[addrVal] : 0;
             const res = {};
-            for (let i = 0; i < 8; i++) res[`out${i}`] = (outVal & (1 << i)) ? 1 : 0;
+            for (let i = 0; i < 8; i++) {
+                const pinIdx = flip ? (8 - 1 - i) : i;
+                res[`out${pinIdx}`] = (outVal & (1 << i)) ? 1 : 0;
+            }
             return res;
         }
         if (node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
             const bits = parseInt(node.type.split('-')[1]) || 1;
             if (bits === 1) return g(this.getDrivingSignal(sim, node.id, 'in0'));
             const nextState = [];
-            const flip = window.Sim && window.Sim.flipPinLogic;
+            const flip = window.Sim && window.Sim.flipPinLogic && (sim === window.Sim);
             for (let i = 0; i < bits; i++) {
                 const pinIdx = (bits > 1 && flip) ? (bits - 1 - i) : i;
                 nextState.push(g(this.getDrivingSignal(sim, node.id, `in${pinIdx}`)));
@@ -257,13 +262,17 @@ const Engine = {
         if (!chipDef) return {};
 
         const subSim = {
-            nodes: chipDef.nodes.map(n => ({ ...n })),
+            nodes: chipDef.nodes.map(n => {
+                const clone = JSON.parse(JSON.stringify(n));
+                clone._forcePropagate = true;
+                return clone;
+            }),
             wires: chipDef.wires,
             library: sim.library,
             eventQueue: new Set()
         };
 
-        // Restore persisted state for stateful inner nodes (DFF, TFF, custom sub-chips)
+        // Restore persisted state for stateful inner nodes (DFF, TFF, RAM, custom sub-chips)
         // so that registers accumulate state correctly across V8 engine invocations.
         if (outerNode) {
             if (!outerNode._internalState) outerNode._internalState = {};
@@ -273,6 +282,8 @@ const Engine = {
                     if (cached.val !== undefined) n.val = typeof cached.val === 'object' ? JSON.parse(JSON.stringify(cached.val)) : cached.val;
                     if (cached.state !== undefined) n.state = typeof cached.state === 'object' ? JSON.parse(JSON.stringify(cached.state)) : cached.state;
                     if (cached._lastClk !== undefined) n._lastClk = cached._lastClk;
+                    if (cached.memoryData !== undefined) n.memoryData = JSON.parse(JSON.stringify(cached.memoryData));
+                    if (cached._internalState !== undefined) n._internalState = JSON.parse(JSON.stringify(cached._internalState));
                 }
             });
         }
@@ -290,13 +301,13 @@ const Engine = {
         // Persist stateful node outputs back into the outer node's cache
         if (outerNode) {
             subSim.nodes.forEach(n => {
-                if (n.type === 'DFF' || n.type === 'TFF' || n.isCustom) {
-                    outerNode._internalState[n.id] = {
-                        val: typeof n.val === 'object' && n.val !== null ? JSON.parse(JSON.stringify(n.val)) : n.val,
-                        state: typeof n.state === 'object' && n.state !== null ? JSON.parse(JSON.stringify(n.state)) : n.state,
-                        _lastClk: n._lastClk
-                    };
-                }
+                outerNode._internalState[n.id] = {
+                    val: typeof n.val === 'object' && n.val !== null ? JSON.parse(JSON.stringify(n.val)) : n.val,
+                    state: typeof n.state === 'object' && n.state !== null ? JSON.parse(JSON.stringify(n.state)) : n.state,
+                    _lastClk: n._lastClk,
+                    memoryData: n.memoryData ? JSON.parse(JSON.stringify(n.memoryData)) : undefined,
+                    _internalState: n._internalState ? JSON.parse(JSON.stringify(n._internalState)) : undefined
+                };
             });
         }
 
@@ -363,13 +374,7 @@ const Engine = {
                     WasmEngine.writeState(n.id, n.state);
                 });
 
-                if (!WasmEngine.useWorker) {
-                    for (let i = 0; i < execDepth; i++) {
-                        WasmEngine.executeTick(0);
-                    }
-                    WasmEngine.executeTick(1);
-                    WasmEngine.executeTick(2);
-                }
+                WasmEngine.triggerTickAndWait();
 
                 sim.nodes.forEach(n => {
                     const NATIVE_GATES = new Set(['NAND', 'CLOCK', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'TRISTATE']);
@@ -568,7 +573,8 @@ const Engine = {
                     let visitedJuncs = new Set();
                     const traceDriven = (nid, depth = 0) => {
                         if (depth > 100) return;
-                        sim.wires.forEach(w => {
+                        const adj = sim._wireMap ? (sim._wireMap.get(nid) || []) : sim.wires.filter(w => w.from.nodeId === nid || w.to.nodeId === nid);
+                        adj.forEach(w => {
                             if (w.from.nodeId === nid) {
                                 const ds = sim._nodeMap ? sim._nodeMap.get(w.to.nodeId) : sim.nodes.find(n => n.id === w.to.nodeId);
                                 if (ds) {

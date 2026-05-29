@@ -71,7 +71,7 @@ class TestEngineParity(unittest.IsolatedAsyncioTestCase):
         
         # Reload page bypassing cache to initialize fresh
         await self.ws.send(json.dumps({"id": 200, "method": "Page.reload", "params": {"ignoreCache": True}}))
-        await asyncio.sleep(3.0)
+        await asyncio.sleep(5.0)
 
         # Locate nodes
         nodes = await self.eval_js("window.Sim.nodes.map(n => ({id: n.id, label: n.label, type: n.type}))")
@@ -103,8 +103,10 @@ class TestEngineParity(unittest.IsolatedAsyncioTestCase):
 
         # --- V8 Fallback Simulation Run ---
         # Reload to ensure identical clean starting states
+        # Re-write the clean layout to localStorage before reloading!
+        await self.eval_js(f"localStorage.setItem('bsim_autosave', {escaped_project})")
         await self.ws.send(json.dumps({"id": 201, "method": "Page.reload", "params": {"ignoreCache": True}}))
-        await asyncio.sleep(3.0)
+        await asyncio.sleep(5.0)
         
         await self.eval_js("window.Sim.setEngine('v8')")
         await self.eval_js("window.Sim.flipPinLogic = true")
