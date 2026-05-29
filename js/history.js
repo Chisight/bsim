@@ -102,10 +102,9 @@ class DeleteNodeCommand {
     constructor(node) {
         this.node = node;
         // [AUDIT: v1.24.82 | SEC_ARCH_LEAD] - Captured adjacent topological edges to prevent mathematically orphaned wires post-deletion.
-        this.attachedWires = [];
+        this.attachedWires = window.Sim && Sim.wires ? Sim.wires.filter(w => w.from.nodeId === this.node.id || w.to.nodeId === this.node.id) : [];
     }
     do() {
-        this.attachedWires = Sim.wires.filter(w => w.from.nodeId === this.node.id || w.to.nodeId === this.node.id);
         Sim.nodes = Sim.nodes.filter(n => n.id !== this.node.id);
         const el = document.getElementById(this.node.id);
         if (el) el.remove();
@@ -221,7 +220,11 @@ class PasteCommand {
     undo() {
         const ids = new Set(this.nodes.map(n => n.id));
         Sim.nodes = Sim.nodes.filter(n => !ids.has(n.id));
-        Sim.wires = Sim.wires.filter(w => !ids.has(w.from.nodeId) && !ids.has(w.to.nodeId));
+        
+        // Targeted wire deletion: only delete wires that were actually pasted
+        const pastedWiresSet = new Set(this.wires);
+        Sim.wires = Sim.wires.filter(w => !pastedWiresSet.has(w));
+        
         this.nodes.forEach(n => {
             const el = document.getElementById(n.id);
             if (el) el.remove();
@@ -246,9 +249,39 @@ class SplitWireCommand {
         this.jId = 'node-' + Math.random().toString(36).substr(2, 9);
         this.newWire = { from: { nodeId: this.jId, portId: 'j' }, to: { ...wire.to } };
         this.oldTo = { ...wire.to };
+        
+        // Resolve the wire's bit width dynamically to prevent bus collapses
+        let bits = 1;
+        if (window.Sim && Sim.nodes) {
+            const srcNode = Sim.nodes.find(n => n.id === wire.from.nodeId);
+            if (srcNode) {
+                const getWidth = (node, portId) => {
+                    if (node.type.includes('-')) return parseInt(node.type.split('-')[1]) || 1;
+                    if (node.isCustom && Sim.library && Sim.library[node.type]) {
+                        const lib = Sim.library[node.type];
+                        const isIn = portId.startsWith('in');
+                        const ioNodes = (lib.nodes || []).filter(x => x.type.startsWith(isIn ? 'IN-' : 'OUT-') || (isIn && x.type.startsWith('PROBE-')));
+                        ioNodes.sort((a, b) => a.y - b.y);
+                        
+                        let bitIdx = 0;
+                        for (const io of ioNodes) {
+                            const ioBits = parseInt(io.type.split('-')[1]) || 1;
+                            const bPref = isIn ? 'in' : 'out';
+                            if (portId === `${bPref}${bitIdx}`) return ioBits;
+                            bitIdx += ioBits;
+                        }
+                    }
+                    return 1;
+                };
+                bits = getWidth(srcNode, wire.from.portId);
+            }
+        }
+        this.bits = bits;
     }
     do() {
-        const junction = { id: this.jId, type: 'JUNCTION', x: this.clickX, y: this.clickY, label: 'JUNCTION', val: 0, state: 0, outputs: {}, lastClk: 0 };
+        const val = this.bits > 1 ? new Array(this.bits).fill(0) : 0;
+        const state = this.bits > 1 ? new Array(this.bits).fill(0) : 0;
+        const junction = { id: this.jId, type: 'JUNCTION', x: this.clickX, y: this.clickY, label: 'JUNCTION', val: val, state: state, outputs: {}, lastClk: 0 };
         Sim.nodes.push(junction);
         if (typeof NodeRenderer !== 'undefined') NodeRenderer.renderNode(junction);
         
