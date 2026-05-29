@@ -79,8 +79,6 @@ const View = {
         const gs = 20 * this.scale;
         document.getElementById('grid-layer').style.backgroundPosition = `${this.x}px ${this.y}px`;
         document.getElementById('grid-layer').style.backgroundSize = `${gs}px ${gs}px`;
-        // Force wire recalculation on view matrix change
-        if (window.Sim) Sim.updateWireVisuals();
     }
 };
 
