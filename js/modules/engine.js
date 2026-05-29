@@ -6,13 +6,19 @@ const Engine = {
     // KERNEL set for purity validation
     KERNEL: new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'RAM', '0']),
 
+    _isPureNativeCache: null,
+    invalidatePurityCache() {
+        this._isPureNativeCache = null;
+    },
     isPureNative(nodes, library) {
+        if (this._isPureNativeCache !== null) return this._isPureNativeCache;
         const checkPure = (nodes) => nodes.every(n => {
             if (this.KERNEL.has(n.type)) return true;
             if (library && library[n.type]) return checkPure(library[n.type].nodes);
             return false;
         });
-        return checkPure(nodes);
+        this._isPureNativeCache = checkPure(nodes || []);
+        return this._isPureNativeCache;
     },
 
     fastEqual(a, b) {
