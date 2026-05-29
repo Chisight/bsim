@@ -38,7 +38,7 @@ const InteractionHandler = {
                 wires: cWires,
                 library: cLib,
                 meta: {
-                    version: (window.LOADED_BSIM_VERSION || "1.27.27") + "-Modular",
+                    version: (window.LOADED_BSIM_VERSION || "1.27.28") + "-Modular",
                     exportedAt: new Date().toISOString(),
                     type: "dbsim_snapshot",
                     activeTabId: Sim.activeTabId,
@@ -562,12 +562,6 @@ const InteractionHandler = {
                 lbl.innerText = node.label;
                 lbl.style.pointerEvents = '';
                 if (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-') || node.type === 'RAM') {
-                    if (typeof NodeRenderer !== 'undefined') {
-                        // Remove the existing element first to avoid duplicate stale ghost elements
-                        const existing = document.getElementById(node.id);
-                        if (existing) existing.remove();
-                        NodeRenderer.renderNode(node);
-                    }
                     Sim.updateWireVisuals();
                 }
                 Sim.autoSave();
