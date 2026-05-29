@@ -808,7 +808,7 @@ const DebugTerminal = {
                 }
                 
                 // Generic Help output
-                this.print("[SYSTEM] ARCHITECTURAL PRIMITIVES (v1.27.24):", "sys");
+                this.print("[SYSTEM] ARCHITECTURAL PRIMITIVES (v1.27.25):", "sys");
                 this.print("  - help [command] : Show this overview or specific detailed command manual.", "sys");
                 this.print("  - tick <n> [p]   : Advance simulation. Phase: 0=Settle, 1=Latch, 2=Commit.", "sys");
                 this.print("  - trace <id>     : Trace signal paths to identify zero-delay loops.", "sys");

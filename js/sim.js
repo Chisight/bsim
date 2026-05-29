@@ -1,6 +1,6 @@
 /**
  * Browser-Sim Core Engine
- * Version: 1.27.24
+ * Version: 1.27.25
  */
 const _getSimStorage = () => (window.location.search.includes('chip') || window.self !== window.top) ? sessionStorage : localStorage;
 
@@ -94,6 +94,9 @@ const Sim = {
             mutationFn();
         } finally {
             this._topologyLock = false;
+            if (window.Engine && typeof Engine.invalidatePurityCache === 'function') {
+                Engine.invalidatePurityCache();
+            }
         }
     },
 
