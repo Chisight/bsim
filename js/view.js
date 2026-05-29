@@ -75,6 +75,7 @@ const View = {
         document.getElementById('scene').style.transform = transformStr;
         document.getElementById('svg-layer').style.transform = transformStr;
         document.getElementById('grid-layer').style.transform = transformStr;
+        if (window.WireRenderer) WireRenderer.drawWires(true);
     }
 };
 

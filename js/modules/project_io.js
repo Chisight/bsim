@@ -97,7 +97,7 @@ const ProjectManager = {
             let fileVerStr = data.meta?.version;
             if (!fileVerStr) {
                 const epoch = this.detectEpoch(data);
-                fileVerStr = epoch === "modern" ? (window.LOADED_BSIM_VERSION || "1.27.29") : "1.0.0";
+                fileVerStr = epoch === "modern" ? (window.LOADED_BSIM_VERSION || "1.27.30") : "1.0.0";
                 console.log(`[Migration] Missing version metadata. Detected epoch: ${epoch}. Assigning virtual version: ${fileVerStr}`);
             }
             const fileVer = this.parseVer(fileVerStr);
@@ -604,7 +604,7 @@ const ProjectManager = {
                         tabs: safeTabs, activeTabId: Sim.activeTabId,
                         deletedChips: Array.from(deletedChips),
                         prefs: { snapNodes: Sim.snapNodes, snapWires: Sim.snapWires, confirmDelete: Sim.confirmDelete, showStats: Sim.showStats, showTooltips: Sim.showTooltips, tutorialMode: Sim.tutorialMode, hudPos: Sim.hudPos, toastPos: Sim.toastPos, disableAnimations: Sim.disableAnimations, portSize: Sim.portSize, dotSize: Sim.dotSize, junctionSize: Sim.junctionSize, uiScale: Sim.uiScale, flipPinLogic: Sim.flipPinLogic, debugMode: Sim.debugMode, polarity: Sim.polarity || {} },
-                        meta: { version: (window.LOADED_BSIM_VERSION || "1.27.29") + "-Modular", exportedAt: new Date().toISOString() }
+                        meta: { version: (window.LOADED_BSIM_VERSION || "1.27.30") + "-Modular", exportedAt: new Date().toISOString() }
                     };
                     _getProjectStorage().setItem('bsim_autosave', JSON.stringify(project));
                 };

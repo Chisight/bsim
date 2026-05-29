@@ -7,6 +7,32 @@ const InteractionHandler = {
     activeContextX: null,
     activeContextY: null,
     customChipsList: [],
+    hoveredWireIndex: -1,
+    selectedWire: null,
+
+    _getDistanceToSegment(px, py, x1, y1, x2, y2) {
+        if (x1 === x2) {
+            const minY = Math.min(y1, y2);
+            const maxY = Math.max(y1, y2);
+            if (py >= minY && py <= maxY) {
+                return Math.abs(px - x1);
+            } else if (py < minY) {
+                return Math.hypot(px - x1, py - minY);
+            } else {
+                return Math.hypot(px - x1, py - maxY);
+            }
+        } else {
+            const minX = Math.min(x1, x2);
+            const maxX = Math.max(x1, x2);
+            if (px >= minX && px <= maxX) {
+                return Math.abs(py - y1);
+            } else if (px < minX) {
+                return Math.hypot(px - minX, py - y1);
+            } else {
+                return Math.hypot(px - maxX, py - y1);
+            }
+        }
+    },
 
     saveDbsimSnapshot() {
         const menu = document.getElementById('context-menu');
@@ -38,7 +64,7 @@ const InteractionHandler = {
                 wires: cWires,
                 library: cLib,
                 meta: {
-                    version: (window.LOADED_BSIM_VERSION || "1.27.29") + "-Modular",
+                    version: (window.LOADED_BSIM_VERSION || "1.27.30") + "-Modular",
                     exportedAt: new Date().toISOString(),
                     type: "dbsim_snapshot",
                     activeTabId: Sim.activeTabId,
@@ -917,19 +943,43 @@ const InteractionHandler = {
         });
 
         ws.addEventListener('mousedown', (e) => {
-            // 1. Delegated Wire Interception
-            let wireTarget = e.target;
-            if (!Sim.wiring.active && wireTarget && wireTarget.hasAttribute && wireTarget.hasAttribute('data-wire-index')) {
-                const wireIdx = parseInt(wireTarget.getAttribute('data-wire-index'));
-                if (!isNaN(wireIdx)) {
-                    const w = Sim.wires[wireIdx];
-                    if (w && window.InteractionHandler) {
-                        const pw1 = Sim.getPortCoords(w.from.nodeId, w.from.portId);
-                        const pw2 = Sim.getPortCoords(w.to.nodeId, w.to.portId);
-                        if (pw1 && pw2) {
-                            InteractionHandler.handleWireInteraction(e, w, pw1, pw2);
-                            return; 
+            // 1. Canvas Wire Interception (Default)
+            if (!Sim.wiring.active && window.InteractionHandler) {
+                const wr = ws.getBoundingClientRect();
+                const mouseX = (e.clientX - wr.left - View.x) / View.scale;
+                const mouseY = (e.clientY - wr.top - View.y) / View.scale;
+
+                let hitWireIdx = -1;
+                let minDistance = 9; // 9 pixel tolerance in scene space
+
+                if (Sim.wires) {
+                    for (let i = 0; i < Sim.wires.length; i++) {
+                        const w = Sim.wires[i];
+                        if (!w._segments) continue;
+                        for (const seg of w._segments) {
+                            const dist = InteractionHandler._getDistanceToSegment(mouseX, mouseY, seg.x1, seg.y1, seg.x2, seg.y2);
+                            if (dist < minDistance) {
+                                minDistance = dist;
+                                hitWireIdx = i;
+                            }
                         }
+                    }
+                }
+
+                if (hitWireIdx !== -1) {
+                    const w = Sim.wires[hitWireIdx];
+                    const pw1 = Sim.getPortCoords(w.from.nodeId, w.from.portId);
+                    const pw2 = Sim.getPortCoords(w.to.nodeId, w.to.portId);
+                    if (pw1 && pw2) {
+                        InteractionHandler.selectedWire = w;
+                        InteractionHandler.handleWireInteraction(e, w, pw1, pw2);
+                        if (window.WireRenderer) WireRenderer.drawWires();
+                        return;
+                    }
+                } else {
+                    if (InteractionHandler.selectedWire) {
+                        InteractionHandler.selectedWire = null;
+                        if (window.WireRenderer) WireRenderer.drawWires();
                     }
                 }
             }
@@ -1106,6 +1156,41 @@ const InteractionHandler = {
                 if (state.isVertical) state.wire.midY = val; else state.wire.midX = val;
                 WireRenderer.drawWires();
                 return;
+            }
+
+            // 3. Canvas Wire Hover Hit-Testing
+            if (!Sim.wiring.active && !Sim._activeWireDrag && !Sim._pinDrag && !isDragging && !Sim._isDraggingPan) {
+                const wr = ws.getBoundingClientRect();
+                const mouseX = (e.clientX - wr.left - View.x) / View.scale;
+                const mouseY = (e.clientY - wr.top - View.y) / View.scale;
+                
+                let hoverIdx = -1;
+                let minDistance = 9; // 9 pixel tolerance in scene space
+                
+                if (Sim.wires) {
+                    for (let i = 0; i < Sim.wires.length; i++) {
+                        const w = Sim.wires[i];
+                        if (!w._segments) continue;
+                        for (const seg of w._segments) {
+                            const dist = InteractionHandler._getDistanceToSegment(mouseX, mouseY, seg.x1, seg.y1, seg.x2, seg.y2);
+                            if (dist < minDistance) {
+                                minDistance = dist;
+                                hoverIdx = i;
+                            }
+                        }
+                    }
+                }
+
+                if (InteractionHandler.hoveredWireIndex !== hoverIdx) {
+                    InteractionHandler.hoveredWireIndex = hoverIdx;
+                    if (window.WireRenderer) WireRenderer.drawWires();
+                }
+
+                if (hoverIdx !== -1) {
+                    ws.style.cursor = 'move';
+                } else if (ws.style.cursor === 'move') {
+                    ws.style.cursor = 'default';
+                }
             }
 
             if (!isDragging) return;

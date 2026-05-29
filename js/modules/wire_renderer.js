@@ -48,22 +48,7 @@ const WireRenderer = {
      * Prevents expensive full-schematic redraws by updating only connected wires.
      */
     drawWiresSelective(dragNodeIds) {
-        const svg = document.getElementById('svg-layer');
-        if (!svg) return;
-
-        const dragNodeSet = new Set(dragNodeIds);
-
-        Sim.wires.forEach((w) => {
-            if (dragNodeSet.has(w.from.nodeId) || dragNodeSet.has(w.to.nodeId)) {
-                const p1 = Sim.getPortCoords(w.from.nodeId, w.from.portId);
-                const p2 = Sim.getPortCoords(w.to.nodeId, w.to.portId);
-                if (p1 && p2 && w._domBg && w._domPath) {
-                    const d = this._calculateSmartPath(p1, p2, w.from.nodeId, w.to.nodeId, w);
-                    w._domBg.setAttribute('d', d);
-                    w._domPath.setAttribute('d', d);
-                }
-            }
-        });
+        this.drawWires(true);
     },
 
     /**
@@ -71,54 +56,46 @@ const WireRenderer = {
      * Achieves 0ms drawing feedback latency during connection drags.
      */
     drawWirePreview() {
-        const svg = document.getElementById('svg-layer');
-        if (!svg || !Sim.wiring.active) return;
-
-        const p1 = Sim.getPortCoords(Sim.wiring.start.nodeId, Sim.wiring.start.portId);
-        const p2Snap = Sim.wiring.snapTarget ? Sim.getPortCoords(Sim.wiring.snapTarget.nodeId, Sim.wiring.snapTarget.portId) : null;
-        
-        const scene = document.getElementById('scene');
-        const sr = scene ? scene.getBoundingClientRect() : { left: 0, top: 0 };
-        const sceneMouseX = (Sim.wiring.mouseX - sr.left) / View.scale;
-        const sceneMouseY = (Sim.wiring.mouseY - sr.top) / View.scale;
-        const p2 = p2Snap || { x: sceneMouseX, y: sceneMouseY };
-
-        if (p1 && p2) {
-            const d = this._calculateSmartPath(p1, p2, Sim.wiring.start.nodeId, Sim.wiring.snapTarget?.nodeId, null);
-
-            if (!this._domPreviewPath || !svg.contains(this._domPreviewPath)) {
-                this.drawWires(true);
-                return;
-            }
-
-            this._domPreviewPath.setAttribute('d', d);
-            this._domPreviewPath.setAttribute('stroke', Sim.wiring.snapTarget ? 'var(--wire-on)' : '#ffffff44');
-        }
+        this.drawWires(true);
     },
 
     _actualDrawWires() {
-        if (!Sim.wiring.active) {
+        const canvas = document.getElementById('canvas-layer');
+        if (!canvas) return;
+        const workspace = document.getElementById('workspace');
+        if (!workspace) return;
+
+        // Clear legacy SVG layer if populated
+        const svg = document.getElementById('svg-layer');
+        if (svg && svg.children.length > 0) {
+            svg.innerHTML = '';
+            this._pool = [];
             this._domPreviewPath = null;
         }
 
-        const svg = document.getElementById('svg-layer');
-        if (!svg) {
-            return;
-        }
-        
-        // Clear crossing masks from previous render
-        const oldMasks = svg.querySelectorAll('.wire-mask');
-        oldMasks.forEach(m => m.remove());
+        // Resize canvas to match actual viewport dimensions in device pixels
+        const rect = workspace.getBoundingClientRect();
+        const dpr = window.devicePixelRatio || 1;
+        const targetWidth = Math.floor(rect.width);
+        const targetHeight = Math.floor(rect.height);
 
-        if (this._pool.length === 0 || svg.children.length === 0) {
-            this._pool = Array.from(svg.children);
+        if (canvas.width !== Math.floor(targetWidth * dpr) || canvas.height !== Math.floor(targetHeight * dpr)) {
+            canvas.width = Math.floor(targetWidth * dpr);
+            canvas.height = Math.floor(targetHeight * dpr);
+            canvas.style.width = targetWidth + 'px';
+            canvas.style.height = targetHeight + 'px';
         }
 
-        let domIndex = 0;
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // Apply viewport scale and translation
+        ctx.save();
+        ctx.setTransform(View.scale * dpr, 0, 0, View.scale * dpr, View.x * dpr, View.y * dpr);
 
         const isPureNative = Sim.isPureNative();
-
-        // Build transient Wire Adjacency Map for O(1) getDrivingSignal lookups during this render pass
+        
+        // Build transient Wire Adjacency Map for O(1) getDrivingSignal lookups
         Sim._wireMap = new Map();
         Sim.wires.forEach(w => {
             if (!Sim._wireMap.has(w.from.nodeId)) Sim._wireMap.set(w.from.nodeId, []);
@@ -129,12 +106,12 @@ const WireRenderer = {
             }
         });
 
+        // 1. Draw Wires
         Sim.wires.forEach((w, i) => {
             const p1 = Sim.getPortCoords(w.from.nodeId, w.from.portId);
             const p2 = Sim.getPortCoords(w.to.nodeId, w.to.portId);
             if (p1 && p2) {
                 let sig = null;
-
                 if (Sim.useWasm && isPureNative && window.WasmEngine && WasmEngine.ready && WasmEngine.wireIdxMap) {
                     sig = WasmEngine.readWireState(i);
                 }
@@ -144,36 +121,105 @@ const WireRenderer = {
                         sig = Sim.getSignal(w.from.nodeId, w.from.portId);
                     }
                 }
-                domIndex = this._drawOrtho(svg, p1, p2, false, sig, i, domIndex);
+
+                // Parse signal state
+                let val = (sig === true) ? 1 : (sig === false ? 0 : sig);
+                if (val === 'Z') val = 2;
+                if (val === 'E') val = 3;
+                if (Array.isArray(sig)) {
+                    if (sig.some(v => v === 3 || v === 'E')) val = 3;
+                    else if (sig.some(v => v === 1 || v === true)) val = 1;
+                    else if (sig.every(v => v === 2 || v === 'Z')) val = 2;
+                    else val = 0;
+                }
+
+                const d = this._calculateSmartPath(p1, p2, w.from.nodeId, w.to.nodeId, w);
+                
+                // Draw path on canvas
+                ctx.beginPath();
+                w._segments = this._drawSvgPathOnCanvasContext(ctx, d);
+
+                // Set style
+                let strokeColor = '#ff3838'; // var(--wire-off) default
+                if (val === 1) strokeColor = '#1db954'; // var(--wire-on)
+                else if (val === 2) strokeColor = '#ffff00'; // highz
+                else if (val === 3) strokeColor = '#ff3333'; // contention
+
+                ctx.strokeStyle = strokeColor;
+                ctx.lineWidth = Array.isArray(sig) ? 4 : 2;
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                ctx.stroke();
+
+                // Highlight hovered or selected wires!
+                const isHovered = (window.InteractionHandler && InteractionHandler.hoveredWireIndex === i);
+                const isSelected = (window.InteractionHandler && InteractionHandler.selectedWire === w);
+                if (isHovered || isSelected) {
+                    ctx.strokeStyle = '#ffffffaa';
+                    ctx.lineWidth = (Array.isArray(sig) ? 4 : 2) + 2;
+                    ctx.stroke();
+                }
             }
         });
 
-        // Clean up transient Wire Adjacency Map after render pass
-        delete Sim._wireMap;
-
+        // 2. Draw wiring preview (if active)
         if (Sim.wiring.active) {
             const p1 = Sim.getPortCoords(Sim.wiring.start.nodeId, Sim.wiring.start.portId);
             const p2Snap = Sim.wiring.snapTarget ? Sim.getPortCoords(Sim.wiring.snapTarget.nodeId, Sim.wiring.snapTarget.portId) : null;
+            
             const scene = document.getElementById('scene');
             const sr = scene ? scene.getBoundingClientRect() : { left: 0, top: 0 };
             const sceneMouseX = (Sim.wiring.mouseX - sr.left) / View.scale;
             const sceneMouseY = (Sim.wiring.mouseY - sr.top) / View.scale;
             const p2 = p2Snap || { x: sceneMouseX, y: sceneMouseY };
-            
+
             if (p1 && p2) {
-                domIndex = this._drawOrtho(svg, p1, p2, true, null, -1, domIndex);
+                const d = this._calculateSmartPath(p1, p2, Sim.wiring.start.nodeId, Sim.wiring.snapTarget?.nodeId, null);
+                ctx.beginPath();
+                this._drawSvgPathOnCanvasContext(ctx, d);
+                ctx.strokeStyle = Sim.wiring.snapTarget ? '#1db954' : '#ffffff44';
+                ctx.lineWidth = 2;
+                ctx.setLineDash([4, 4]);
+                ctx.stroke();
+                ctx.setLineDash([]);
             }
         }
 
-        for (let i = domIndex; i < this._pool.length; i++) {
-            this._pool[i].setAttribute('d', '');
-            this._pool[i].removeAttribute('data-wire-index');
-            this._pool[i].style.pointerEvents = 'none';
-            this._pool[i].onmousedown = null;
-        }
+        ctx.restore();
+        delete Sim._wireMap;
+    },
 
-        // [AUDIT: v1.24.13 | SEC_ARCH_LEAD] - Disabled geometric wire crossing masks per user preference.
-        // this._renderCrossingMasks(svg);
+    _drawSvgPathOnCanvasContext(ctx, pathStr) {
+        const cmds = pathStr.match(/[MHVL][^MHVL]*/g);
+        if (!cmds) return [];
+        let curX = 0, curY = 0;
+        const segments = [];
+        cmds.forEach(cmd => {
+            const type = cmd[0];
+            const args = cmd.slice(1).trim().split(/[\s,]+/).map(parseFloat);
+            let nx = curX;
+            let ny = curY;
+            if (type === 'M') {
+                curX = args[0]; curY = args[1];
+                ctx.moveTo(curX, curY);
+            } else if (type === 'L') {
+                nx = args[0]; ny = args[1];
+                ctx.lineTo(nx, ny);
+                segments.push({ x1: curX, y1: curY, x2: nx, y2: ny });
+                curX = nx; curY = ny;
+            } else if (type === 'H') {
+                nx = args[0];
+                ctx.lineTo(nx, curY);
+                segments.push({ x1: curX, y1: curY, x2: nx, y2: curY });
+                curX = nx;
+            } else if (type === 'V') {
+                ny = args[0];
+                ctx.lineTo(curX, ny);
+                segments.push({ x1: curX, y1: curY, x2: curX, y2: ny });
+                curY = ny;
+            }
+        });
+        return segments;
     },
 
     /**

@@ -38,13 +38,10 @@ const Engine = {
     getSignal(sim, nodeId, portId, visited = new Set()) {
         const node = sim._nodeMap ? sim._nodeMap.get(nodeId) : sim.nodes.find(n => n.id === nodeId);
         if (!node) {
-            console.log(`[DEBUG_GET_SIGNAL] Node ${nodeId} not found, returning Z`);
             return 'Z';
         }
         if (node.type === 'JUNCTION') {
-            const res = this.getDrivingSignal(sim, nodeId, portId, visited);
-            console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> ${res}`);
-            return res;
+            return this.getDrivingSignal(sim, nodeId, portId, visited);
         }
         if (node.type.startsWith('IN-')) {
             let res = node.state;
@@ -53,57 +50,40 @@ const Engine = {
                 if (isNaN(idx)) res = 0;
                 else res = node.state[idx] !== undefined ? node.state[idx] : 0;
             }
-            console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> ${res}`);
             return res;
         }
         if (node.type === 'CLOCK') {
-            console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> ${node.state}`);
             return node.state;
         }
         if (node.type === '0') {
-            console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> 0`);
             return 0;
         }
         if (node.type === 'TRISTATE') {
             if (portId !== 'out') {
-                console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> Z (non-output)`);
                 return 'Z';
             }
-            const res = node.val !== undefined ? node.val : 'Z';
-            console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> ${res}`);
-            return res;
+            return node.val !== undefined ? node.val : 'Z';
         }
         if (node.type === 'RAM') {
             if (!portId.startsWith('out')) {
-                console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> Z (non-output)`);
                 return 'Z';
             }
-            const res = (node.val && node.val[portId] !== undefined) ? node.val[portId] : 0;
-            console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> ${res}`);
-            return res;
+            return (node.val && node.val[portId] !== undefined) ? node.val[portId] : 0;
         }
         if (node.type === 'DFF' || node.type === 'TFF') {
             if (portId !== 'q' && portId !== 'nq') {
-                console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> Z (non-output)`);
                 return 'Z';
             }
-            const res = (node.val && node.val[portId] !== undefined) ? node.val[portId] : 0;
-            console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> ${res}`);
-            return res;
+            return (node.val && node.val[portId] !== undefined) ? node.val[portId] : 0;
         }
         if (node.isCustom) {
-            const res = (node.outputs && node.outputs[portId] !== undefined) ? node.outputs[portId] : 'Z';
-            console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> ${res} (custom)`);
-            return res;
+            return (node.outputs && node.outputs[portId] !== undefined) ? node.outputs[portId] : 'Z';
         }
         // Standard gates (AND, OR, NAND, NOR, XOR, XNOR, NOT)
         if (portId !== 'q' && portId !== 'out') {
-            console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> Z (non-output standard gate)`);
             return 'Z';
         }
-        const res = node.val !== undefined ? node.val : 0;
-        console.log(`[DEBUG_GET_SIGNAL] Node ${node.id} (${node.type}) port=${portId} -> ${res} (standard gate)`);
-        return res;
+        return node.val !== undefined ? node.val : 0;
     },
 
     getDrivingSignal(sim, nodeId, portId, visited = new Set()) {
