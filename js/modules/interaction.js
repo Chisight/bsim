@@ -38,7 +38,7 @@ const InteractionHandler = {
                 wires: cWires,
                 library: cLib,
                 meta: {
-                    version: (window.LOADED_BSIM_VERSION || "1.27.23") + "-Modular",
+                    version: (window.LOADED_BSIM_VERSION || "1.27.24") + "-Modular",
                     exportedAt: new Date().toISOString(),
                     type: "dbsim_snapshot",
                     activeTabId: Sim.activeTabId,
@@ -1159,9 +1159,16 @@ const InteractionHandler = {
                 // Compute logical bounds incorporating View Pan translation
                 const ex = (n.x * View.scale) + View.x;
                 const ey = (n.y * View.scale) + View.y;
-                // [AUDIT: v1.24.76 | SEC_ARCH_LEAD] - Fallback to parametric UI mutators for dynamic hitboxes (RAM/ROM integration).
-                const eWidth = (n.customWidth || (n.type.includes('-8') ? 120 : 80)) * View.scale;
-                const eHeight = (n.customHeight || (n.type.includes('-8') ? 160 : (n.type.includes('-4') ? 80 : 64))) * View.scale;
+                
+                // Retrieve actual live DOM offset size, falling back to estimations if 0/undrawn
+                let rawWidth = el.offsetWidth;
+                let rawHeight = el.offsetHeight;
+                if (!rawWidth || !rawHeight) {
+                    rawWidth = n.customWidth || (n.type.includes('-8') ? 120 : 80);
+                    rawHeight = n.customHeight || (n.type.includes('-8') ? 160 : (n.type.includes('-4') ? 80 : 64));
+                }
+                const eWidth = rawWidth * View.scale;
+                const eHeight = rawHeight * View.scale;
                 
                 const isContained = (ex >= left && ex + eWidth <= left + width && ey >= top && ey + eHeight <= top + height);
                 

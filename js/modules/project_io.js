@@ -97,7 +97,7 @@ const ProjectManager = {
             let fileVerStr = data.meta?.version;
             if (!fileVerStr) {
                 const epoch = this.detectEpoch(data);
-                fileVerStr = epoch === "modern" ? (window.LOADED_BSIM_VERSION || "1.27.23") : "1.0.0";
+                fileVerStr = epoch === "modern" ? (window.LOADED_BSIM_VERSION || "1.27.24") : "1.0.0";
                 console.log(`[Migration] Missing version metadata. Detected epoch: ${epoch}. Assigning virtual version: ${fileVerStr}`);
             }
             const fileVer = this.parseVer(fileVerStr);
@@ -324,6 +324,135 @@ const ProjectManager = {
 
     /**
      */
+    sanitizeString(str) {
+        if (typeof str !== 'string') return str;
+        return str.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+    },
+
+    isUrlSecure(url) {
+        try {
+            const parsedUrl = new URL(url, window.location.href);
+            if (parsedUrl.protocol !== 'http:' && parsedUrl.protocol !== 'https:') {
+                console.error("Rejected insecure payload protocol:", parsedUrl.protocol);
+                return false;
+            }
+            if (parsedUrl.protocol === 'http:' && parsedUrl.hostname !== 'localhost' && parsedUrl.hostname !== '127.0.0.1') {
+                console.error("HTTP payloads are restricted to localhost for development security.");
+                return false;
+            }
+            return true;
+        } catch (e) {
+            console.error("Invalid payload URL:", url);
+            return false;
+        }
+    },
+
+    sanitizeNode(n) {
+        if (!n || typeof n !== 'object') return null;
+        return {
+            id: String(n.id),
+            type: String(n.type),
+            x: Number(n.x) || 0,
+            y: Number(n.y) || 0,
+            label: typeof n.label === 'string' ? this.sanitizeString(n.label) : null,
+            val: n.val,
+            state: n.state,
+            isCustom: !!n.isCustom,
+            freq: n.freq !== undefined ? Number(n.freq) : undefined,
+            interval: n.interval !== undefined ? Number(n.interval) : undefined,
+            lastTick: n.lastTick !== undefined ? Number(n.lastTick) : undefined,
+            customWidth: n.customWidth !== undefined ? Number(n.customWidth) : undefined,
+            customHeight: n.customHeight !== undefined ? Number(n.customHeight) : undefined,
+            flipPolarity: n.flipPolarity !== undefined ? !!n.flipPolarity : undefined,
+            memoryData: Array.isArray(n.memoryData) ? n.memoryData.map(Number) : undefined,
+            addressPins: n.addressPins !== undefined ? Number(n.addressPins) : undefined,
+            portLabels: typeof n.portLabels === 'object' ? JSON.parse(JSON.stringify(n.portLabels)) : undefined
+        };
+    },
+
+    sanitizeWire(w) {
+        if (!w || typeof w !== 'object') return null;
+        return {
+            from: w.from ? { nodeId: String(w.from.nodeId), portId: String(w.from.portId) } : null,
+            to: w.to ? { nodeId: String(w.to.nodeId), portId: String(w.to.portId) } : null,
+            midX: w.midX !== undefined && w.midX !== null ? Number(w.midX) : undefined,
+            midY: w.midY !== undefined && w.midY !== null ? Number(w.midY) : undefined
+        };
+    },
+
+    sanitizeWorkspaceLayer(ws) {
+        if (!ws || typeof ws !== 'object') return {};
+        return {
+            id: typeof ws.id === 'string' ? ws.id : undefined,
+            name: typeof ws.name === 'string' ? this.sanitizeString(ws.name) : undefined,
+            nodes: Array.isArray(ws.nodes) ? ws.nodes.map(n => this.sanitizeNode(n)).filter(n => n !== null) : [],
+            wires: Array.isArray(ws.wires) ? ws.wires.map(w => this.sanitizeWire(w)).filter(w => w !== null) : []
+        };
+    },
+
+    sanitizeTab(t) {
+        if (!t || typeof t !== 'object') return {};
+        return {
+            id: typeof t.id === 'string' ? t.id : 'tab-' + Math.random(),
+            name: typeof t.name === 'string' ? this.sanitizeString(t.name) : 'Main',
+            nodes: Array.isArray(t.nodes) ? t.nodes.map(n => this.sanitizeNode(n)).filter(n => n !== null) : [],
+            wires: Array.isArray(t.wires) ? t.wires.map(w => this.sanitizeWire(w)).filter(w => w !== null) : [],
+            historyStack: [],
+            historyIndex: -1
+        };
+    },
+
+    sanitizePayload(data) {
+        if (!data || typeof data !== 'object') return {};
+        const clean = {
+            version: typeof data.version === 'string' ? data.version : '1.0.0',
+            activeEditingChip: typeof data.activeEditingChip === 'string' ? data.activeEditingChip : null,
+            activeSplitChip: typeof data.activeSplitChip === 'string' ? data.activeSplitChip : null,
+            library: {},
+            workspaceStack: Array.isArray(data.workspaceStack) ? data.workspaceStack.map(ws => this.sanitizeWorkspaceLayer(ws)) : [],
+            tabs: Array.isArray(data.tabs) ? data.tabs.map(t => this.sanitizeTab(t)) : [],
+            prefs: {},
+            directories: Array.isArray(data.directories) ? data.directories.map(d => ({
+                id: String(d.id),
+                name: this.sanitizeString(d.name || ''),
+                folder: String(d.folder || '')
+            })) : []
+        };
+
+        if (data.library && typeof data.library === 'object') {
+            for (const [key, chip] of Object.entries(data.library)) {
+                if (key !== '__proto__' && key !== 'constructor' && key !== 'prototype') {
+                    clean.library[key] = this.sanitizeWorkspaceLayer(chip);
+                }
+            }
+        }
+
+        if (data.prefs && typeof data.prefs === 'object') {
+            const VALID_PREFS = new Set([
+                'snapNodes', 'snapWires', 'confirmDelete', 'showStats', 'showTooltips',
+                'tutorialMode', 'hudPos', 'toastPos', 'disableAnimations', 'portSize',
+                'dotSize', 'junctionSize', 'uiScale', 'flipPinLogic', 'debugMode', 'polarity'
+            ]);
+            for (const [k, v] of Object.entries(data.prefs)) {
+                if (VALID_PREFS.has(k)) {
+                    if (k === 'polarity') {
+                        if (v && typeof v === 'object' && !Array.isArray(v)) {
+                            clean.prefs.polarity = {};
+                            for (const [pk, pv] of Object.entries(v)) {
+                                if (pk !== '__proto__' && pk !== 'constructor' && pk !== 'prototype') {
+                                    clean.prefs.polarity[pk] = !!pv;
+                                }
+                            }
+                        }
+                    } else {
+                        clean.prefs[k] = v;
+                    }
+                }
+            }
+        }
+        return clean;
+    },
+
     _normalizeData(data) {
         return this.MigrationEngine.migrate(data);
     },
@@ -370,7 +499,7 @@ const ProjectManager = {
      */
     autoSave() {
         if (Sim._autoSaveTimer) clearTimeout(Sim._autoSaveTimer);
-        Sim._autoSaveTimer = setTimeout(() => {
+        Sim._autoSaveTimer = setTimeout(async () => {
             try {
                 const cNodes = Sim.nodes.map(n => this._cleanNode(n)).filter(n => n !== null);
                 const cWires = Sim.wires.map(w => this._cleanWire(w)).filter(w => w !== null);
@@ -390,93 +519,101 @@ const ProjectManager = {
                 if (Sim.activeEditingChip && wsStack.length > 0) {
                     Sim.library[Sim.activeEditingChip] = { folder: Sim.library[Sim.activeEditingChip]?.folder || '', nodes: cNodes, wires: cWires };
                 }
-                
-                // [State Merging] Fetch latest localStorage before committing to prevent cross-window overwrites
-                let storedProject = null;
-                try {
-                    const raw = _getProjectStorage().getItem('bsim_autosave');
-                    if (raw) storedProject = JSON.parse(raw);
-                } catch (e) { console.warn('Failed to parse existing autosave for merging', e); }
 
-                const safeLib = {};
-                Object.keys(Sim.library).forEach(k => {
-                    if (Sim.library[k]) {
-                        safeLib[k] = {
-                            nodes: (Sim.library[k].nodes || []).map(n => this._cleanNode(n)).filter(n => n !== null),
-                            wires: (Sim.library[k].wires || []).map(w => this._cleanWire(w)).filter(w => w !== null),
-                            folder: Sim.library[k].folder || ''
-                        };
-                    }
-                });
+                const performSave = async () => {
+                    // [State Merging] Fetch latest localStorage before committing to prevent cross-window overwrites
+                    let storedProject = null;
+                    try {
+                        const raw = _getProjectStorage().getItem('bsim_autosave');
+                        if (raw) storedProject = JSON.parse(raw);
+                    } catch (e) { console.warn('Failed to parse existing autosave for merging', e); }
 
-                const deletedChips = new Set(Sim._deletedChips || []);
-                if (storedProject && storedProject.deletedChips) {
-                    storedProject.deletedChips.forEach(c => deletedChips.add(c));
-                }
-                Sim._deletedChips = deletedChips;
-
-                // Merge library chips from storedProject if they aren't currently being edited or deleted
-                if (storedProject && storedProject.library) {
-                    Object.keys(storedProject.library).forEach(k => {
-                        if (k !== Sim.activeEditingChip && !safeLib[k] && !deletedChips.has(k)) {
-                            safeLib[k] = storedProject.library[k];
+                    const safeLib = {};
+                    Object.keys(Sim.library).forEach(k => {
+                        if (Sim.library[k]) {
+                            safeLib[k] = {
+                                nodes: (Sim.library[k].nodes || []).map(n => this._cleanNode(n)).filter(n => n !== null),
+                                wires: (Sim.library[k].wires || []).map(w => this._cleanWire(w)).filter(w => w !== null),
+                                folder: Sim.library[k].folder || ''
+                            };
                         }
                     });
-                }
 
-                const activeTab = Sim.tabs?.find(t => t.id === Sim.activeTabId);
-                if (activeTab && Sim.workspaceStack.length === 0) {
-                    activeTab.nodes = cNodes;
-                    activeTab.wires = cWires;
-                    if (window.History) {
-                        activeTab.historyStack = History.stack;
-                        activeTab.historyIndex = History.index;
+                    const deletedChips = new Set(Sim._deletedChips || []);
+                    if (storedProject && storedProject.deletedChips) {
+                        storedProject.deletedChips.forEach(c => deletedChips.add(c));
                     }
-                }
+                    Sim._deletedChips = deletedChips;
 
-                const safeTabs = (Sim.tabs || []).map(t => ({
-                    id: t.id, name: t.name,
-                    nodes: (t.id === Sim.activeTabId && Sim.workspaceStack.length === 0) ? cNodes : (t.nodes || []).map(n => this._cleanNode(n)).filter(n => n !== null),
-                    wires: (t.id === Sim.activeTabId && Sim.workspaceStack.length === 0) ? cWires : (t.wires || []).map(w => this._cleanWire(w)).filter(w => w !== null),
-                    historyStack: t.historyStack || [], historyIndex: t.historyIndex !== undefined ? t.historyIndex : -1,
-                    activeSplitChip: t.id === Sim.activeTabId ? Sim.activeSplitChip : t.activeSplitChip,
-                    splitDirection: t.id === Sim.activeTabId ? (document.getElementById('main')?.classList.contains('split-left') ? 'left' : (document.getElementById('main')?.classList.contains('split-right') ? 'right' : (Sim.activeSplitChip ? 'popup' : null))) : t.splitDirection
-                }));
-
-                // Merge background tabs from storedProject to isolate cross-window editing
-                if (storedProject && storedProject.tabs) {
-                    safeTabs.forEach(st => {
-                        if (st.id !== Sim.activeTabId) {
-                            const otherTab = storedProject.tabs.find(x => x && x.id === st.id);
-                            if (otherTab) {
-                                st.nodes = otherTab.nodes || [];
-                                st.wires = otherTab.wires || [];
-                                st.historyStack = otherTab.historyStack || [];
-                                st.historyIndex = otherTab.historyIndex !== undefined ? otherTab.historyIndex : -1;
-                                st.activeSplitChip = otherTab.activeSplitChip;
-                                st.splitDirection = otherTab.splitDirection;
+                    // Merge library chips from storedProject if they aren't currently being edited or deleted
+                    if (storedProject && storedProject.library) {
+                        Object.keys(storedProject.library).forEach(k => {
+                            if (k !== Sim.activeEditingChip && !safeLib[k] && !deletedChips.has(k)) {
+                                safeLib[k] = storedProject.library[k];
                             }
-                        }
-                    });
-                    
-                    // Append any new tabs created in another window
-                    storedProject.tabs.forEach(ot => {
-                        if (ot && !safeTabs.find(st => st.id === ot.id)) {
-                            safeTabs.push(ot);
-                        }
-                    });
-                }
+                        });
+                    }
 
-                const project = { 
-                    nodes: wsStack.length > 0 ? wsStack[0].nodes : cNodes, 
-                    wires: wsStack.length > 0 ? wsStack[0].wires : cWires, 
-                    library: safeLib, directories: Sim.directories || [], workspaceStack: wsStack, activeEditingChip: Sim.activeEditingChip,
-                    tabs: safeTabs, activeTabId: Sim.activeTabId,
-                    deletedChips: Array.from(deletedChips),
-                    prefs: { snapNodes: Sim.snapNodes, snapWires: Sim.snapWires, confirmDelete: Sim.confirmDelete, showStats: Sim.showStats, showTooltips: Sim.showTooltips, tutorialMode: Sim.tutorialMode, hudPos: Sim.hudPos, toastPos: Sim.toastPos, disableAnimations: Sim.disableAnimations, portSize: Sim.portSize, dotSize: Sim.dotSize, junctionSize: Sim.junctionSize, uiScale: Sim.uiScale, flipPinLogic: Sim.flipPinLogic, debugMode: Sim.debugMode, polarity: Sim.polarity || {} },
-                    meta: { version: (window.LOADED_BSIM_VERSION || "1.27.23") + "-Modular", exportedAt: new Date().toISOString() }
+                    const activeTab = Sim.tabs?.find(t => t.id === Sim.activeTabId);
+                    if (activeTab && Sim.workspaceStack.length === 0) {
+                        activeTab.nodes = cNodes;
+                        activeTab.wires = cWires;
+                        if (window.History) {
+                            activeTab.historyStack = History.stack;
+                            activeTab.historyIndex = History.index;
+                        }
+                    }
+
+                    const safeTabs = (Sim.tabs || []).map(t => ({
+                        id: t.id, name: t.name,
+                        nodes: (t.id === Sim.activeTabId && Sim.workspaceStack.length === 0) ? cNodes : (t.nodes || []).map(n => this._cleanNode(n)).filter(n => n !== null),
+                        wires: (t.id === Sim.activeTabId && Sim.workspaceStack.length === 0) ? cWires : (t.wires || []).map(w => this._cleanWire(w)).filter(w => w !== null),
+                        historyStack: t.historyStack || [], historyIndex: t.historyIndex !== undefined ? t.historyIndex : -1,
+                        activeSplitChip: t.id === Sim.activeTabId ? Sim.activeSplitChip : t.activeSplitChip,
+                        splitDirection: t.id === Sim.activeTabId ? (document.getElementById('main')?.classList.contains('split-left') ? 'left' : (document.getElementById('main')?.classList.contains('split-right') ? 'right' : (Sim.activeSplitChip ? 'popup' : null))) : t.splitDirection
+                    }));
+
+                    // Merge background tabs from storedProject to isolate cross-window editing
+                    if (storedProject && storedProject.tabs) {
+                        safeTabs.forEach(st => {
+                            if (st.id !== Sim.activeTabId) {
+                                const otherTab = storedProject.tabs.find(x => x && x.id === st.id);
+                                if (otherTab) {
+                                    st.nodes = otherTab.nodes || [];
+                                    st.wires = otherTab.wires || [];
+                                    st.historyStack = otherTab.historyStack || [];
+                                    st.historyIndex = otherTab.historyIndex !== undefined ? otherTab.historyIndex : -1;
+                                    st.activeSplitChip = otherTab.activeSplitChip;
+                                    st.splitDirection = otherTab.splitDirection;
+                                }
+                            }
+                        });
+                        
+                        // Append any new tabs created in another window
+                        storedProject.tabs.forEach(ot => {
+                            if (ot && !safeTabs.find(st => st.id === ot.id)) {
+                                safeTabs.push(ot);
+                            }
+                        });
+                    }
+
+                    const project = { 
+                        nodes: wsStack.length > 0 ? wsStack[0].nodes : cNodes, 
+                        wires: wsStack.length > 0 ? wsStack[0].wires : cWires, 
+                        library: safeLib, directories: Sim.directories || [], workspaceStack: wsStack, activeEditingChip: Sim.activeEditingChip,
+                        tabs: safeTabs, activeTabId: Sim.activeTabId,
+                        deletedChips: Array.from(deletedChips),
+                        prefs: { snapNodes: Sim.snapNodes, snapWires: Sim.snapWires, confirmDelete: Sim.confirmDelete, showStats: Sim.showStats, showTooltips: Sim.showTooltips, tutorialMode: Sim.tutorialMode, hudPos: Sim.hudPos, toastPos: Sim.toastPos, disableAnimations: Sim.disableAnimations, portSize: Sim.portSize, dotSize: Sim.dotSize, junctionSize: Sim.junctionSize, uiScale: Sim.uiScale, flipPinLogic: Sim.flipPinLogic, debugMode: Sim.debugMode, polarity: Sim.polarity || {} },
+                        meta: { version: (window.LOADED_BSIM_VERSION || "1.27.24") + "-Modular", exportedAt: new Date().toISOString() }
+                    };
+                    _getProjectStorage().setItem('bsim_autosave', JSON.stringify(project));
                 };
-                _getProjectStorage().setItem('bsim_autosave', JSON.stringify(project));
+
+                if (navigator.locks) {
+                    await navigator.locks.request('bsim_autosave_lock', performSave);
+                } else {
+                    await performSave();
+                }
             } catch (e) {
                 console.error("[AutoSave] Serialization Failure:", e);
             }
@@ -490,7 +627,30 @@ const ProjectManager = {
                 let parsed = JSON.parse(raw);
                 parsed = this._normalizeData(parsed);
                 Sim.library = parsed.library || {};
-                if (parsed.prefs) Object.assign(Sim, parsed.prefs);
+                if (parsed.prefs) {
+                    const VALID_PREFS = new Set([
+                        'snapNodes', 'snapWires', 'confirmDelete', 'showStats', 'showTooltips',
+                        'tutorialMode', 'hudPos', 'toastPos', 'disableAnimations', 'portSize',
+                        'dotSize', 'junctionSize', 'uiScale', 'flipPinLogic', 'debugMode', 'polarity'
+                    ]);
+                    for (const key of Object.keys(parsed.prefs)) {
+                        if (VALID_PREFS.has(key)) {
+                            const val = parsed.prefs[key];
+                            if (key === 'polarity') {
+                                if (val && typeof val === 'object' && !Array.isArray(val)) {
+                                    Sim.polarity = {};
+                                    for (const polKey of Object.keys(val)) {
+                                        if (polKey !== '__proto__' && polKey !== 'constructor' && polKey !== 'prototype') {
+                                            Sim.polarity[polKey] = val[polKey];
+                                        }
+                                    }
+                                }
+                            } else {
+                                Sim[key] = val;
+                            }
+                        }
+                    }
+                }
                 
                 Sim.workspaceStack = parsed.workspaceStack || [];
                 Sim.activeEditingChip = parsed.activeEditingChip || null;
@@ -758,6 +918,10 @@ const ProjectManager = {
     /**
      */
     async importFromUrl(url) {
+        if (!this.isUrlSecure(url)) {
+            if (window.Sim && typeof Sim.toast === 'function') Sim.toast('Failed to load project: Insecure URL protocol/host.', 'danger');
+            return;
+        }
         try {
             let res;
             try {
@@ -771,7 +935,8 @@ const ProjectManager = {
             }
             
             const data = await res.json();
-            _getProjectStorage().setItem('bsim_autosave', JSON.stringify(data));
+            const sanitized = this.sanitizePayload(data);
+            _getProjectStorage().setItem('bsim_autosave', JSON.stringify(sanitized));
             location.reload();
         } catch (e) {
             console.error('[FATAL] Remote import failed:', e);

@@ -89,13 +89,21 @@ window.onload = () => {
     }
 
     function fetchAndLoadPayload(url) {
-        // [AUDIT: v1.25.10 | SEC_ARCH_LEAD] - Authenticate and stream remote payload
+        if (!ProjectManager.isUrlSecure(url)) {
+            console.error("Rejected insecure payload URL:", url);
+            return;
+        }
+
         sessionStorage.setItem('activeRemotePayload', url);
-        // [AUDIT: v1.26.02 | SEC_ARCH_LEAD] - Persist payload URL for page reload parity
+
         fetch(url)
-            .then(res => res.json())
+            .then(res => {
+                if (!res.ok) throw new Error("Network response was not ok");
+                return res.json();
+            })
             .then(data => {
-                storage.setItem('bsim_autosave', JSON.stringify(data));
+                const sanitized = ProjectManager.sanitizePayload(data);
+                storage.setItem('bsim_autosave', JSON.stringify(sanitized));
                 ProjectManager.loadAutoSave();
                 Sim.updateTabsUI();
                 Sim.updateLibraryUI();
@@ -130,8 +138,26 @@ window.onload = () => {
 
     // [AUDIT: SEC_ARCH_LEAD] - Global keyboard shortcut bindings for state history traversal.
     window.addEventListener('keydown', (e) => {
-        // Prevent interfering with modal inputs or text fields
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') return;
+        // Prevent interfering with modal inputs, text fields, dropdowns, contenteditable elements, or Shadow DOM equivalents
+        const isEditable = (el) => {
+            if (!el) return false;
+            if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.tagName === 'SELECT') return true;
+            if (el.hasAttribute && el.hasAttribute('contenteditable')) return true;
+            if (el.isContentEditable) return true;
+            return false;
+        };
+
+        // ComposedPath check to penetrate Shadow DOM boundaries
+        const path = e.composedPath ? e.composedPath() : [e.target];
+        if (path.some(el => isEditable(el))) return;
+
+        // Block history traversal during active pin layout editing or node modal editing
+        if (document.body.classList.contains('edit-mode-active') || 
+            document.body.classList.contains('pin-mutate-active') || 
+            document.body.classList.contains('modal-open') || 
+            (window.Sim && Sim.editModeActive)) {
+            return;
+        }
 
         if (e.ctrlKey || e.metaKey) {
             if (e.key.toLowerCase() === 'z') {
@@ -166,7 +192,7 @@ window.onload = () => {
     // [AUDIT: v1.27.19 | SEC_ARCH_LEAD] - Injected WebWorker performance telemetry, async round-trip latency pings, and low-level wasm inspect subcommands.
     // [AUDIT: v1.27.20 | SEC_ARCH_LEAD] - Injected Zsh-style inline predictive completion overlay, Right-Arrow autosuggestions, colors/predict toggle command switches, and monochrome overrides.
     // [AUDIT: v1.27.22 | SEC_ARCH_LEAD] - Configured MSB-at-top as the default wiring pin logic globally and resolved dynamic DOM re-rendering limits.
-    window.LOADED_BSIM_VERSION = "1.27.23";
+    window.LOADED_BSIM_VERSION = "1.27.24";
 
     // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Purged legacy JIT DOM interceptor in favor of native parametric coordinate generation.
 
