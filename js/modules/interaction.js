@@ -107,7 +107,9 @@ const InteractionHandler = {
         if (node) {
             const targetNode = Sim.nodes.find(n => n.id === node.id);
             if (targetNode) {
+                this._isRenaming = true; // Signal to skip config dialogs and go straight to label edit
                 InteractionHandler.handleNodeDblClick(new Event('dblclick'), targetNode, document.getElementById(node.id));
+                this._isRenaming = false;
             }
         }
         const menu = document.getElementById('context-menu');
@@ -433,7 +435,7 @@ const InteractionHandler = {
                 }
             }, node.freq);
         // [AUDIT: v1.24.25 | SEC_ARCH_LEAD] - Removed uiEnterValue popup intercept to allow inline renaming on multi-bit inputs.
-        } else if (node.type === 'RAM') {
+        } else if (node.type === 'RAM' && !this._isRenaming) {
             /**
              */
             // [AUDIT: v1.24.97 | SEC_ARCH_LEAD] - Intercept configuration triggers to accept URL mapping and memory depth natively.
@@ -559,7 +561,7 @@ const InteractionHandler = {
                 node.label = val;
                 lbl.innerText = node.label;
                 lbl.style.pointerEvents = '';
-                if (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
+                if (node.type.startsWith('IN-') || node.type.startsWith('OUT-') || node.type.startsWith('PROBE-') || node.type === 'RAM') {
                     if (typeof NodeRenderer !== 'undefined') {
                         // Remove the existing element first to avoid duplicate stale ghost elements
                         const existing = document.getElementById(node.id);
