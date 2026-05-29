@@ -231,7 +231,7 @@ class TestInteraction(unittest.IsolatedAsyncioTestCase):
         raw_autosave = await self.eval_js("localStorage.getItem('bsim_autosave')")
         autosave_data = json.loads(raw_autosave)
         self.assertIsNotNone(autosave_data.get("meta"))
-        self.assertIn("1.27.33", autosave_data["meta"].get("version", ""))
+        self.assertIn("1.27.34", autosave_data["meta"].get("version", ""))
 
     async def test_dbsim_export_and_import(self):
         # 1. Blank out workspace
@@ -276,7 +276,7 @@ class TestInteraction(unittest.IsolatedAsyncioTestCase):
                     wires: cWires,
                     library: cLib,
                     meta: {
-                        version: (window.LOADED_BSIM_VERSION || "1.27.33") + "-Modular",
+                        version: (window.LOADED_BSIM_VERSION || "1.27.34") + "-Modular",
                         exportedAt: new Date().toISOString(),
                         type: "dbsim_snapshot",
                         activeTabId: window.Sim.activeTabId,
