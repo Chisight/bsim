@@ -1,6 +1,8 @@
 /**
  * Project Persistence Module
  */
+const _getProjectStorage = () => (window.location.search.includes('chip') || window.self !== window.top) ? sessionStorage : localStorage;
+
 const ProjectManager = {
     MigrationEngine: {
         /**
@@ -379,7 +381,10 @@ const ProjectManager = {
 
                 const wsStack = (Sim.workspaceStack || []).map(ws => ({ 
                     nodes: (ws.nodes || []).map(n => this._cleanNode(n)).filter(n => n !== null), 
-                    wires: (ws.wires || []).map(w => this._cleanWire(w)).filter(w => w !== null) 
+                    wires: (ws.wires || []).map(w => this._cleanWire(w)).filter(w => w !== null),
+                    activeEditingChip: ws.activeEditingChip || null,
+                    historyStack: ws.historyStack || [],
+                    historyIndex: ws.historyIndex !== undefined ? ws.historyIndex : -1
                 }));
                 
                 if (Sim.activeEditingChip && wsStack.length > 0) {
@@ -389,7 +394,7 @@ const ProjectManager = {
                 // [State Merging] Fetch latest localStorage before committing to prevent cross-window overwrites
                 let storedProject = null;
                 try {
-                    const raw = localStorage.getItem('bsim_autosave');
+                    const raw = _getProjectStorage().getItem('bsim_autosave');
                     if (raw) storedProject = JSON.parse(raw);
                 } catch (e) { console.warn('Failed to parse existing autosave for merging', e); }
 
@@ -404,10 +409,16 @@ const ProjectManager = {
                     }
                 });
 
-                // Merge library chips from storedProject if they aren't currently being edited
+                const deletedChips = new Set(Sim._deletedChips || []);
+                if (storedProject && storedProject.deletedChips) {
+                    storedProject.deletedChips.forEach(c => deletedChips.add(c));
+                }
+                Sim._deletedChips = deletedChips;
+
+                // Merge library chips from storedProject if they aren't currently being edited or deleted
                 if (storedProject && storedProject.library) {
                     Object.keys(storedProject.library).forEach(k => {
-                        if (k !== Sim.activeEditingChip && !safeLib[k]) {
+                        if (k !== Sim.activeEditingChip && !safeLib[k] && !deletedChips.has(k)) {
                             safeLib[k] = storedProject.library[k];
                         }
                     });
@@ -461,10 +472,11 @@ const ProjectManager = {
                     wires: wsStack.length > 0 ? wsStack[0].wires : cWires, 
                     library: safeLib, directories: Sim.directories || [], workspaceStack: wsStack, activeEditingChip: Sim.activeEditingChip,
                     tabs: safeTabs, activeTabId: Sim.activeTabId,
+                    deletedChips: Array.from(deletedChips),
                     prefs: { snapNodes: Sim.snapNodes, snapWires: Sim.snapWires, confirmDelete: Sim.confirmDelete, showStats: Sim.showStats, showTooltips: Sim.showTooltips, tutorialMode: Sim.tutorialMode, hudPos: Sim.hudPos, toastPos: Sim.toastPos, disableAnimations: Sim.disableAnimations, portSize: Sim.portSize, dotSize: Sim.dotSize, junctionSize: Sim.junctionSize, uiScale: Sim.uiScale, flipPinLogic: Sim.flipPinLogic, debugMode: Sim.debugMode, polarity: Sim.polarity || {} },
                     meta: { version: (window.LOADED_BSIM_VERSION || "1.27.22") + "-Modular", exportedAt: new Date().toISOString() }
                 };
-                localStorage.setItem('bsim_autosave', JSON.stringify(project));
+                _getProjectStorage().setItem('bsim_autosave', JSON.stringify(project));
             } catch (e) {
                 console.error("[AutoSave] Serialization Failure:", e);
             }
@@ -473,7 +485,7 @@ const ProjectManager = {
 
     loadAutoSave() {
         try {
-            const raw = localStorage.getItem('bsim_autosave');
+            const raw = _getProjectStorage().getItem('bsim_autosave');
             if (raw) {
                 let parsed = JSON.parse(raw);
                 parsed = this._normalizeData(parsed);
@@ -759,7 +771,7 @@ const ProjectManager = {
             }
             
             const data = await res.json();
-            localStorage.setItem('bsim_autosave', JSON.stringify(data));
+            _getProjectStorage().setItem('bsim_autosave', JSON.stringify(data));
             location.reload();
         } catch (e) {
             console.error('[FATAL] Remote import failed:', e);

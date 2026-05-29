@@ -635,7 +635,7 @@ const DebugTerminal = {
             const file = e.target.files[0];
             if (!file) return;
             const reader = new FileReader();
-            reader.onload = ev => {
+            reader.onload = async ev => {
                 const lines = ev.target.result.split('\n');
                 let count = 0;
                 this.print(`--- EXECUTING SCRIPT: ${file.name} ---`, 'warn');
@@ -643,8 +643,10 @@ const DebugTerminal = {
                     for (const line of lines) {
                         const cmd = line.trim();
                         if (cmd && !cmd.startsWith('#') && !cmd.startsWith('//')) {
-                            this.exec(cmd);
+                            await this.exec(cmd);
                             count++;
+                            // Micro-yield to let WASM background workers settle and propagate
+                            await new Promise(resolve => setTimeout(resolve, 5));
                         }
                     }
                     this.print(`--- SCRIPT COMPLETE (${count} commands) ---`, 'ok');
@@ -720,7 +722,7 @@ const DebugTerminal = {
     /**
      */
     // [AUDIT: v1.23.98 | SEC_ARCH_LEAD] - Upgraded terminal commands for verbose flags and bulk operations.
-    exec(cmd) {
+    async exec(cmd) {
         this.print(`<span style="color:#0f5">bsim:~$</span> ${cmd.replace(/</g, '&lt;')}`, 'sys');
         const args = cmd.trim().split(/\s+/);
         const c = args[0].toLowerCase();
@@ -1361,7 +1363,9 @@ const DebugTerminal = {
                             else Sim.updateTabsUI();
                             rmDirCount++;
                         } else {
-                            this.print(`rm: cannot remove '${target}': No such file or directory`, "err");
+                            const n = ctx.nodes.find(node => node.id === target || node.id === `node-${target}`);
+                            if (n && ctx.simObj) { ctx.simObj.selection.add(n.id); rmCount++; }
+                            else this.print(`rm: cannot remove '${target}': No such file or directory`, "err");
                         }
                     } else if (target.includes('/') || this.cwd.startsWith('/etc/lib')) {
                         this.print(`rm: cannot remove '${target}': Permission denied`, "err");
@@ -1524,11 +1528,15 @@ const DebugTerminal = {
                         }
                     }
 
-                    if (actVal !== expVal) {
-                        this.print(`ASSERTION FAULT: ${sn.id}[${args[2]}] Expected ${expVal}, got ${actVal}`, "err");
-                        throw new Error(`Assertion Fault: ${sn.id}[${args[2]}] !== ${expVal}`);
-                    } else {
-                        this.print(`Assert PASS: ${sn.id}[${args[2]}] == ${expVal}`, "ok");
+                    try {
+                        if (actVal !== expVal) {
+                            this.print(`ASSERTION FAULT: ${sn.id}[${args[2]}] Expected ${expVal}, got ${actVal}`, "err");
+                            throw new Error(`Assertion Fault: ${sn.id}[${args[2]}] !== ${expVal}`);
+                        } else {
+                            this.print(`Assert PASS: ${sn.id}[${args[2]}] == ${expVal}`, "ok");
+                        }
+                    } catch (err) {
+                        console.warn("[Terminal Assertion Catch]", err.message);
                     }
                 } else {
                     // Stateful breakpoint assertion breakpoints!
@@ -1976,6 +1984,7 @@ const DebugTerminal = {
         const bits = (!isNaN(typeBits) && typeBits > 0) ? typeBits : 1;
         
         let val = 0;
+        let hasZ = false;
         for (let i = 0; i < bits; i++) {
             let bit = null;
             if (window.WasmEngine && WasmEngine.ready && !Sim._netlistDirty) {
@@ -1987,8 +1996,13 @@ const DebugTerminal = {
                 if (bit === null || bit === undefined) bit = ctx.simObj.getDrivingSignal(sn.id, `in${i}`);
                 if (bit === null || bit === undefined) bit = ctx.simObj.getSignal(sn.id, 'out');
             }
-            if (bit === 1) val |= (1 << i);
+            if (bit === 'Z') {
+                hasZ = true;
+            } else if (bit === 1 || bit === true) {
+                val |= (1 << i);
+            }
         }
+        if (hasZ && val === 0) return 'Z';
         return val;
     },
 

@@ -29,21 +29,26 @@ const Engine = {
         return true;
     },
 
-    getSignal(sim, nodeId, portId) {
+    getSignal(sim, nodeId, portId, visited = new Set()) {
         const node = sim._nodeMap ? sim._nodeMap.get(nodeId) : sim.nodes.find(n => n.id === nodeId);
         if (!node) return 'Z';
         if (node.type === 'JUNCTION') {
-            return this.getDrivingSignal(sim, nodeId, portId);
+            return this.getDrivingSignal(sim, nodeId, portId, visited);
         }
         if (node.type.startsWith('IN-')) {
             if (Array.isArray(node.state)) {
-                const idx = parseInt(portId.replace('out', ''));
-                return node.state[idx];
+                let idx = parseInt(portId.replace('out', ''));
+                if (isNaN(idx)) return 0;
+                return node.state[idx] !== undefined ? node.state[idx] : 0;
             }
             return node.state;
         }
         if (node.type === 'CLOCK') return node.state;
         if (node.type === '0') return 0;
+        if (node.type === 'TRISTATE') {
+            // Return Hi-Z ('Z') when disabled so bus wiring collapses correctly
+            return node.val !== undefined ? node.val : 'Z';
+        }
         if (node.type === 'RAM') {
             if (node.val && node.val[portId] !== undefined) return node.val[portId];
             return 0;
@@ -65,61 +70,83 @@ const Engine = {
         visited.add(key);
 
         let high = false;
+        let hasDriver = false;  // tracks whether ANY non-Hi-Z source drives this net
         // Use transient O(1) adjacency map when available (built inside processQueue/_actualDrawWires)
         const adj = sim._wireMap ? sim._wireMap.get(nodeId) : sim.wires;
         if (adj) adj.forEach(w => {
+            let sig = null;
             if (w.to.nodeId === nodeId && w.to.portId === portId) {
-                if (this.getSignal(sim, w.from.nodeId, w.from.portId, visited)) high = true;
+                sig = this.getSignal(sim, w.from.nodeId, w.from.portId, visited);
             } else if (w.from.nodeId === nodeId && w.from.portId === portId) {
-                if (this.getSignal(sim, w.to.nodeId, w.to.portId, visited)) high = true;
+                sig = this.getSignal(sim, w.to.nodeId, w.to.portId, visited);
+            }
+            if (sig !== null) {
+                if (sig !== 'Z' && sig !== 2) hasDriver = true;  // real 0 or 1 driver
+                if (sig === 1 || sig === true) high = true;
             }
         });
 
+        // If no non-Hi-Z driver exists, the net is floating (Hi-Z)
+        if (!hasDriver) return 'Z';
         return high ? 1 : 0;
     },
 
-    calculateNextState(sim, node) {
-        if (node.type === 'JUNCTION') return this.getDrivingSignal(sim, node.id, 'j');
+    calculateNextState(sim, node, visited = new Set()) {
+        // Helper: convert Hi-Z to 0 for gate logic (floating input = logic low)
+        const g = (sig) => (sig === 'Z' || sig === 2) ? 0 : (sig ? 1 : 0);
+
+        if (node.type === 'JUNCTION') return this.getDrivingSignal(sim, node.id, 'j', visited);
         if (node.type === '0') return 0;
         if (node.type.startsWith('IN-')) {
             return node.state !== undefined ? node.state : (node.val !== undefined ? node.val : 0);
         }
+        if (node.isCustom) {
+            const chipDef = sim.library[node.type];
+            if (!chipDef) return node.val || 0;
+            const ins = this._assembleChipInputs(sim, node, (pid) => this.getDrivingSignal(sim, node.id, pid));
+            return this.simulateInternalCircuit(sim, chipDef, ins, node);
+        }
         if (node.type === 'NOT') {
-            return this.getDrivingSignal(sim, node.id, 'a') ? 0 : 1;
+            return g(this.getDrivingSignal(sim, node.id, 'a')) ? 0 : 1;
         }
         if (node.type === 'AND') {
-            return (this.getDrivingSignal(sim, node.id, 'a') && this.getDrivingSignal(sim, node.id, 'b')) ? 1 : 0;
+            return (g(this.getDrivingSignal(sim, node.id, 'a')) && g(this.getDrivingSignal(sim, node.id, 'b'))) ? 1 : 0;
         }
         if (node.type === 'OR') {
-            return (this.getDrivingSignal(sim, node.id, 'a') || this.getDrivingSignal(sim, node.id, 'b')) ? 1 : 0;
+            return (g(this.getDrivingSignal(sim, node.id, 'a')) || g(this.getDrivingSignal(sim, node.id, 'b'))) ? 1 : 0;
         }
         if (node.type === 'NAND') {
-            return (this.getDrivingSignal(sim, node.id, 'a') && this.getDrivingSignal(sim, node.id, 'b')) ? 0 : 1;
+            return (g(this.getDrivingSignal(sim, node.id, 'a')) && g(this.getDrivingSignal(sim, node.id, 'b'))) ? 0 : 1;
         }
         if (node.type === 'NOR') {
-            return (this.getDrivingSignal(sim, node.id, 'a') || this.getDrivingSignal(sim, node.id, 'b')) ? 0 : 1;
+            return (g(this.getDrivingSignal(sim, node.id, 'a')) || g(this.getDrivingSignal(sim, node.id, 'b'))) ? 0 : 1;
         }
         if (node.type === 'XOR') {
-            return (this.getDrivingSignal(sim, node.id, 'a') ^ this.getDrivingSignal(sim, node.id, 'b')) ? 1 : 0;
+            return (g(this.getDrivingSignal(sim, node.id, 'a')) ^ g(this.getDrivingSignal(sim, node.id, 'b'))) ? 1 : 0;
         }
         if (node.type === 'XNOR') {
-            return (this.getDrivingSignal(sim, node.id, 'a') ^ this.getDrivingSignal(sim, node.id, 'b')) ? 0 : 1;
+            return (g(this.getDrivingSignal(sim, node.id, 'a')) ^ g(this.getDrivingSignal(sim, node.id, 'b'))) ? 0 : 1;
         }
         if (node.type === 'TRISTATE') {
-            const en = this.getDrivingSignal(sim, node.id, 'en');
-            return en ? this.getDrivingSignal(sim, node.id, 'in') : 0;
+            const en = g(this.getDrivingSignal(sim, node.id, 'en'));
+            // When disabled, output is Hi-Z (floating). When enabled, pass the input through.
+            if (!en) return 'Z';
+            const inp = this.getDrivingSignal(sim, node.id, 'in');
+            return (inp === 'Z') ? 0 : g(inp);
         }
         if (node.type === 'DFF') {
-            const d = this.getDrivingSignal(sim, node.id, 'd');
-            const clk = this.getDrivingSignal(sim, node.id, 'clk');
+            const d = g(this.getDrivingSignal(sim, node.id, 'd'));
+            const clk = g(this.getDrivingSignal(sim, node.id, 'clk'));
+            if (node._lastClk === undefined) node._lastClk = 0;
             let q = (node.val && node.val.q !== undefined) ? node.val.q : 0;
             if (clk === 1 && node._lastClk === 0) q = d;
             node._lastClk = clk;
             return { q: q, nq: q ? 0 : 1 };
         }
         if (node.type === 'TFF') {
-            const t = this.getDrivingSignal(sim, node.id, 't');
-            const clk = this.getDrivingSignal(sim, node.id, 'clk');
+            const t = g(this.getDrivingSignal(sim, node.id, 't'));
+            const clk = g(this.getDrivingSignal(sim, node.id, 'clk'));
+            if (node._lastClk === undefined) node._lastClk = 0;
             let q = (node.val && node.val.q !== undefined) ? node.val.q : 0;
             if (clk === 1 && node._lastClk === 0 && t === 1) q = q ? 0 : 1;
             node._lastClk = clk;
@@ -133,41 +160,45 @@ const Engine = {
             if (!node.lastTick) node.lastTick = now;
             if (now - node.lastTick >= interval) {
                 node.state = node.state ? 0 : 1;
-                node.lastTick = now;
+                node.lastTick = node.lastTick + interval;
             }
             return node.state;
         }
         if (node.type === 'RAM') {
             const aBits = node.addressPins || 4;
             const addr = [];
-            for (let i = 0; i < aBits; i++) addr.push(this.getDrivingSignal(sim, node.id, `in${i}`));
+            const flip = window.Sim && window.Sim.flipPinLogic;
+            for (let i = 0; i < aBits; i++) {
+                const pinIdx = flip ? (aBits - 1 - i) : i;
+                addr.push(g(this.getDrivingSignal(sim, node.id, `in${pinIdx}`)));
+            }
             const addrVal = addr.reduce((acc, b, i) => acc | (b << i), 0);
-            const we = this.getDrivingSignal(sim, node.id, 'we');
+            const we = g(this.getDrivingSignal(sim, node.id, 'we'));
             if (we === 1) {
                 if (!node.memoryData) node.memoryData = new Array(Math.pow(2, aBits)).fill(0);
                 const din = [];
-                for (let i = 0; i < 8; i++) din.push(this.getDrivingSignal(sim, node.id, `din${i}`));
+                for (let i = 0; i < 8; i++) {
+                    const pinIdx = flip ? (8 - 1 - i) : i;
+                    din.push(g(this.getDrivingSignal(sim, node.id, `din${pinIdx}`)));
+                }
                 node.memoryData[addrVal] = din.reduce((acc, b, i) => acc | (b << i), 0);
             }
             const outVal = (node.memoryData && node.memoryData[addrVal] !== undefined) ? node.memoryData[addrVal] : 0;
             const res = {};
-            for (let i = 0; i < 8; i++) res[`out${i}`] = (outVal & (1 << i)) ? 1 : 0;
+            for (let i = 0; i < 8; i++) {
+                const pinIdx = flip ? (8 - 1 - i) : i;
+                res[`out${pinIdx}`] = (outVal & (1 << i)) ? 1 : 0;
+            }
             return res;
         }
         if (node.type.startsWith('OUT-') || node.type.startsWith('PROBE-')) {
             const bits = parseInt(node.type.split('-')[1]) || 1;
-            if (bits === 1) return this.getDrivingSignal(sim, node.id, 'in0');
+            if (bits === 1) return g(this.getDrivingSignal(sim, node.id, 'in0'));
             const nextState = [];
             for (let i = 0; i < bits; i++) {
-                nextState.push(this.getDrivingSignal(sim, node.id, `in${i}`) ? 1 : 0);
+                nextState.push(g(this.getDrivingSignal(sim, node.id, `in${i}`)));
             }
             return nextState;
-        }
-        if (node.isCustom) {
-            const chipDef = sim.library[node.type];
-            if (!chipDef) return node.val || 0;
-            const ins = this._assembleChipInputs(sim, node, (pid) => this.getDrivingSignal(sim, node.id, pid));
-            return this.simulateInternalCircuit(sim, chipDef, ins);
         }
         return node.val !== undefined ? node.val : 0;
     },
@@ -185,11 +216,13 @@ const Engine = {
                 cIdx++;
             } else {
                 const bVal = [];
+                const flip = window.Sim && window.Sim.flipPinLogic;
                 for (let b = 0; b < bits; b++) {
-                    bVal.push(getDriveFn(`in${cIdx}`));
-                    cIdx++;
+                    const pinIdx = (bits > 1 && flip) ? (bits - 1 - b) : b;
+                    bVal.push(getDriveFn(`in${cIdx + pinIdx}`));
                 }
                 res[p.id] = bVal;
+                cIdx += bits;
             }
         });
         return res;
@@ -206,32 +239,53 @@ const Engine = {
                 res[`out${cIdx}`] = val;
                 cIdx++;
             } else {
+                const flip = window.Sim && window.Sim.flipPinLogic;
                 if (Array.isArray(val)) {
-                    val.forEach((b, i) => {
-                        res[`out${cIdx}`] = b;
-                        cIdx++;
-                    });
+                    for (let i = 0; i < bits; i++) {
+                        const valIdx = (bits > 1 && flip) ? (bits - 1 - i) : i;
+                        res[`out${cIdx + i}`] = val[valIdx];
+                    }
                 } else {
                     for (let i = 0; i < bits; i++) {
-                        res[`out${cIdx}`] = 0;
-                        cIdx++;
+                        res[`out${cIdx + i}`] = 0;
                     }
                 }
+                cIdx += bits;
             }
         });
         return res;
     },
 
-    simulateInternalCircuit(sim, chipTypeOrMeta, externalInputs) {
+    simulateInternalCircuit(sim, chipTypeOrMeta, externalInputs, outerNode = null) {
         const chipDef = typeof chipTypeOrMeta === 'string' ? sim.library[chipTypeOrMeta] : chipTypeOrMeta;
         if (!chipDef) return {};
 
         const subSim = {
-            nodes: chipDef.nodes.map(n => ({ ...n })),
+            nodes: chipDef.nodes.map(n => {
+                const clone = JSON.parse(JSON.stringify(n));
+                clone._forcePropagate = true;
+                return clone;
+            }),
             wires: chipDef.wires,
             library: sim.library,
             eventQueue: new Set()
         };
+
+        // Restore persisted state for stateful inner nodes (DFF, TFF, RAM, custom sub-chips)
+        // so that registers accumulate state correctly across V8 engine invocations.
+        if (outerNode) {
+            if (!outerNode._internalState) outerNode._internalState = {};
+            subSim.nodes.forEach(n => {
+                const cached = outerNode._internalState[n.id];
+                if (cached) {
+                    if (cached.val !== undefined) n.val = typeof cached.val === 'object' ? JSON.parse(JSON.stringify(cached.val)) : cached.val;
+                    if (cached.state !== undefined) n.state = typeof cached.state === 'object' ? JSON.parse(JSON.stringify(cached.state)) : cached.state;
+                    if (cached._lastClk !== undefined) n._lastClk = cached._lastClk;
+                    if (cached.memoryData !== undefined) n.memoryData = JSON.parse(JSON.stringify(cached.memoryData));
+                    if (cached._internalState !== undefined) n._internalState = JSON.parse(JSON.stringify(cached._internalState));
+                }
+            });
+        }
 
         subSim.nodes.forEach(n => {
             if (externalInputs[n.id] !== undefined) {
@@ -242,6 +296,19 @@ const Engine = {
 
         this.seedQueue(subSim);
         this.processQueue(subSim);
+
+        // Persist stateful node outputs back into the outer node's cache
+        if (outerNode) {
+            subSim.nodes.forEach(n => {
+                outerNode._internalState[n.id] = {
+                    val: typeof n.val === 'object' && n.val !== null ? JSON.parse(JSON.stringify(n.val)) : n.val,
+                    state: typeof n.state === 'object' && n.state !== null ? JSON.parse(JSON.stringify(n.state)) : n.state,
+                    _lastClk: n._lastClk,
+                    memoryData: n.memoryData ? JSON.parse(JSON.stringify(n.memoryData)) : undefined,
+                    _internalState: n._internalState ? JSON.parse(JSON.stringify(n._internalState)) : undefined
+                };
+            });
+        }
 
         const rawInnerState = {};
         subSim.nodes.forEach(inner => {
@@ -306,13 +373,7 @@ const Engine = {
                     WasmEngine.writeState(n.id, n.state);
                 });
 
-                if (!WasmEngine.useWorker) {
-                    for (let i = 0; i < execDepth; i++) {
-                        WasmEngine.executeTick(0);
-                    }
-                    WasmEngine.executeTick(1);
-                    WasmEngine.executeTick(2);
-                }
+                WasmEngine.triggerTickAndWait();
 
                 sim.nodes.forEach(n => {
                     const NATIVE_GATES = new Set(['NAND', 'CLOCK', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'TRISTATE']);
@@ -502,13 +563,17 @@ const Engine = {
                     }
 
                     node.val = rawNew;
+                    if (node.isCustom) {
+                        node.outputs = typeof rawNew === 'object' && rawNew !== null ? { ...rawNew } : {};
+                    }
                     node._oscillating = false;
                     if (typeof sim.updateNodeVisual === 'function') sim.updateNodeVisual(node);
 
                     let visitedJuncs = new Set();
                     const traceDriven = (nid, depth = 0) => {
                         if (depth > 100) return;
-                        sim.wires.forEach(w => {
+                        const adj = sim._wireMap ? (sim._wireMap.get(nid) || []) : sim.wires.filter(w => w.from.nodeId === nid || w.to.nodeId === nid);
+                        adj.forEach(w => {
                             if (w.from.nodeId === nid) {
                                 const ds = sim._nodeMap ? sim._nodeMap.get(w.to.nodeId) : sim.nodes.find(n => n.id === w.to.nodeId);
                                 if (ds) {
