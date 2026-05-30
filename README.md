@@ -1,7 +1,7 @@
-# bSim v1.27.07 - Professional Modular Logic Simulator
+# bSim v1.27.35 - Professional Modular Logic Simulator
 
 > [!IMPORTANT]
-> **Architectural Status v1.27.07**: Phase 2 Modularization is complete. The architecture has been aggressively decoupled, separating UI orchestration, rendering engines, and notification subsystems from the simulator core. High-Z native primitive decoding has been synchronized to enforce absolute dual-engine NAND propagation parity.
+> **Architectural Status v1.27.35**: UI logic synthesis has been rewritten to be fully transaction-safe with atomic workspace state rollback on failure. The cyclic dependency scanner has been decoupled during compilation to permit components matching in-progress designs without collision. Decoupled UI orchestration, rendering engines, and notification subsystems are fully active.
 
 **bSim** is a high-performance, modular digital logic simulator engineered for the web. Built on an atomic NAND-foundation, it provides professional-grade tools for circuit design, hierarchical macro synthesis, and high-frequency Wasm-accelerated simulation.
 
@@ -14,7 +14,7 @@ bSim's simulation kernel is a masterpiece of modern web engineering, utilizing a
 ### 🚀 Simulation Engine
 - **Standard Wasm Kernel**: O(1) signal propagation using a linear instruction set compiled from native netlists.
 - **V8 Fallback**: A robust object-graph simulator for rapid prototyping and complex mixed-mode debugging.
-- **Hybrid Parity**: (v1.27.07) Full opcode dispatchers including the native **Opcode 9 (CONST_0)** for grounding and centralized Wasm memory evaluation.
+- **Hybrid Parity**: (v1.27.35) Full opcode dispatchers including the native **Opcode 9 (CONST_0)** for grounding and centralized Wasm memory evaluation.
 - **Memory Sync**: Forced heap synchronization for RAM/ROM primitives via netlist-dirty signaling and hardware-level instruction emission.
 
 ### 🛡️ Multi-Phase Commit Protocol
@@ -26,17 +26,20 @@ The bSim engine operates on a deterministic pipeline to ensure physical hardware
 
 ## 🛠 Advanced Features
 
-### 🧩 Hierarchical Macro Synthesis
-Design complex integrated circuits and encapsulate them into reusable chips. bSim handles deep recursion and bit-mapped bus ports with high efficiency.
+### 🧩 Hierarchical Macro Synthesis & Safe Compiler
+Design complex integrated circuits and encapsulate them into reusable chips.
+- **Transaction-Safe Synthesis**: UI logic synthesis runs in an isolated temporary context. If compilation succeeds, the new component is safely injected into the library and the previous workspace is restored intact. If compilation fails, an atomic rollback restores the exact pre-synthesis state, completely protecting against active chip loss or project corruption.
+- **Cycle Scanner Decoupling**: During synthesis, the cyclic dependency checker isolates the newly compiled target name, preventing invalid self-reference cycle blocks on components matching the sub-circuit currently being edited.
+- **Dual-Engine Signature Mapping**: Deep signature mapping with correct internal circuit simulation matching for all pre-existing library chips.
 
 ### 📱 Mobile-First Responsive UI
-(v1.27.07) Optimized for productivity across all form factors.
+(v1.27.35) Optimized for productivity across all form factors.
 - **Adaptive Sidebar**: Collapsible mobile overlay with touch-optimized toggles.
 - **Hierarchical Library**: Native `primitives` and custom macros are encapsulated in professional collapsible directories.
 - **Macro Management**: Hierarchical folder sub-menus with inline DOM mutation for rapid library organization.
 
 ### 🖥️ Modular Debug Terminal
-(v1.27.07) An integrated Linux-style CLI for low-level telemetry and netlist manipulation.
+(v1.27.35) An integrated Linux-style CLI for low-level telemetry and netlist manipulation.
 - **Virtual File System**: Navigate tab-specific netlists and global libraries via standard `ls`, `cd`, and `pwd`.
 - **Standard Symbolic Linking**: Use POSIX-compliant `ln -s <target> <link>` to map library paths to workspace aliases.
 - **Parametric Spawning**: Add components and wire ports directly from the terminal with sub-pixel coordinate precision.
@@ -51,7 +54,7 @@ Design complex integrated circuits and encapsulate them into reusable chips. bSi
 
 ```text
 browser-sim/
-├── index.html          # Main entry point (v1.27.07 Architecture)
+├── index.html          # Main entry point (v1.27.35 Architecture)
 ├── wasm-core/          # WebAssembly source (WAT) for high-speed kernels
 ├── css/
 │   └── style.css       # Responsive UI & Design System

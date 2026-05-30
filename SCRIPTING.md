@@ -53,6 +53,7 @@ The terminal uses a Virtual File System (VFS) to navigate your library and works
 - `tree`: Display the entire project hierarchy.
 
 ### Advanced Diagnostics
+- `synth <target>`: Compile truth table logic or recipe dependencies natively into the library (e.g., `synth XOR`).
 - `trace <nodeId>`: Show all incoming and outgoing connections for a node.
 - `watch <nodeId>`: Log state changes to the terminal in real-time.
 - `bom [macro]`: Generate a Bill of Materials for the current circuit.
