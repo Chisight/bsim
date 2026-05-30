@@ -31,7 +31,7 @@ const LogicSynthesizer = {
                     testInputs[node.id] = (i & (1 << (ins.length - 1 - idx))) ? 1 : 0;
                 });
                 // simulate the chip
-                const result = Sim.simulateInternalCircuit({ meta }, testInputs);
+                const result = Sim.simulateInternalCircuit(meta, testInputs);
                 sig += result[outs[0].id] ? '1' : '0';
             }
             console.log(`[DEBUG] Library Chip Signature | Name: ${chipName} | Sig: ${sig}`);
@@ -59,19 +59,120 @@ const LogicSynthesizer = {
             console.log(`[DEBUG] Starting synthesis for chip: ${chipName}`);
             Sim.toast(`Generating logic for ${chipName}...`, 'success');
 
-            Sim.workspaceStack.push({ nodes: JSON.parse(JSON.stringify(Sim.nodes)), wires: JSON.parse(JSON.stringify(Sim.wires)) });
-            Sim.nodes = []; Sim.wires = [];
-            document.getElementById('scene').innerHTML = '';
+            // 1. Snapshot the complete current workspace state to enable a transaction-safe rollback or return.
+            const snapshot = {
+                nodes: JSON.parse(JSON.stringify(Sim.nodes)),
+                wires: JSON.parse(JSON.stringify(Sim.wires)),
+                wireMap: new Map(Sim.wireMap),
+                activeEditingChip: Sim.activeEditingChip,
+                workspaceStack: [...Sim.workspaceStack],
+                historyStack: window.History ? [...History.stack] : [],
+                historyIndex: window.History ? History.index : -1,
+                sceneHTML: document.getElementById('scene') ? document.getElementById('scene').innerHTML : '',
+                svgHTML: document.getElementById('svg-layer') ? document.getElementById('svg-layer').innerHTML : ''
+            };
 
-            inputLabels.forEach((lbl, i) => { Sim.addNode('IN-1', 50, 100 + (i * 100), lbl); });
-            this.synthesize(outputsData, inputLabels, chipName);
+            try {
+                // 2. Prepare temporary synthesis context
+                // Set the activeEditingChip temporarily to chipName so that the cyclic dependency checker
+                // correctly evaluates within the context of the newly synthesized chip, rather than
+                // incorrectly blocking components matching the sub-circuit being edited!
+                Sim.activeEditingChip = chipName;
 
-            Sim.library[chipName] = { nodes: JSON.parse(JSON.stringify(Sim.nodes)), wires: JSON.parse(JSON.stringify(Sim.wires)) };
+                // Clear active workspace
+                Sim.nodes = [];
+                Sim.wires = [];
+                Sim.wireMap.clear();
+                if (window.History) {
+                    History.stack = [];
+                    History.index = -1;
+                }
+                const scene = document.getElementById('scene');
+                if (scene) scene.innerHTML = '';
+                const svg = document.getElementById('svg-layer');
+                if (svg) svg.innerHTML = '';
+                if (typeof WireRenderer !== 'undefined') {
+                    WireRenderer._pool = [];
+                    WireRenderer._domPreviewPath = null;
+                }
 
-            Sim.activeEditingChip = chipName;
-            Sim.uiExitChipEdit();
-            Sim.updateLibraryUI();
-            Sim.modal('Synthesis Complete', `Mapped logic to Library Chip: <strong>${chipName}</strong>.`, 'alert');
+                // Add inputs
+                inputLabels.forEach((lbl, i) => { 
+                    Sim.addNode('IN-1', 50, 100 + (i * 100), lbl); 
+                });
+
+                // Run the Q-M synthesizer to build nodes/wires in the temporary workspace
+                this.synthesize(outputsData, inputLabels, chipName);
+
+                // 3. Save the synthesized sub-circuit to library
+                Sim.library[chipName] = {
+                    folder: '',
+                    nodes: Sim.nodes.map(n => Sim._cleanNode(n)).filter(n => n !== null),
+                    wires: Sim.wires.map(w => Sim._cleanWire(w)).filter(w => w !== null)
+                };
+
+                // 4. Restore original workspace perfectly from snapshot
+                Sim.nodes = snapshot.nodes;
+                Sim.wires = snapshot.wires;
+                Sim.wireMap = snapshot.wireMap;
+                Sim.activeEditingChip = snapshot.activeEditingChip;
+                Sim.workspaceStack = snapshot.workspaceStack;
+                if (window.History) {
+                    History.stack = snapshot.historyStack;
+                    History.index = snapshot.historyIndex;
+                    History.updateButtons();
+                }
+                if (document.getElementById('scene')) {
+                    document.getElementById('scene').innerHTML = snapshot.sceneHTML;
+                }
+                if (document.getElementById('svg-layer')) {
+                    document.getElementById('svg-layer').innerHTML = snapshot.svgHTML;
+                }
+                if (typeof WireRenderer !== 'undefined') {
+                    WireRenderer._pool = [];
+                    WireRenderer._domPreviewPath = null;
+                }
+                Sim.updateWireVisuals();
+                Sim.updateLibraryUI();
+                const exitBtn = document.getElementById('btn-exit-chip');
+                if (exitBtn) exitBtn.style.display = Sim.activeEditingChip ? 'inline' : 'none';
+
+                // Trigger autosave to persist the library addition
+                Sim.autoSave();
+
+                Sim.modal('Synthesis Complete', `Mapped logic to Library Chip: <strong>${chipName}</strong>.`, 'alert');
+
+            } catch (e) {
+                // On error, roll back all modifications to restore original state perfectly!
+                console.error('[Synthesis Error] Critical failure during logic compilation:', e);
+                
+                Sim.nodes = snapshot.nodes;
+                Sim.wires = snapshot.wires;
+                Sim.wireMap = snapshot.wireMap;
+                Sim.activeEditingChip = snapshot.activeEditingChip;
+                Sim.workspaceStack = snapshot.workspaceStack;
+                if (window.History) {
+                    History.stack = snapshot.historyStack;
+                    History.index = snapshot.historyIndex;
+                    History.updateButtons();
+                }
+                if (document.getElementById('scene')) {
+                    document.getElementById('scene').innerHTML = snapshot.sceneHTML;
+                }
+                if (document.getElementById('svg-layer')) {
+                    document.getElementById('svg-layer').innerHTML = snapshot.svgHTML;
+                }
+                if (typeof WireRenderer !== 'undefined') {
+                    WireRenderer._pool = [];
+                    WireRenderer._domPreviewPath = null;
+                }
+                Sim.updateWireVisuals();
+                Sim.updateLibraryUI();
+                const exitBtn = document.getElementById('btn-exit-chip');
+                if (exitBtn) exitBtn.style.display = Sim.activeEditingChip ? 'inline' : 'none';
+
+                Sim.modal('Synthesis Failed', `An error occurred during synthesis:<br><span style="color:#ff4757; font-family:monospace;">${e.message}</span>`, 'alert');
+            }
         }, defaultName);
     },
 

@@ -234,3 +234,113 @@ class TestTerminalAndMacro(unittest.IsolatedAsyncioTestCase):
         await verify_xor_state_wasm(0, 1, 1)
         await verify_xor_state_wasm(1, 0, 1)
         await verify_xor_state_wasm(1, 1, 0)
+
+    async def test_ui_synthesis_safety_and_cyclic(self):
+        # 1. Setup a pre-existing custom chip 'DEMUX3' in library to simulate the user editing DEMUX3
+        await self.eval_js("""
+            window.Sim.library['DEMUX3'] = {
+                nodes: [
+                    { id: 'in0', type: 'IN-1', x: 0, y: 0 },
+                    { id: 'out0', type: 'OUT-1', x: 200, y: 0 }
+                ],
+                wires: [
+                    { from: { nodeId: 'in0', portId: 'out0' }, to: { nodeId: 'out0', portId: 'in0' } }
+                ]
+            };
+            // Set DEMUX3 as the active editing chip
+            window.Sim.activeEditingChip = 'DEMUX3';
+            // Setup active workspace representing DEMUX3
+            window.Sim.nodes = [
+                { id: 'in0', type: 'IN-1', x: 0, y: 0 },
+                { id: 'out0', type: 'OUT-1', x: 200, y: 0 }
+            ];
+            window.Sim.wires = [];
+        """)
+
+        # Verify initial workspace state
+        active_chip = await self.eval_js("window.Sim.activeEditingChip")
+        self.assertEqual(active_chip, 'DEMUX3')
+
+        # 2. Simulate synthesis to a new name 'TEST' that utilizes the DEMUX3 chip
+        # In our case, since the truth table logic is simple, we will trigger synthesis
+        # programmatically via LogicSynthesizer.synthesizeToChip
+        # We override Sim.modal to auto-confirm with 'TEST'
+        await self.eval_js("""
+            const originalModal = window.Sim.modal;
+            window.Sim.modal = function(title, body, type, callback, defaultVal) {
+                if (type === 'prompt' && title === 'Package Synthesized Logic') {
+                    // Auto-resolve with the name 'TEST'
+                    setTimeout(() => callback('TEST'), 10);
+                } else {
+                    originalModal(title, body, type, callback, defaultVal);
+                }
+            };
+        """)
+
+        # Call synthesizeToChip. The outputsData represents an identity logic (equal to input) which would
+        # trigger matching to DEMUX3 (or AND/NOT primitives). Let's provide a truth table that forces
+        # a signature matching or custom logic using DEMUX3.
+        # Since DEMUX3 has 1 input and 1 output, it matches signature '01' (identity).
+        # We will synthesize a new chip 'TEST' with 1 input and 1 output with the identity truth table '01'.
+        # Since DEMUX3 is in the signature map for '01', the synthesizer will try to spawn 'DEMUX3'!
+        await self.eval_js("""
+            const outputsData = [{ label: 'Q', truthArray: [0, 1] }];
+            window.LogicSynthesizer.synthesizeToChip(outputsData, ['A'], '');
+        """)
+
+        # Wait a moment for the asynchronous prompt callback to execute
+        await asyncio.sleep(0.5)
+
+        # 3. Check if TEST was successfully synthesized and DEMUX3 is preserved!
+        test_exists = await self.eval_js("!!window.Sim.library['TEST']")
+        self.assertTrue(test_exists, "Synthesis failed to create the new chip 'TEST'")
+
+        # Verify target 'TEST' contains 'DEMUX3' custom node since DEMUX3 was signature matched for identity logic
+        test_nodes = await self.eval_js("window.Sim.library['TEST'].nodes")
+        custom_types = [n["type"] for n in test_nodes if n.get("isCustom")]
+        self.assertIn("DEMUX3", custom_types, "TEST should contain DEMUX3 as a component via signature matching")
+
+        # Verify DEMUX3 in-progress editing workspace was perfectly preserved and was NOT wiped out
+        active_chip = await self.eval_js("window.Sim.activeEditingChip")
+        self.assertEqual(active_chip, 'DEMUX3', "Active editing chip should still be DEMUX3 after synthesis")
+        nodes_len = await self.eval_js("window.Sim.nodes.length")
+        self.assertEqual(nodes_len, 2, "DEMUX3 workspace nodes should remain fully intact")
+
+        # 4. Now let's test synthesis error safety / rollback
+        # We will intentionally make synthesis fail by causing a TypeError or supplying invalid data,
+        # e.g., passing invalid outputsData that will throw inside synthesize.
+        # We want to verify that the active workspace and DEMUX3 are perfectly rolled back!
+        await self.eval_js("""
+            // Make modal auto-confirm with 'FAIL_TEST'
+            const originalModalFail = window.Sim.modal;
+            window.Sim.modal = function(title, body, type, callback, defaultVal) {
+                if (type === 'prompt' && title === 'Package Synthesized Logic') {
+                    setTimeout(() => callback('FAIL_TEST'), 10);
+                } else {
+                    originalModalFail(title, body, type, callback, defaultVal);
+                }
+            };
+        """)
+
+        # Trigger synthesis with invalid outputsData (null list) to cause an exception
+        try:
+            await self.eval_js("""
+                window.LogicSynthesizer.synthesizeToChip(null, ['A'], '');
+            """)
+        except Exception as e:
+            # Expected to raise a JS Exception due to TypeError: Cannot read properties of null
+            self.assertIn("TypeError", str(e))
+
+        # Wait a moment for any async/prompt processing to settle
+        await asyncio.sleep(0.5)
+
+        # Verify that FAIL_TEST was NOT created in the library
+        fail_test_exists = await self.eval_js("!!window.Sim.library['FAIL_TEST']")
+        self.assertFalse(fail_test_exists)
+
+        # Verify that the DEMUX3 workspace, activeEditingChip, and all nodes are perfectly preserved!
+        active_chip = await self.eval_js("window.Sim.activeEditingChip")
+        self.assertEqual(active_chip, 'DEMUX3', "Active editing chip must still be DEMUX3 after failed synthesis")
+        nodes_len = await self.eval_js("window.Sim.nodes.length")
+        self.assertEqual(nodes_len, 2, "DEMUX3 workspace nodes must be completely restored after a failed synthesis")
+
