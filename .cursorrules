@@ -1,0 +1,10 @@
+# bSim AI Coding Rules & Developer Guidelines
+
+Whenever you make any code change (bug fix, feature, optimization, or clean-up) in this repository:
+1. **You MUST bump the project version** immediately after the change. Use the automated release script:
+   ```bash
+   python3 bsim_release.py bump
+   ```
+   This uniformly increments the patch version (e.g. `1.27.36` -> `1.27.37`) across all 7 tracked files.
+2. **You MUST stage and commit** the bumped version files along with your functional changes in the same release or as a unified tracking commit.
+3. Always maintain clean, accurate version tracking to keep the changelog transparent.
