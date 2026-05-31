@@ -312,7 +312,7 @@ const Sim = {
         // [AUDIT: v1.24.66 | SEC_ARCH_LEAD] - Formally registered RAM as a core primitive to prevent macro-substitution logic.
         // [AUDIT: v1.25.14 | SEC_ARCH_LEAD] - Registered '0' as native primitive.
         const NATIVE_TYPES = new Set(['NAND', 'CLOCK', 'IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'JUNCTION', 'TRISTATE', 'DFF', 'TFF', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'RAM', '0']);
-        if (this.library[type] && !NATIVE_TYPES.has(type)) {
+        if (this.library[type]) {
             // [AUDIT: v1.25.47 | SEC_ARCH_LEAD] - Established cyclical dependency scanner to avert recursion faults.
             if (this.activeEditingChip) {
                 const checkCycle = (target, check) => {
@@ -650,14 +650,17 @@ const Sim = {
         if (document.body.classList.contains('edit-mode-active') || document.body.classList.contains('pin-mutate-active')) return;
         const pEl = document.getElementById(nodeId)?.querySelector(`[data-port="${portId}"]`);
         if (e.shiftKey && !this.wiring.active) {
-            const wire = this.wires.findLast(w => (w.to.nodeId === nodeId && w.to.portId === portId) || (w.from.nodeId === nodeId && w.from.portId === portId));
-            if (wire) {
-                const other = (wire.to.nodeId === nodeId && wire.to.portId === portId) ? wire.from : wire.to;
-                History.execute(new DeleteWireCommand(wire));
-                const otherEl = document.getElementById(other.nodeId)?.querySelector(`[data-port="${other.portId}"]`);
-                this.wiring.active = true; this.wiring.start = { ...other, isOutput: otherEl?.classList.contains('output') };
-                if (otherEl) otherEl.classList.add('selected');
-                return;
+            const isJunc = pEl?.parentElement.classList.contains('junction');
+            if (!isJunc) {
+                const wire = this.wires.findLast(w => (w.to.nodeId === nodeId && w.to.portId === portId) || (w.from.nodeId === nodeId && w.from.portId === portId));
+                if (wire) {
+                    const other = (wire.to.nodeId === nodeId && wire.to.portId === portId) ? wire.from : wire.to;
+                    History.execute(new DeleteWireCommand(wire));
+                    const otherEl = document.getElementById(other.nodeId)?.querySelector(`[data-port="${other.portId}"]`);
+                    this.wiring.active = true; this.wiring.start = { ...other, isOutput: otherEl?.classList.contains('output') };
+                    if (otherEl) otherEl.classList.add('selected');
+                    return;
+                }
             }
         }
         if (!this.wiring.active) {

@@ -164,7 +164,7 @@ const ProjectManager = {
                         const cNode = nodes.find(n => n.id === ep.nodeId);
                         if (!cNode) return;
 
-                        if (NATIVE.has(cNode.type)) {
+                        if (NATIVE.has(cNode.type) && !cNode.isCustom) {
                             const t = cNode.type;
                             if (isIn) {
                                 if (t === 'NOT' && (ep.portId === 'in0' || ep.portId === 'in')) ep.portId = 'a';
@@ -270,8 +270,10 @@ const ProjectManager = {
                         if (!Array.isArray(n.state)) n.state = new Array(bits).fill(n.state || 0);
                     }
 
-                    if (NATIVE.has(n.type)) n.isCustom = false;
-                    else if (data.library && data.library[n.type]) n.isCustom = true;
+                    if (n.isCustom === undefined) {
+                        if (data.library && data.library[n.type]) n.isCustom = true;
+                        else if (NATIVE.has(n.type)) n.isCustom = false;
+                    }
                     if (n.type === 'CLOCK') {
                         if (n.freq === undefined) n.freq = 1;
                         if (n.interval === undefined) n.interval = 1000 / n.freq;
