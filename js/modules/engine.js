@@ -88,7 +88,7 @@ const Engine = {
 
     getDrivingSignal(sim, nodeId, portId, visited = new Set()) {
         const key = `${nodeId}:${portId}`;
-        if (visited.has(key)) return 0;
+        if (visited.has(key)) return 'Z';
         visited.add(key);
 
         let hasHigh = false;
