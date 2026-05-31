@@ -126,22 +126,48 @@ const Sim = {
         this.wakeQueue = () => { if (!running) { running = true; requestAnimationFrame(runQueue); } };
         const runQueue = () => {
             const now = performance.now();
+            Sim._isSimulating = true;
 
-            // [AUDIT: v1.25.20 | SEC_ARCH_LEAD] - Transitioned to centralized purity validation.
-            const isPureNative = Sim.isPureNative();
+            // Centralized transaction-safe sub-stepping simulation execution loop.
+            // This runs multiple simulation ticks sequentially in a single frame to guarantee clock speed parity
+            // with real-time (e.g. 100Hz) even if browser paint/layout frame rate drops.
+            let simulationTicksProcessed = 0;
+            const MAX_TICKS_PER_FRAME = 20; // Safety cap to avoid freezing or death spirals on extreme lag
+            let clockDue = true;
 
-            Sim.nodes.forEach(n => {
-                // [AUDIT: v1.24.55 | SEC_ARCH_LEAD] - Stripped restrictive Wasm-eligibility guard blocking temporal V8 clock evaluation. Both engines rely on V8 for real-time oscillator intervals.
-                if (n.type === 'CLOCK' && n.freq > 0) {
-                    // Guard against timeline desyncs from autosave reloads
-                    if (n.lastTick > now) n.lastTick = now;
-                    if (now - n.lastTick >= n.interval / 2) {
-                        n.state = n.state ? 0 : 1; n.lastTick = now;
-                        Sim.eventQueue.add(n);
+            while (clockDue && simulationTicksProcessed < MAX_TICKS_PER_FRAME) {
+                clockDue = false;
+
+                Sim.nodes.forEach(n => {
+                    if (n.type === 'CLOCK' && n.freq > 0) {
+                        if (n.lastTick > now) n.lastTick = now;
+                        const halfInterval = n.interval / 2;
+                        
+                        // Prevent massive backlog of accumulated ticks on autosave reload or focus lag
+                        const maxBacklog = halfInterval * 5;
+                        if (now - n.lastTick > maxBacklog) {
+                            n.lastTick = now - maxBacklog;
+                        }
+
+                        if (now - n.lastTick >= halfInterval) {
+                            n.state = n.state ? 0 : 1;
+                            n.lastTick = n.lastTick + halfInterval;
+                            Sim.eventQueue.add(n);
+                            clockDue = true;
+                        }
                     }
+                });
+
+                if (Sim.eventQueue.size > 0) {
+                    Sim.processQueue();
+                    simulationTicksProcessed++;
+                } else {
+                    break;
                 }
-            });
-            if (Sim.eventQueue.size > 0) Sim.processQueue();
+            }
+
+            Sim._isSimulating = false;
+
             if (Sim.eventQueue.size === 0) Sim._transitions.clear(); // Clear flip history when stable
             if (Sim.nodes.some(n => n.type === 'CLOCK') || Sim.eventQueue.size > 0) requestAnimationFrame(runQueue); else running = false;
         };

@@ -186,14 +186,17 @@ const Engine = {
             return { q: q, nq: q ? 0 : 1 };
         }
         if (node.type === 'CLOCK') {
-            // [AUDIT: v1.27.17 | SEC_ARCH_LEAD] - Synchronized temporal frame references across engines to prevent oscillator faults.
-            const now = performance.now();
-            const freq = node.freq || 1;
-            const interval = 1000 / (freq * 2);
-            if (!node.lastTick) node.lastTick = now;
-            if (now - node.lastTick >= interval) {
-                node.state = node.state ? 0 : 1;
-                node.lastTick = node.lastTick + interval;
+            // Centralized ticking is handled in the sim.js loop. We only tick here
+            // if we are in a static/standalone analysis context (not running active simulation).
+            if (!sim || !sim._isSimulating) {
+                const now = performance.now();
+                const freq = node.freq || 1;
+                const interval = 1000 / (freq * 2);
+                if (!node.lastTick) node.lastTick = now;
+                if (now - node.lastTick >= interval) {
+                    node.state = node.state ? 0 : 1;
+                    node.lastTick = node.lastTick + interval;
+                }
             }
             return node.state;
         }
