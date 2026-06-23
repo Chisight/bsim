@@ -192,7 +192,7 @@ window.onload = () => {
     // [AUDIT: v1.27.19 | SEC_ARCH_LEAD] - Injected WebWorker performance telemetry, async round-trip latency pings, and low-level wasm inspect subcommands.
     // [AUDIT: v1.27.20 | SEC_ARCH_LEAD] - Injected Zsh-style inline predictive completion overlay, Right-Arrow autosuggestions, colors/predict toggle command switches, and monochrome overrides.
     // [AUDIT: v1.27.22 | SEC_ARCH_LEAD] - Configured MSB-at-top as the default wiring pin logic globally and resolved dynamic DOM re-rendering limits.
-    window.LOADED_BSIM_VERSION = "1.27.37";
+    window.LOADED_BSIM_VERSION = "1.27.38";
 
     // [AUDIT: v1.25.35 | SEC_ARCH_LEAD] - Purged legacy JIT DOM interceptor in favor of native parametric coordinate generation.
 
