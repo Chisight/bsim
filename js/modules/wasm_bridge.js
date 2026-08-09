@@ -238,7 +238,7 @@ const WasmEngine = {
         // The bridge has zero knowledge of AND/OR/XOR/etc — if a user wants those
         // gates, they build them from NANDs in the library. Done.
         // [AUDIT: v1.24.73 | SEC_ARCH_LEAD] - Synchronized KERNEL primitives to prevent errant flattening of ROM/RAM modules.
-        const KERNEL = new Set(['NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'DFF', 'CLOCK', 'TFF', 'TRISTATE', 'JUNCTION', 'RAM', '0']);
+        const KERNEL = new Set(['NAND', 'CLOCK', 'TRISTATE', 'JUNCTION', 'RAM', '0']);
 
         let fNodes = [];
         let fWires = [];

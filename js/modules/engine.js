@@ -4,7 +4,7 @@
  */
 const Engine = {
     // KERNEL set for purity validation
-    KERNEL: new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'CLOCK', 'JUNCTION', 'DFF', 'TFF', 'TRISTATE', 'RAM', '0']),
+    KERNEL: new Set(['IN-1', 'IN-4', 'IN-8', 'OUT-1', 'OUT-4', 'OUT-8', 'PROBE-4', 'PROBE-8', 'NAND', 'CLOCK', 'JUNCTION', 'TRISTATE', 'RAM', '0']),
     _sharedVisitedSet: new Set(),
     _sharedVisitedJuncs: new Set(),
 
@@ -69,12 +69,6 @@ const Engine = {
         }
         if (node.type === 'RAM') {
             if (!portId.startsWith('out')) {
-                return 'Z';
-            }
-            return (node.val && node.val[portId] !== undefined) ? node.val[portId] : 0;
-        }
-        if (node.type === 'DFF' || node.type === 'TFF') {
-            if (portId !== 'q' && portId !== 'nq') {
                 return 'Z';
             }
             return (node.val && node.val[portId] !== undefined) ? node.val[portId] : 0;
@@ -144,26 +138,8 @@ const Engine = {
             const ins = this._assembleChipInputs(sim, node, (pid) => this.getDrivingSignal(sim, node.id, pid));
             return this.simulateInternalCircuit(sim, chipDef, ins, node);
         }
-        if (node.type === 'NOT') {
-            return g(this.getDrivingSignal(sim, node.id, 'a')) ? 0 : 1;
-        }
-        if (node.type === 'AND') {
-            return (g(this.getDrivingSignal(sim, node.id, 'a')) && g(this.getDrivingSignal(sim, node.id, 'b'))) ? 1 : 0;
-        }
-        if (node.type === 'OR') {
-            return (g(this.getDrivingSignal(sim, node.id, 'a')) || g(this.getDrivingSignal(sim, node.id, 'b'))) ? 1 : 0;
-        }
         if (node.type === 'NAND') {
             return (g(this.getDrivingSignal(sim, node.id, 'a')) && g(this.getDrivingSignal(sim, node.id, 'b'))) ? 0 : 1;
-        }
-        if (node.type === 'NOR') {
-            return (g(this.getDrivingSignal(sim, node.id, 'a')) || g(this.getDrivingSignal(sim, node.id, 'b'))) ? 0 : 1;
-        }
-        if (node.type === 'XOR') {
-            return (g(this.getDrivingSignal(sim, node.id, 'a')) ^ g(this.getDrivingSignal(sim, node.id, 'b'))) ? 1 : 0;
-        }
-        if (node.type === 'XNOR') {
-            return (g(this.getDrivingSignal(sim, node.id, 'a')) ^ g(this.getDrivingSignal(sim, node.id, 'b'))) ? 0 : 1;
         }
         if (node.type === 'TRISTATE') {
             const en = g(this.getDrivingSignal(sim, node.id, 'en'));
@@ -171,24 +147,6 @@ const Engine = {
             if (!en) return 'Z';
             const inp = this.getDrivingSignal(sim, node.id, 'in');
             return (inp === 'Z') ? 0 : g(inp);
-        }
-        if (node.type === 'DFF') {
-            const d = g(this.getDrivingSignal(sim, node.id, 'd'));
-            const clk = g(this.getDrivingSignal(sim, node.id, 'clk'));
-            if (node._lastClk === undefined) node._lastClk = 0;
-            let q = (node.val && node.val.q !== undefined) ? node.val.q : 0;
-            if (clk === 1 && node._lastClk === 0) q = d;
-            node._lastClk = clk;
-            return { q: q, nq: q ? 0 : 1 };
-        }
-        if (node.type === 'TFF') {
-            const t = g(this.getDrivingSignal(sim, node.id, 't'));
-            const clk = g(this.getDrivingSignal(sim, node.id, 'clk'));
-            if (node._lastClk === undefined) node._lastClk = 0;
-            let q = (node.val && node.val.q !== undefined) ? node.val.q : 0;
-            if (clk === 1 && node._lastClk === 0 && t === 1) q = q ? 0 : 1;
-            node._lastClk = clk;
-            return { q: q, nq: q ? 0 : 1 };
         }
         if (node.type === 'CLOCK') {
             // Centralized ticking is handled in the sim.js loop. We only tick here
@@ -312,7 +270,7 @@ const Engine = {
             eventQueue: new Set()
         };
 
-        // Restore persisted state for stateful inner nodes (DFF, TFF, RAM, custom sub-chips)
+        // Restore persisted state for stateful inner nodes (RAM, custom sub-chips)
         // so that registers accumulate state correctly across V8 engine invocations.
         if (outerNode) {
             if (!outerNode._internalState) outerNode._internalState = {};
@@ -417,7 +375,7 @@ const Engine = {
                 WasmEngine.triggerTickAndWait();
 
                 sim.nodes.forEach(n => {
-                    const NATIVE_GATES = new Set(['NAND', 'CLOCK', 'NOT', 'AND', 'OR', 'NOR', 'XOR', 'XNOR', 'TRISTATE']);
+                    const NATIVE_GATES = new Set(['NAND', 'CLOCK', 'TRISTATE']);
                     if (NATIVE_GATES.has(n.type) && !n.isCustom) {
                         let newVal = WasmEngine.readState(n.id);
                         // [AUDIT: v1.26.06 | SEC_ARCH_LEAD] - Corrected High-Z decoding for all native primitives.
@@ -427,16 +385,6 @@ const Engine = {
                             n.val = newVal;
                             changed = true;
                             if (typeof sim.updateNodeVisual === 'function') sim.updateNodeVisual(n);
-                        }
-                    } else if ((n.type === 'DFF' || n.type === 'TFF') && !n.isCustom) {
-                        const newVal = WasmEngine.readState(n.id);
-                        if (newVal && newVal.length >= 2) {
-                            if (!n.val || n.val.q !== newVal[0] || n.val.nq !== newVal[1] || n._forcePropagate) {
-                                n._forcePropagate = false;
-                                n.val = { q: newVal[0], nq: newVal[1] };
-                                changed = true;
-                                if (typeof sim.updateNodeVisual === 'function') sim.updateNodeVisual(n);
-                            }
                         }
                     } else if (n.type === 'RAM' && !n.isCustom) {
                         const newVal = WasmEngine.readState(n.id);
@@ -641,7 +589,7 @@ const Engine = {
             sim._seqNodesList.length = 0;
 
             sim.eventQueue.forEach(node => {
-                if (['DFF', 'TFF', 'CLOCK', 'RAM'].includes(node.type)) {
+                if (['CLOCK', 'RAM'].includes(node.type)) {
                     sim._seqNodesList.push(node);
                 } else {
                     sim._combNodesList.push(node);
