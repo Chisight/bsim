@@ -3,7 +3,7 @@
 > \[!IMPORTANT]
 > **Architectural Status v1.27.37**: UI logic synthesis has been rewritten to be fully transaction-safe with atomic workspace state rollback on failure. The cyclic dependency scanner has been decoupled during compilation to permit components matching in-progress designs without collision. Decoupled UI orchestration, rendering engines, and notification subsystems are fully active.
 
-**bSim** is a modular digital logic simulator engineered to complement a web based classroom. Built on an atomic NOR-foundation, it provides educational tools for circuit design, and high-frequency Wasm-accelerated simulation.  Students build up from the NOR gate to AND, OR, NAND, XOR and into more complex structures like a Full-Adder and D-Flip-Flop or even a complete microprocessor, all from the NOR gate base plus just a few extras like the Tri-State-Buffer.
+**bSim** is a modular digital logic simulator engineered to complement a web based classroom. Built on an atomic NAND-foundation, it provides educational tools for circuit design, and high-frequency Wasm-accelerated simulation.  Students build up from the NAND gate to AND, OR, NOR, XOR and into more complex structures like a Full-Adder and D-Flip-Flop or even a complete microprocessor, all from the NAND gate base plus just a few extras like the Tri-State-Buffer.
 
 ## Reliable Execution
 
