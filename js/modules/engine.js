@@ -76,10 +76,6 @@ const Engine = {
         if (node.isCustom) {
             return (node.outputs && node.outputs[portId] !== undefined) ? node.outputs[portId] : 'Z';
         }
-        // Standard gates (AND, OR, NAND, NOR, XOR, XNOR, NOT)
-        if (portId !== 'q' && portId !== 'out') {
-            return 'Z';
-        }
         return node.val !== undefined ? node.val : 0;
     },
 

@@ -49,8 +49,6 @@
   ;;   4  = TFF (t=a, clk=b)
   ;;   11 = BUS_RESOLVE (OR-priority: 1 > 0 > Z)
   ;;
-  ;; All other gates (NOT, AND, OR, NOR, XOR, XNOR) are decomposed into
-  ;; sequences of NAND instructions by the JS bridge before reaching here.
   ;; -----------------------------------------------------------------------
   ;; [AUDIT: v1.23.64 | SEC_ARCH_LEAD] - Entry trace for Wasm simulation tick.
   ;; @ARCH: CORE_KERNEL
