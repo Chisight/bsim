@@ -249,7 +249,7 @@ const UIOrchestrator = {
 
         const primFolder = document.createElement('div');
         primFolder.className = 'lib-folder' + (collapsedFolders.has('primitives') ? ' collapsed' : '');
-        primFolder.innerHTML = `<span class="folder-title" onclick="this.parentElement.classList.toggle('collapsed')">📁 primitives</span><div class="folder-contents"></div>`;
+        primFolder.innerHTML = `<span class="folder-title" onclick="this.parentElement.classList.toggle('collapsed')">📁</span><div class="folder-contents"></div>`;
         lib.appendChild(primFolder);
         const primContainer = primFolder.querySelector('.folder-contents');
 
