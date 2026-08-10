@@ -95,27 +95,16 @@ const NodeRenderer = {
                     </div>
                 `;
             }
-            else if (['NAND', 'AND', 'OR', 'NOR', 'XOR', 'XNOR'].includes(node.type)) {
+            else if (['NAND'].includes(node.type)) {
                 portsHtml = `
                     <div class="port input" data-port="a" style="top:42%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'a')"><span class="port-label">A</span></div>
                     <div class="port input" data-port="b" style="top:78%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'b')"><span class="port-label">B</span></div>
                     <div class="port output" data-port="q" style="top:60%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'q')"><span class="port-label">Q</span></div>`;
-            } else if (node.type === 'NOT') {
-                portsHtml = `
-                    <div class="port input" data-port="a" style="top:50%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'a')"><span class="port-label">IN</span></div>
-                    <div class="port output" data-port="q" style="top:50%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'q')"><span class="port-label">Q</span></div>`;
             } else if (node.type === 'TRISTATE') {
                 portsHtml = `
                     <div class="port input" data-port="in" style="top:42%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'in')"><span class="port-label">IN</span></div>
                     <div class="port input" data-port="en" style="top:78%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'en')"><span class="port-label">EN</span></div>
                     <div class="port output" data-port="out" style="top:60%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'out')"><span class="port-label">OUT</span></div>`;
-            } else if (node.type === 'DFF' || node.type === 'TFF') {
-                const label = node.type === 'DFF' ? 'D' : 'T';
-                portsHtml = `
-                    <div class="port input" data-port="${label.toLowerCase()}" style="top:42%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', '${label.toLowerCase()}')"><span class="port-label">${label}</span></div>
-                    <div class="port input" data-port="clk" style="top:78%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'clk')"><span class="port-label">CLK</span></div>
-                    <div class="port output" data-port="q" style="top:42%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'q')"><span class="port-label">Q</span></div>
-                    <div class="port output" data-port="nq" style="top:78%" onmousedown="event.stopPropagation(); Sim.handlePortInteraction(event, '${node.id}', 'nq')"><span class="port-label">NQ</span></div>`;
             } else if (node.type === 'RAM') {
                 // [AUDIT: v1.26.10 | SEC_ARCH_LEAD] - Refactored RAM layout to strictly align CSS boundary offsets, anchoring dynamic spacing and locking labels to respective edge borders.
                 const aBits = node.addressPins || 4;
