@@ -340,12 +340,14 @@ nav .sub-menu .menu-item::after { display: none; }
 #ui-input-container { margin-top: 0px; }
 #ui-buttons { display: flex; justify-content: flex-end; gap: 12px; margin-top: 10px; }
 
-footer { 
-    height: 48px; background: var(--panel); border-top: 1px solid var(--border); 
-    display: flex; align-items: center; padding: 0 20px; gap: 15px; 
-    overflow-x: auto; overflow-y: hidden; white-space: nowrap; 
+footer {
+    height: 78px; background: var(--panel); border-top: 1px solid var(--border);
+    display: flex; align-items: flex-start; padding: 0 20px; gap: 15px;
+    overflow: hidden; white-space: nowrap;
     flex-shrink: 0; z-index: 1000;
     transition: transform 0.3s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+    position: relative;
+    box-sizing: border-box;
 }
 footer.auto-hidden { transform: translateY(100%); position: absolute; bottom: 0; width: 100%; box-sizing: border-box; }
 
@@ -355,8 +357,47 @@ footer.auto-hidden { transform: translateY(100%); position: absolute; bottom: 0;
 .folder-title:hover { color: #fff; }
 .folder-contents { display: flex; gap: 8px; align-items: center; padding-left: 5px; border-left: 1px solid #334; overflow: hidden; transition: max-width 0.3s; max-width: 2000px; }
 .lib-folder.collapsed .folder-contents { max-width: 0; padding: 0; border: none; }
-footer::-webkit-scrollbar { height: 4px; }
-footer::-webkit-scrollbar-thumb { background: var(--border); border-radius: 10px; }
+#chip-lib {
+    min-width: 0;
+    overflow-x: auto;
+    overflow-y: hidden;
+    height: 48px;
+    flex-shrink: 1;
+    box-sizing: border-box;
+
+    scrollbar-width: none;
+}
+
+#chip-lib::-webkit-scrollbar {
+    display: none;
+}
+#chip-lib-scrollbar {
+    position: absolute;
+    left: 20px;
+    right: 20px;
+    bottom: 0;
+    height: 30px;
+    background: var(--border);
+    overflow: hidden;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    cursor: default;
+}
+
+#chip-lib-scrollbar-thumb {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 30px;
+    min-width: 30px;
+    background: #555566;
+    box-sizing: border-box;
+    cursor: grab;
+}
+
+#chip-lib-scrollbar-thumb:active {
+    cursor: grabbing;
+}
 .status-chip { flex-shrink: 0; }
 .menu-item {
     padding: 8px 15px; font-size: 11px; color: #aaa; cursor: pointer;

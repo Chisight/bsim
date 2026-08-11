@@ -125,8 +125,11 @@
     -->
     <footer id="bottom-nav">
         <div id="btn-hide-footer" class="hide-btn" title="Auto-Hide Library">▼</div>
-        <div id="chip-lib" style="display:flex; gap:10px; flex-grow:1; align-items:center; margin-left: 10px;">
+        <div id="chip-lib" style="display:flex; gap:10px; flex-grow:1; align-items:center; margin-left:10px;">
             <span class="status-chip" onclick="Sim.addNode('NAND')">NAND</span>
+        </div>
+        <div id="chip-lib-scrollbar" aria-hidden="true">
+            <div id="chip-lib-scrollbar-thumb"></div>
         </div>
     </footer>
     <div id="bottom-reveal" class="edge-reveal bottom">▲</div>
@@ -223,6 +226,142 @@
             document.querySelectorAll('.sub-menu').forEach(s => s.style.display = '');
             document.querySelectorAll('.keep-open').forEach(el => el.classList.remove('keep-open'));
         });
+    </script>
+        </script>
+
+    <script>
+        function initChipLibraryScrollbar() {
+            const chipLib = document.getElementById('chip-lib');
+            const scrollbar = document.getElementById('chip-lib-scrollbar');
+            const thumb = document.getElementById('chip-lib-scrollbar-thumb');
+
+            if (!chipLib || !scrollbar || !thumb) return;
+
+            let dragging = false;
+            let dragStartX = 0;
+            let dragStartScrollLeft = 0;
+
+            function updateChipLibraryScrollbar() {
+                const scrollWidth = chipLib.scrollWidth;
+                const clientWidth = chipLib.clientWidth;
+                const trackWidth = scrollbar.clientWidth;
+
+                if (scrollWidth <= clientWidth || trackWidth <= 0) {
+                    scrollbar.style.display = 'none';
+                    return;
+                }
+
+                scrollbar.style.display = 'block';
+
+                const maxScrollLeft = scrollWidth - clientWidth;
+
+                let thumbWidth = (clientWidth / scrollWidth) * trackWidth;
+
+                if (thumbWidth < 30) {
+                    thumbWidth = 30;
+                }
+
+                if (thumbWidth > trackWidth) {
+                    thumbWidth = trackWidth;
+                }
+
+                const maxThumbLeft = trackWidth - thumbWidth;
+                const thumbLeft = maxScrollLeft > 0
+                    ? (chipLib.scrollLeft / maxScrollLeft) * maxThumbLeft
+                    : 0;
+
+                thumb.style.width = thumbWidth + 'px';
+                thumb.style.left = thumbLeft + 'px';
+            }
+
+            function scrollFromScrollbar(clientX) {
+                const rect = scrollbar.getBoundingClientRect();
+                const trackWidth = scrollbar.clientWidth;
+                const thumbWidth = thumb.offsetWidth;
+                const maxThumbLeft = trackWidth - thumbWidth;
+
+                if (maxThumbLeft <= 0) {
+                    chipLib.scrollLeft = 0;
+                    return;
+                }
+
+                let thumbLeft = clientX - rect.left - (thumbWidth / 2);
+
+                if (thumbLeft < 0) {
+                    thumbLeft = 0;
+                }
+
+                if (thumbLeft > maxThumbLeft) {
+                    thumbLeft = maxThumbLeft;
+                }
+
+                const maxScrollLeft = chipLib.scrollWidth - chipLib.clientWidth;
+
+                chipLib.scrollLeft = (thumbLeft / maxThumbLeft) * maxScrollLeft;
+            }
+
+            scrollbar.addEventListener('mousedown', (event) => {
+                if (event.target === thumb) {
+                    dragging = true;
+                    dragStartX = event.clientX;
+                    dragStartScrollLeft = chipLib.scrollLeft;
+                    event.preventDefault();
+                    return;
+                }
+
+                scrollFromScrollbar(event.clientX);
+                event.preventDefault();
+            });
+
+            window.addEventListener('mousemove', (event) => {
+                if (!dragging) return;
+
+                const trackWidth = scrollbar.clientWidth;
+                const thumbWidth = thumb.offsetWidth;
+                const maxThumbLeft = trackWidth - thumbWidth;
+
+                if (maxThumbLeft <= 0) return;
+
+                const maxScrollLeft = chipLib.scrollWidth - chipLib.clientWidth;
+                const deltaX = event.clientX - dragStartX;
+                const scrollDelta = (deltaX / maxThumbLeft) * maxScrollLeft;
+
+                chipLib.scrollLeft = dragStartScrollLeft + scrollDelta;
+            });
+
+            window.addEventListener('mouseup', () => {
+                dragging = false;
+            });
+
+            chipLib.addEventListener('scroll', () => {
+                updateChipLibraryScrollbar();
+            }, { passive: true });
+
+            window.addEventListener('resize', () => {
+                updateChipLibraryScrollbar();
+            });
+
+            const resizeObserver = new ResizeObserver(() => {
+                updateChipLibraryScrollbar();
+            });
+
+            resizeObserver.observe(chipLib);
+            resizeObserver.observe(scrollbar);
+
+            const mutationObserver = new MutationObserver(() => {
+                updateChipLibraryScrollbar();
+            });
+
+            mutationObserver.observe(chipLib, {
+                childList: true,
+                subtree: true,
+                attributes: true
+            });
+
+            updateChipLibraryScrollbar();
+        }
+
+        initChipLibraryScrollbar();
     </script>
 </body>
 
