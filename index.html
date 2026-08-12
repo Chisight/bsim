@@ -227,176 +227,209 @@
             document.querySelectorAll('.keep-open').forEach(el => el.classList.remove('keep-open'));
         });
     </script>
-        </script>
-<script>
-    function initChipLibraryScrollbar() {
-        const chipLib = document.getElementById('chip-lib');
-        const scrollbar = document.getElementById('chip-lib-scrollbar');
-        const thumb = document.getElementById('chip-lib-scrollbar-thumb');
+    <script>
+        function initChipLibraryScrollbar() {
+            const chipLib = document.getElementById('chip-lib');
+            const scrollbar = document.getElementById('chip-lib-scrollbar');
+            const thumb = document.getElementById('chip-lib-scrollbar-thumb');
 
-        if (!chipLib || !scrollbar || !thumb) {
-            return;
+            if (!chipLib || !scrollbar || !thumb) {
+                return;
+            }
+
+            let dragging = false;
+            let dragStartX = 0;
+            let dragStartScrollLeft = 0;
+
+            function updateChipLibraryScrollbar() {
+                const scrollWidth = chipLib.scrollWidth;
+                const clientWidth = chipLib.clientWidth;
+                const trackWidth = scrollbar.clientWidth;
+
+                if (trackWidth <= 0) {
+                    return;
+                }
+
+                if (scrollWidth <= clientWidth) {
+                    scrollbar.style.display = 'none';
+                    thumb.style.width = '0px';
+                    thumb.style.left = '0px';
+                    return;
+                }
+
+                scrollbar.style.display = 'block';
+
+                const maxScrollLeft = scrollWidth - clientWidth;
+                const thumbWidth =
+                    (clientWidth / scrollWidth) * trackWidth;
+                const maxThumbLeft =
+                    trackWidth - thumbWidth;
+
+                const scrollRatio =
+                    maxScrollLeft > 0
+                        ? chipLib.scrollLeft / maxScrollLeft
+                        : 0;
+
+                const thumbLeft =
+                    scrollRatio * maxThumbLeft;
+
+                thumb.style.width = `${thumbWidth}px`;
+                thumb.style.left = `${thumbLeft}px`;
+            }
+
+            function scrollFromScrollbar(clientX) {
+                const scrollbarRect =
+                    scrollbar.getBoundingClientRect();
+
+                const trackWidth =
+                    scrollbar.clientWidth;
+
+                const thumbWidth =
+                    thumb.getBoundingClientRect().width;
+
+                const maxThumbLeft =
+                    trackWidth - thumbWidth;
+
+                const maxScrollLeft =
+                    chipLib.scrollWidth - chipLib.clientWidth;
+
+                if (maxThumbLeft <= 0 || maxScrollLeft <= 0) {
+                    return;
+                }
+
+                let thumbLeft =
+                    clientX -
+                    scrollbarRect.left -
+                    (thumbWidth / 2);
+
+                thumbLeft =
+                    Math.max(
+                        0,
+                        Math.min(
+                            thumbLeft,
+                            maxThumbLeft
+                        )
+                    );
+
+                chipLib.scrollLeft =
+                    (thumbLeft / maxThumbLeft) *
+                    maxScrollLeft;
+            }
+
+            thumb.addEventListener('pointerdown', (event) => {
+                if (event.button !== 0) {
+                    return;
+                }
+
+                dragging = true;
+                dragStartX = event.clientX;
+                dragStartScrollLeft = chipLib.scrollLeft;
+
+                thumb.setPointerCapture(event.pointerId);
+
+                event.preventDefault();
+                event.stopPropagation();
+            });
+
+            thumb.addEventListener('pointermove', (event) => {
+                if (!dragging) {
+                    return;
+                }
+
+                const trackWidth =
+                    scrollbar.clientWidth;
+
+                const thumbWidth =
+                    thumb.getBoundingClientRect().width;
+
+                const maxThumbLeft =
+                    trackWidth - thumbWidth;
+
+                const maxScrollLeft =
+                    chipLib.scrollWidth - chipLib.clientWidth;
+
+                if (maxThumbLeft <= 0 || maxScrollLeft <= 0) {
+                    return;
+                }
+
+                const deltaX =
+                    event.clientX - dragStartX;
+
+                const scrollDelta =
+                    (deltaX / maxThumbLeft) *
+                    maxScrollLeft;
+
+                chipLib.scrollLeft =
+                    dragStartScrollLeft + scrollDelta;
+
+                event.preventDefault();
+            });
+
+            thumb.addEventListener('pointerup', (event) => {
+                dragging = false;
+
+                if (thumb.hasPointerCapture(event.pointerId)) {
+                    thumb.releasePointerCapture(event.pointerId);
+                }
+            });
+
+            thumb.addEventListener('pointercancel', (event) => {
+                dragging = false;
+
+                if (thumb.hasPointerCapture(event.pointerId)) {
+                    thumb.releasePointerCapture(event.pointerId);
+                }
+            });
+
+            scrollbar.addEventListener('pointerdown', (event) => {
+                if (event.button !== 0) {
+                    return;
+                }
+
+                if (event.target === thumb) {
+                    return;
+                }
+
+                scrollFromScrollbar(event.clientX);
+
+                event.preventDefault();
+            });
+
+            chipLib.addEventListener(
+                'scroll',
+                updateChipLibraryScrollbar,
+                { passive: true }
+            );
+
+            window.addEventListener(
+                'resize',
+                updateChipLibraryScrollbar
+            );
+
+            const resizeObserver =
+                new ResizeObserver(() => {
+                    updateChipLibraryScrollbar();
+                });
+
+            resizeObserver.observe(chipLib);
+            resizeObserver.observe(scrollbar);
+
+            const mutationObserver =
+                new MutationObserver(() => {
+                    updateChipLibraryScrollbar();
+                });
+
+            mutationObserver.observe(chipLib, {
+                childList: true,
+                subtree: true,
+                attributes: true
+            });
+
+            updateChipLibraryScrollbar();
         }
 
-        let dragging = false;
-        let dragStartX = 0;
-        let dragStartScrollLeft = 0;
-
-        function updateChipLibraryScrollbar() {
-            const scrollWidth = chipLib.scrollWidth;
-            const clientWidth = chipLib.clientWidth;
-            const trackWidth = scrollbar.clientWidth;
-
-            if (scrollWidth <= clientWidth || trackWidth <= 0) {
-                scrollbar.style.display = 'none';
-                return;
-            }
-
-            scrollbar.style.display = 'block';
-
-            const maxScrollLeft = scrollWidth - clientWidth;
-
-            const thumbWidth = (clientWidth / scrollWidth) * trackWidth;
-            const maxThumbLeft = trackWidth - thumbWidth;
-
-            let thumbLeft = 0;
-
-            if (maxScrollLeft > 0) {
-                thumbLeft = (chipLib.scrollLeft / maxScrollLeft) * maxThumbLeft;
-            }
-
-            thumb.style.width = `${thumbWidth}px`;
-            thumb.style.left = `${thumbLeft}px`;
-        }
-
-        function setScrollFromPointer(clientX) {
-            const scrollbarRect = scrollbar.getBoundingClientRect();
-            const trackWidth = scrollbar.clientWidth;
-            const thumbWidth = thumb.offsetWidth;
-            const maxThumbLeft = trackWidth - thumbWidth;
-            const maxScrollLeft = chipLib.scrollWidth - chipLib.clientWidth;
-
-            if (maxThumbLeft <= 0 || maxScrollLeft <= 0) {
-                chipLib.scrollLeft = 0;
-                return;
-            }
-
-            let thumbLeft = clientX - scrollbarRect.left - (thumbWidth / 2);
-
-            if (thumbLeft < 0) {
-                thumbLeft = 0;
-            }
-
-            if (thumbLeft > maxThumbLeft) {
-                thumbLeft = maxThumbLeft;
-            }
-
-            chipLib.scrollLeft =
-                (thumbLeft / maxThumbLeft) * maxScrollLeft;
-        }
-
-        thumb.addEventListener('pointerdown', (event) => {
-            if (event.button !== 0) {
-                return;
-            }
-
-            dragging = true;
-            dragStartX = event.clientX;
-            dragStartScrollLeft = chipLib.scrollLeft;
-
-            thumb.setPointerCapture(event.pointerId);
-
-            event.preventDefault();
-            event.stopPropagation();
-        });
-
-        thumb.addEventListener('pointermove', (event) => {
-            if (!dragging) {
-                return;
-            }
-
-            const trackWidth = scrollbar.clientWidth;
-            const thumbWidth = thumb.offsetWidth;
-            const maxThumbLeft = trackWidth - thumbWidth;
-            const maxScrollLeft = chipLib.scrollWidth - chipLib.clientWidth;
-
-            if (maxThumbLeft <= 0 || maxScrollLeft <= 0) {
-                return;
-            }
-
-            const deltaX = event.clientX - dragStartX;
-
-            const scrollDelta =
-                (deltaX / maxThumbLeft) * maxScrollLeft;
-
-            chipLib.scrollLeft =
-                dragStartScrollLeft + scrollDelta;
-
-            event.preventDefault();
-        });
-
-        thumb.addEventListener('pointerup', (event) => {
-            dragging = false;
-
-            if (thumb.hasPointerCapture(event.pointerId)) {
-                thumb.releasePointerCapture(event.pointerId);
-            }
-        });
-
-        thumb.addEventListener('pointercancel', (event) => {
-            dragging = false;
-
-            if (thumb.hasPointerCapture(event.pointerId)) {
-                thumb.releasePointerCapture(event.pointerId);
-            }
-        });
-
-        scrollbar.addEventListener('pointerdown', (event) => {
-            if (event.target === thumb) {
-                return;
-            }
-
-            if (event.button !== 0) {
-                return;
-            }
-
-            setScrollFromPointer(event.clientX);
-
-            event.preventDefault();
-        });
-
-        chipLib.addEventListener('scroll', () => {
-            updateChipLibraryScrollbar();
-        }, {
-            passive: true
-        });
-
-        window.addEventListener('resize', () => {
-            updateChipLibraryScrollbar();
-        });
-
-        const resizeObserver = new ResizeObserver(() => {
-            updateChipLibraryScrollbar();
-        });
-
-        resizeObserver.observe(chipLib);
-        resizeObserver.observe(scrollbar);
-
-        const mutationObserver = new MutationObserver(() => {
-            updateChipLibraryScrollbar();
-        });
-
-        mutationObserver.observe(chipLib, {
-            childList: true,
-            subtree: true,
-            attributes: true
-        });
-
-        updateChipLibraryScrollbar();
-    }
-
-    initChipLibraryScrollbar();
-</script>
+        initChipLibraryScrollbar();
+    </script>
 </body>
 
 </html>
