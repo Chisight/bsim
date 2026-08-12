@@ -371,16 +371,17 @@ footer.auto-hidden { transform: translateY(100%); position: absolute; bottom: 0;
 #chip-lib::-webkit-scrollbar {
     display: none;
 }
+
 #chip-lib-scrollbar {
     position: absolute;
     left: 20px;
     right: 20px;
     bottom: 0;
-    height: 30px;
+    height: 12px;
     background: var(--border);
+    border-radius: 6px;
     overflow: hidden;
     box-sizing: border-box;
-    flex-shrink: 0;
     cursor: default;
 }
 
@@ -388,9 +389,10 @@ footer.auto-hidden { transform: translateY(100%); position: absolute; bottom: 0;
     position: absolute;
     top: 0;
     left: 0;
-    height: 30px;
-    min-width: 30px;
+    height: 12px;
+    width: 0;
     background: #555566;
+    border-radius: 6px;
     box-sizing: border-box;
     cursor: grab;
 }
