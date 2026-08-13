@@ -861,7 +861,9 @@ const Sim = {
             engineStatus = '<span style="color:#ffaa00">V8 JAVASCRIPT</span>';
         }
 
-        hud.innerHTML = `GATES: ${this.nodes.length} | WIRES: ${this.wires.length}<br>CHIP : ${this.activeEditingChip || 'MAIN'}<br>ENGINE: ${engineStatus}<br>POS  : <span id="hud-coords" style="color:#0f5">0, 0</span>`;
+        const activeTab = this.tabs.find(t => t.id === this.activeTabId);
+        const chipDisplayName = this.activeEditingChip || (activeTab?.name || 'Main');
+        hud.innerHTML = `GATES: ${this.nodes.length} | WIRES: ${this.wires.length}<br>CHIP : ${chipDisplayName}<br>ENGINE: ${engineStatus}<br>POS  : <span id="hud-coords" style="color:#0f5">0, 0</span>`;
     },
 
     /**
@@ -960,6 +962,7 @@ const Sim = {
         if (scene) scene.appendChild(fragment);
         this.wires = JSON.parse(JSON.stringify(chip.wires));
         this.activeEditingChip = name;
+        this.updateHUD();
 
         if (window.History) {
             History.stack = [];
@@ -1214,6 +1217,7 @@ const Sim = {
         }
 
         this.updateTabsUI();
+        this.updateHUD();
         this.updateWireVisuals();
         this.seedQueue(); this.processQueue();
         this.autoSave();
@@ -2019,6 +2023,8 @@ const Sim = {
 
         this.updateWireVisuals();
         this.activeEditingChip = parent.activeEditingChip || null;
+        this.updateHUD();
+
         const exitBtn = document.getElementById('btn-exit-chip');
         if (exitBtn) exitBtn.style.display = this.activeEditingChip ? 'inline' : 'none';
         this.updateLibraryUI();
