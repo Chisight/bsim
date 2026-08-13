@@ -250,18 +250,19 @@
                     return;
                 }
 
+                scrollbar.style.display = 'block';
+
                 if (scrollWidth <= clientWidth) {
-                    scrollbar.style.display = 'none';
-                    thumb.style.width = '0px';
+                    thumb.style.width = `${trackWidth}px`;
                     thumb.style.left = '0px';
                     return;
                 }
 
-                scrollbar.style.display = 'block';
-
                 const maxScrollLeft = scrollWidth - clientWidth;
+
                 const thumbWidth =
                     (clientWidth / scrollWidth) * trackWidth;
+
                 const maxThumbLeft =
                     trackWidth - thumbWidth;
 
