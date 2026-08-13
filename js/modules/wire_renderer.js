@@ -152,8 +152,15 @@ const WireRenderer = {
                 ctx.stroke();
 
                 // Highlight hovered or selected wires!
-                const isHovered = (window.InteractionHandler && InteractionHandler.hoveredWireIndex === i);
-                const isSelected = (window.InteractionHandler && InteractionHandler.selectedWire === w);
+                const isHovered =
+                    window.InteractionHandler &&
+                    InteractionHandler.hoveredWireIndices &&
+                    InteractionHandler.hoveredWireIndices.has(i);
+
+                const isSelected =
+                    window.InteractionHandler &&
+                    InteractionHandler.selectedWire === w;
+
                 if (isHovered || isSelected) {
                     ctx.strokeStyle = '#ffffffaa';
                     ctx.lineWidth = (Array.isArray(sig) ? 4 : 2) + 2;

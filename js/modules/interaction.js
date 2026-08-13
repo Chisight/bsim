@@ -8,6 +8,7 @@ const InteractionHandler = {
     activeContextY: null,
     customChipsList: [],
     hoveredWireIndex: -1,
+    hoveredWireIndices: new Set(),
     selectedWire: null,
 
     _getDistanceToSegment(px, py, x1, y1, x2, y2) {
@@ -1316,9 +1317,82 @@ const InteractionHandler = {
                     }
                 }
 
-                if (InteractionHandler.hoveredWireIndex !== hoverIdx) {
-                    InteractionHandler.hoveredWireIndex = hoverIdx;
-                    if (window.WireRenderer) WireRenderer.drawWires();
+                const oldHoveredWireIndex = InteractionHandler.hoveredWireIndex;
+
+                InteractionHandler.hoveredWireIndex = hoverIdx;
+
+                const newHoveredWireIndices = new Set();
+
+                if (hoverIdx !== -1 && Sim.wires[hoverIdx]) {
+                    const wires = Sim.wires;
+
+                    function endpointKey(endpoint) {
+                        if (!endpoint) {
+                            return null;
+                        }
+
+                        return `${endpoint.nodeId}:${endpoint.portId}`;
+                    }
+
+                    function wiresShareEndpoint(wireA, wireB) {
+                        const aFrom = endpointKey(wireA.from);
+                        const aTo = endpointKey(wireA.to);
+                        const bFrom = endpointKey(wireB.from);
+                        const bTo = endpointKey(wireB.to);
+
+                        return (
+                            (aFrom !== null && (aFrom === bFrom || aFrom === bTo)) ||
+                            (aTo !== null && (aTo === bFrom || aTo === bTo))
+                        );
+                    }
+
+                    const connectedWireIndices = new Set([hoverIdx]);
+                    const wiresToProcess = [hoverIdx];
+
+                    while (wiresToProcess.length > 0) {
+                        const currentIndex = wiresToProcess.pop();
+                        const currentWire = wires[currentIndex];
+
+                        if (!currentWire) {
+                            continue;
+                        }
+
+                        for (let index = 0; index < wires.length; index++) {
+                            if (connectedWireIndices.has(index)) {
+                                continue;
+                            }
+
+                            if (wiresShareEndpoint(currentWire, wires[index])) {
+                                connectedWireIndices.add(index);
+                                wiresToProcess.push(index);
+                            }
+                        }
+                    }
+
+                    connectedWireIndices.forEach(index => {
+                        newHoveredWireIndices.add(index);
+                    });
+                }
+
+                let hoverSetChanged =
+                    oldHoveredWireIndex !== hoverIdx ||
+                    InteractionHandler.hoveredWireIndices.size !== newHoveredWireIndices.size;
+
+                if (!hoverSetChanged) {
+                    for (const index of newHoveredWireIndices) {
+                        if (!InteractionHandler.hoveredWireIndices.has(index)) {
+                            hoverSetChanged = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (hoverSetChanged) {
+                    InteractionHandler.hoveredWireIndices = newHoveredWireIndices;
+
+                    if (window.WireRenderer) {
+                        WireRenderer.drawWires();
+                    }
                 }
 
                 if (hoverIdx !== -1) {
