@@ -919,20 +919,147 @@ const InteractionHandler = {
         // Keyboard Handling (Parity with v1.20.6 Escape and Del logic)
         window.addEventListener('keydown', (e) => {
             const key = e.key.toLowerCase();
+
             if (key === 'escape') {
                 if (Sim.wiring.active) {
                     const s = Sim.wiring.start;
                     document.getElementById(s.nodeId)?.querySelector(`[data-port="${s.portId}"]`)?.classList.remove('selected');
-                    Sim.wiring.active = false; 
-                    Sim.wiring.start = null; 
+                    Sim.wiring.active = false;
+                    Sim.wiring.start = null;
                     Sim.clearSnapState();
                     WireRenderer.drawWires();
                     return;
                 }
+
                 // Deselect all nodes
                 Sim.selection.forEach(id => document.getElementById(id)?.classList.remove('selected'));
                 Sim.selection.clear();
+                return;
             }
+
+            if (e.target.tagName === 'INPUT' ||
+                e.target.tagName === 'TEXTAREA' ||
+                e.target.isContentEditable) {
+                return;
+            }
+
+            if (key !== 'arrowleft' &&
+                key !== 'arrowright' &&
+                key !== 'arrowup' &&
+                key !== 'arrowdown') {
+                return;
+            }
+
+            if (Sim.selection.size === 0) {
+                return;
+            }
+
+            if (Sim.wiring.active ||
+                Sim.activeNodeEdit ||
+                Sim._pinSelectState ||
+                Sim._pinDrag ||
+                Sim._activeWireDrag) {
+                return;
+            }
+
+            e.preventDefault();
+
+            let dx = 0;
+            let dy = 0;
+
+            if (key === 'arrowleft') {
+                dx = -10;
+            } else if (key === 'arrowright') {
+                dx = 10;
+            } else if (key === 'arrowup') {
+                dy = -10;
+            } else if (key === 'arrowdown') {
+                dy = 10;
+            }
+
+            const moveSet = Array.from(Sim.selection)
+                .map(id => {
+                    const node = Sim.nodes.find(n => n.id === id);
+                    const div = document.getElementById(id);
+
+                    if (!node || !div) {
+                        return null;
+                    }
+
+                    return {
+                        node,
+                        div,
+                        ox: node.x,
+                        oy: node.y
+                    };
+                })
+                .filter(item => item !== null);
+
+            if (moveSet.length === 0) {
+                return;
+            }
+
+            const selectedNodeIds =
+                new Set(moveSet.map(item => item.node.id));
+
+            const moveWires = Sim.wires
+                .filter(w =>
+                    selectedNodeIds.has(w.from.nodeId) &&
+                    selectedNodeIds.has(w.to.nodeId) &&
+                    (w.midX !== undefined || w.midY !== undefined)
+                )
+                .map(w => ({
+                    wire: w,
+                    ox: w.midX,
+                    oy: w.midY
+                }));
+
+            moveSet.forEach(item => {
+                item.node.x += dx;
+                item.node.y += dy;
+
+                Sim.updateNodePosition(
+                    item.node,
+                    item.div
+                );
+            });
+
+            moveWires.forEach(item => {
+                if (item.ox !== undefined) {
+                    item.wire.midX = item.ox + dx;
+                }
+
+                if (item.oy !== undefined) {
+                    item.wire.midY = item.oy + dy;
+                }
+            });
+
+            const moves = moveSet.map(item => ({
+                id: item.node.id,
+                ox: item.ox,
+                oy: item.oy,
+                nx: item.node.x,
+                ny: item.node.y
+            }));
+
+            const wMoves = moveWires.map(item => ({
+                wire: item.wire,
+                ox: item.ox,
+                oy: item.oy,
+                nx: item.wire.midX,
+                ny: item.wire.midY
+            }));
+
+            History.execute(
+                new MoveNodeCommand(
+                    moves,
+                    wMoves
+                )
+            );
+
+            WireRenderer.drawWiresSelective(
+                moveSet.map(item => item.node.id)
+            );
         });
 
         ws.addEventListener('dblclick', (e) => {
